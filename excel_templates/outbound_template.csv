@@ -1,0 +1,3 @@
+outbound_date,part_code,quantity,requester,department,reason,equipment,notes,created_by
+2023-05-20,MT001,2,홍길동,생산부,정기 교체,MACHINE-001,1호기 정기 교체,admin
+2023-05-25,MT002,1,김철수,유지보수팀,고장 수리,MACHINE-002,비상 수리,admin 

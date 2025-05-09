@@ -1,0 +1,3 @@
+part_code,current_quantity,last_count_date,location,updated_by
+MT001,50,2023-05-01,main,admin
+MT002,30,2023-05-01,main,admin 

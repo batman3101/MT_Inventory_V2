@@ -1,0 +1,4 @@
+part_code,supplier_code,unit_price,currency,effective_from,is_current,created_by
+MT001,CODE,15000,dong,HOM NAY,TRUE,admin
+MT001,CODE,25000,dong,HOM NAY,TRUE,admin
+MT002,CODE,16000,dong,HOM NAY,TRUE,admin 
