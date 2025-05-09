@@ -34,7 +34,7 @@ def get_departments():
         ]
         
         # Supabase 클라이언트 가져오기
-        client = supabase()
+        client = supabase(use_service_role=True)
         if not client:
             logger.error("Supabase 클라이언트를 가져올 수 없습니다.")
             return default_departments
@@ -283,8 +283,8 @@ def create_user(user_data):
         # API 키 사용 로깅
         logger.info("사용자 생성을 위해 Supabase API 호출 시작")
         
-        # Supabase에 데이터 삽입
-        response = supabase().table('users').insert(user_data).execute()
+        # Supabase에 데이터 삽입 (service_role 권한 사용)
+        response = supabase(use_service_role=True).table('users').insert(user_data).execute()
         
         if response.data:
             logger.info(f"사용자 생성 성공: {response.data}")
@@ -324,11 +324,11 @@ def update_user(user_data):
         is_delete = user_data.pop('is_delete', False)
         
         if is_delete:
-            # 사용자 삭제
-            response = supabase().table('users').delete().eq('user_id', user_id).execute()
+            # 사용자 삭제 (service_role 권한 사용)
+            response = supabase(use_service_role=True).table('users').delete().eq('user_id', user_id).execute()
         else:
-            # 사용자 정보 업데이트
-            response = supabase().table('users').update(user_data).eq('user_id', user_id).execute()
+            # 사용자 정보 업데이트 (service_role 권한 사용)
+            response = supabase(use_service_role=True).table('users').update(user_data).eq('user_id', user_id).execute()
         
         if response.data:
             return True

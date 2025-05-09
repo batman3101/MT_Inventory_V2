@@ -38,7 +38,7 @@ def get_departments():
         ]
         
         # Supabase 클라이언트 가져오기
-        client = supabase()
+        client = supabase(use_service_role=True)
         if not client:
             logger.error("Supabase 클라이언트를 가져올 수 없습니다.")
             return default_departments
@@ -119,8 +119,8 @@ def display_admin_list():
     관리자 목록 표시
     """
     try:
-        # Supabase에서 관리자 목록 조회 - 부서 정보 조인
-        response = supabase().from_('users').select("""
+        # Supabase에서 관리자 목록 조회 - 부서 정보 조인 (service_role 권한 사용)
+        response = supabase(use_service_role=True).from_('users').select("""
             user_id, 
             username, 
             full_name, 
@@ -255,8 +255,8 @@ def add_admin_form():
                 # 디버깅을 위해 로그 출력
                 logger.info(f"등록할 관리자 데이터: {admin_data}")
                 
-                # Supabase에 데이터 삽입
-                response = supabase().table('users').insert(admin_data).execute()
+                # Supabase에 데이터 삽입 (service_role 권한 사용)
+                response = supabase(use_service_role=True).table('users').insert(admin_data).execute()
                 
                 if response.data:
                     display_success("관리자가 성공적으로 등록되었습니다.")
@@ -345,7 +345,7 @@ def update_admin_form(admin_data):
                     update_data['password_hash'] = hashed_password
                 
                 # Supabase 데이터 업데이트
-                response = supabase().table('users').update(update_data).eq('user_id', user_id).execute()
+                response = supabase(use_service_role=True).table('users').update(update_data).eq('user_id', user_id).execute()
                 
                 if response.data:
                     display_success("관리자 정보가 업데이트되었습니다.")
@@ -366,7 +366,7 @@ def update_admin_form(admin_data):
                 
                 if confirm:
                     # Supabase에서 관리자 삭제
-                    response = supabase().table('users').delete().eq('user_id', user_id).execute()
+                    response = supabase(use_service_role=True).table('users').delete().eq('user_id', user_id).execute()
                     
                     if response.data:
                         display_success("관리자가 삭제되었습니다.")
