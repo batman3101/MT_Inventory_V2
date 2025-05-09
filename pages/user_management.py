@@ -201,15 +201,20 @@ def add_user_form():
                     'updated_at': datetime.now().isoformat()
                 }
                 
+                # 디버깅을 위해 로그 출력
+                logger.info(f"등록할 사용자 데이터: {user_data}")
+                
                 # Supabase에 데이터 삽입
                 response = supabase().table('users').insert(user_data).execute()
                 
                 if response.data:
                     display_success("사용자가 성공적으로 등록되었습니다.")
+                    logger.info(f"사용자 등록 성공: {response.data}")
                     # 폼 초기화
                     st.rerun()
                 else:
                     display_error("사용자 등록에 실패했습니다.")
+                    logger.error("사용자 등록 결과 데이터가 없습니다.")
             
             except Exception as e:
                 logger.error(f"사용자 등록 중 오류 발생: {e}")
