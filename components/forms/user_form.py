@@ -280,16 +280,32 @@ def create_user(user_data):
         bool: 성공 여부
     """
     try:
+        # API 키 사용 로깅
+        logger.info("사용자 생성을 위해 Supabase API 호출 시작")
+        
         # Supabase에 데이터 삽입
         response = supabase().table('users').insert(user_data).execute()
         
         if response.data:
+            logger.info(f"사용자 생성 성공: {response.data}")
             return True
         else:
+            logger.error(f"사용자 생성 실패: 응답 데이터 없음")
+            logger.error(f"응답 전체: {response}")
             return False
     
     except Exception as e:
         logger.error(f"사용자 생성 중 오류 발생: {e}")
+        # 자세한 예외 정보 로깅
+        if hasattr(e, 'response'):
+            try:
+                error_json = e.response.json()
+                logger.error(f"API 오류 세부정보: {error_json}")
+            except Exception:
+                logger.error(f"API 응답: {e.response.text if hasattr(e.response, 'text') else '응답 내용 없음'}")
+        
+        import traceback
+        logger.error(f"스택 트레이스: {traceback.format_exc()}")
         return False
 
 def update_user(user_data):
