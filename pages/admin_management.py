@@ -29,14 +29,65 @@ def get_departments():
     부서 목록 조회 및 캐싱
     """
     try:
-        response = supabase().table('departments').select('department_id, department_name').execute()
-        if response.data:
+        # 기본 부서 목록 - 데이터베이스에서 불러오지 못할 경우를 대비
+        default_departments = [
+            ('00000000-0000-0000-0000-000000000001', '통합 관리'),
+            ('00000000-0000-0000-0000-000000000002', '설비 관리'),
+            ('00000000-0000-0000-0000-000000000003', '자재 입출고 관리'),
+            ('00000000-0000-0000-0000-000000000004', 'MT')
+        ]
+        
+        # Supabase 클라이언트 가져오기
+        client = supabase()
+        if not client:
+            logger.error("Supabase 클라이언트를 가져올 수 없습니다.")
+            return default_departments
+            
+        # 부서 테이블 쿼리
+        response = client.table('departments').select('department_id, department_name').execute()
+        logger.info(f"부서 데이터 조회 결과: {response}")
+        
+        if response and hasattr(response, 'data') and response.data:
             # (department_id, department_name) 형태의 튜플 리스트로 변환
             return [(dept['department_id'], dept['department_name']) for dept in response.data]
-        return []
+        
+        logger.warning("부서 데이터가 없습니다. 기본 부서 목록을 사용합니다.")
+        
+        # 부서 테이블이 비어있는 경우, 기본 부서 데이터 삽입 시도
+        try:
+            departments_data = [
+                {"department_code": "INTEG", "department_name": "통합 관리", "description": "시스템 전체 관리 부서"},
+                {"department_code": "EQUIP", "department_name": "설비 관리", "description": "생산 설비 관리 부서"},
+                {"department_code": "MATIN", "department_name": "자재 입출고 관리", "description": "자재 입출고 관리 부서"},
+                {"department_code": "MT", "department_name": "MT", "description": "유지보수 부서"}
+            ]
+            
+            for dept in departments_data:
+                client.table('departments').insert(dept).execute()
+                
+            logger.info("기본 부서 데이터를 삽입했습니다.")
+            
+            # 다시 부서 목록 조회
+            retry_response = client.table('departments').select('department_id, department_name').execute()
+            if retry_response and hasattr(retry_response, 'data') and retry_response.data:
+                return [(dept['department_id'], dept['department_name']) for dept in retry_response.data]
+        except Exception as e:
+            logger.error(f"기본 부서 데이터 삽입 중 오류 발생: {e}")
+            
+        # 기본 부서 목록 반환
+        return default_departments
     except Exception as e:
         logger.error(f"부서 목록 조회 중 오류 발생: {e}")
-        return []
+        # 오류 세부정보 로깅
+        if hasattr(e, '__dict__'):
+            logger.error(f"오류 세부정보: {vars(e)}")
+        # 기본 부서 목록 반환
+        return [
+            ('00000000-0000-0000-0000-000000000001', '통합 관리'),
+            ('00000000-0000-0000-0000-000000000002', '설비 관리'),
+            ('00000000-0000-0000-0000-000000000003', '자재 입출고 관리'),
+            ('00000000-0000-0000-0000-000000000004', 'MT')
+        ]
 
 def admin_management():
     """
