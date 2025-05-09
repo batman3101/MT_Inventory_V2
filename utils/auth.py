@@ -23,13 +23,20 @@ from database.supabase_client import supabase
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 세션 상태 초기화
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'username' not in st.session_state:
-    st.session_state.username = None
-if 'user_role' not in st.session_state:
-    st.session_state.user_role = None
+# 세션 상태 초기화 - 오류 방지를 위해 try-except로 감싸기
+try:
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    if 'username' not in st.session_state:
+        st.session_state.username = None
+    if 'user_role' not in st.session_state:
+        st.session_state.user_role = None
+except Exception as e:
+    logger.error(f"세션 상태 초기화 중 오류 발생: {e}")
+    # 오류 발생 시 전역 변수로 기본값 설정
+    authenticated = False
+    username = None
+    user_role = None
 
 def create_auth_config():
     """
@@ -149,7 +156,19 @@ def check_authentication():
     Returns:
         bool: 인증 상태
     """
-    return st.session_state.authenticated
+    try:
+        # session_state에 authenticated 키가 있는지 확인
+        if 'authenticated' in st.session_state:
+            return st.session_state.authenticated
+        else:
+            # 키가 없으면 기본값으로 False 반환
+            logger.warning("세션 상태에 authenticated 키가 없습니다. 기본값 False를 사용합니다.")
+            st.session_state.authenticated = False
+            return False
+    except Exception as e:
+        logger.error(f"인증 상태 확인 중 오류 발생: {e}")
+        # 오류 발생 시 안전하게 False 반환
+        return False
 
 def get_current_user():
     """
@@ -158,7 +177,17 @@ def get_current_user():
     Returns:
         str: 현재 사용자명
     """
-    return st.session_state.username
+    try:
+        if 'username' in st.session_state:
+            return st.session_state.username
+        else:
+            # 키가 없으면 기본값으로 None 반환
+            logger.warning("세션 상태에 username 키가 없습니다. 기본값 None을 사용합니다.")
+            st.session_state.username = None
+            return None
+    except Exception as e:
+        logger.error(f"현재 사용자 정보 확인 중 오류 발생: {e}")
+        return None
 
 def get_user_role():
     """
@@ -167,7 +196,17 @@ def get_user_role():
     Returns:
         str: 현재 사용자 역할
     """
-    return st.session_state.user_role
+    try:
+        if 'user_role' in st.session_state:
+            return st.session_state.user_role
+        else:
+            # 키가 없으면 기본값으로 None 반환
+            logger.warning("세션 상태에 user_role 키가 없습니다. 기본값 None을 사용합니다.")
+            st.session_state.user_role = None
+            return None
+    except Exception as e:
+        logger.error(f"사용자 역할 확인 중 오류 발생: {e}")
+        return None
 
 def logout():
     """
