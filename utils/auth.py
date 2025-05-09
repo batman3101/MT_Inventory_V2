@@ -210,7 +210,54 @@ def check_login_credentials(username, password):
                     'full_name': '시스템 관리자'
                 }
         
-        # 인증 설정 로드
+        # [변경사항] Supabase에서 직접 사용자 확인 - auth.yaml 이전에 먼저 시도
+        try:
+            import bcrypt
+            from database.supabase_client import supabase
+            
+            # 이메일 또는 사용자명으로 사용자 찾기 시도
+            logger.info(f"Supabase에서 사용자 조회 시도 - 입력된 사용자명: {username}")
+            # 사용자명으로 찾기
+            username_query = supabase().from_('users').select('*').eq('username', username)
+            # 이메일로도 찾기
+            response = username_query.execute()
+            
+            # 사용자명으로 찾지 못한 경우 이메일로 찾기 시도
+            if not response.data:
+                email_query = supabase().from_('users').select('*').eq('email', username)
+                response = email_query.execute()
+                if response.data:
+                    logger.info(f"이메일로 사용자 찾음: {username}")
+            else:
+                logger.info(f"사용자명으로 사용자 찾음: {username}")
+                
+            # 사용자가 있으면 비밀번호 검증    
+            if response.data:
+                user_data = response.data[0]
+                # 비밀번호 확인
+                stored_password = user_data.get('password_hash')
+                if stored_password and bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
+                    logger.info(f"Supabase 사용자 로그인 성공: {user_data['username']}")
+                    
+                    # 계정 활성화 상태 확인
+                    if not user_data.get('is_active', True):
+                        logger.warning(f"비활성화된 계정 로그인 시도: {username}")
+                        return None
+                    
+                    # 세션 상태 업데이트
+                    st.session_state.authenticated = True
+                    st.session_state.username = user_data['username']
+                    st.session_state.user_role = user_data.get('role', 'user')
+                    
+                    return user_data
+                else:
+                    logger.warning(f"Supabase 사용자 비밀번호 불일치: {username}")
+            else:
+                logger.info(f"Supabase에서 사용자를 찾을 수 없음: {username}")
+        except Exception as e:
+            logger.error(f"Supabase 사용자 인증 중 오류 발생: {e}")
+                
+        # 인증 설정 로드 (auth.yaml 기반 인증 - 기존 로직)
         config = load_auth_config()
         if not config or 'credentials' not in config:
             st.error("인증 설정을 불러올 수 없습니다.")
@@ -233,9 +280,9 @@ def check_login_credentials(username, password):
                 st.session_state.username = username
                 st.session_state.user_role = user_info.get('role', 'user')
                 
-                logger.info(f"사용자 로그인 성공: {username}, 역할: {user_info.get('role', 'user')}")
+                logger.info(f"auth.yaml 사용자 로그인 성공: {username}, 역할: {user_info.get('role', 'user')}")
                 
-                # Supabase에서 사용자 정보 가져오기
+                # Supabase에서 사용자 정보 가져오기 (기존 로직)
                 try:
                     from database.supabase_client import supabase
                     response = supabase().from_('users').select('*').eq('username', username).execute()
@@ -260,9 +307,9 @@ def check_login_credentials(username, password):
                         'full_name': user_info.get('name', '')
                     }
             else:
-                logger.warning(f"비밀번호 불일치: {username}")
+                logger.warning(f"auth.yaml 비밀번호 불일치: {username}")
         else:
-            logger.warning(f"사용자를 찾을 수 없음: {username}")
+            logger.warning(f"auth.yaml에서 사용자를 찾을 수 없음: {username}")
         
         # 인증 실패
         return None
