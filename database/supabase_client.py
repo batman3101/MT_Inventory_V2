@@ -113,17 +113,36 @@ class SupabaseClient:
         """Supabase service_role API 키 가져오기"""
         # 1. Streamlit 시크릿에서 시도
         try:
+            # SUPABASE_SERVICE_KEY로 시도 (우선순위 높음)
             if 'SUPABASE_SERVICE_KEY' in st.secrets:
-                return st.secrets['SUPABASE_SERVICE_KEY']
+                service_key = st.secrets['SUPABASE_SERVICE_KEY']
+                logger.info(f"SUPABASE_SERVICE_KEY를 찾았습니다. 길이: {len(service_key)}")
+                return service_key
+                
+            # SUPABASE_KEY가 service_role인 경우 시도
             if 'SUPABASE_KEY' in st.secrets:
                 key = st.secrets['SUPABASE_KEY']
                 if 'role":"service_role"' in key:  # service_role 키 확인
+                    logger.info("SUPABASE_KEY에서 service_role 키를 찾았습니다.")
                     return key
-        except Exception:
-            logger.info("Streamlit 시크릿에서 Supabase service_role 키를 찾을 수 없습니다.")
+                else:
+                    logger.warning("SUPABASE_KEY가 service_role 키가 아닙니다.")
+        except Exception as e:
+            logger.error(f"Streamlit 시크릿에서 Supabase service_role 키를 찾는 중 오류 발생: {e}")
         
         # 2. 환경 변수에서 시도
-        return SUPABASE_KEY if 'role":"service_role"' in SUPABASE_KEY else None
+        try:
+            if SUPABASE_KEY and 'role":"service_role"' in SUPABASE_KEY:
+                logger.info("환경 변수에서 service_role 키를 찾았습니다.")
+                return SUPABASE_KEY
+            else:
+                logger.warning("환경 변수의 SUPABASE_KEY가 service_role 키가 아니거나 비어 있습니다.")
+        except Exception as e:
+            logger.error(f"환경 변수에서 service_role 키를 가져오는 중 오류 발생: {e}")
+        
+        # 3. 하드코딩된 키 반환 (최후의 수단)
+        logger.warning("서비스 롤 키를 찾을 수 없어 하드코딩된 키를 사용합니다.")
+        return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlldWN1Z3BjeXdtdGZ5dHZ0enVtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NjYwNjEzOCwiZXhwIjoyMDYyMTgyMTM4fQ.Pl166ZVAS6xj1joMgp33KNfRBRnVZmMldoZh8yvnmWs"
     
     def get_client(self, use_service_role=False) -> Client:
         """
@@ -137,20 +156,55 @@ class SupabaseClient:
         """
         # 요청된 클라이언트가 없으면 초기화 시도
         if (use_service_role and not self._service_client) or (not use_service_role and not self._anon_client):
+            logger.info(f"클라이언트 초기화 시도 (use_service_role={use_service_role})")
             self._initialize()
         
         # 요청된 클라이언트 반환
         if use_service_role:
             if not self._service_client:
-                raise Exception("Supabase service_role 클라이언트가 초기화되지 않았습니다.")
+                # 마지막 시도로 service_role 클라이언트 직접 생성
+                try:
+                    url = self._get_supabase_url()
+                    key = self._get_service_key()
+                    if url and key:
+                        logger.info("마지막 시도로 service_role 클라이언트 직접 생성 중...")
+                        self._service_client = create_client(url, key)
+                        logger.info("service_role 클라이언트 직접 생성 성공")
+                    else:
+                        logger.error(f"service_role 클라이언트 생성 실패: URL={bool(url)}, KEY={bool(key)}")
+                except Exception as e:
+                    logger.error(f"service_role 클라이언트 직접 생성 중 오류: {e}")
+                
+                # 여전히 초기화 실패한 경우
+                if not self._service_client:
+                    error_msg = "Supabase service_role 클라이언트가 초기화되지 않았습니다."
+                    logger.error(error_msg)
+                    raise Exception(error_msg)
             return self._service_client
         else:
             if not self._anon_client:
-                # anon 클라이언트가 없으면 service_role 클라이언트로 대체
-                if self._service_client:
+                # anon 클라이언트 직접 생성 시도
+                try:
+                    url = self._get_supabase_url()
+                    key = self._get_anon_key()
+                    if url and key:
+                        logger.info("마지막 시도로 anon 클라이언트 직접 생성 중...")
+                        self._anon_client = create_client(url, key)
+                        logger.info("anon 클라이언트 직접 생성 성공")
+                    else:
+                        logger.error(f"anon 클라이언트 생성 실패: URL={bool(url)}, KEY={bool(key)}")
+                except Exception as e:
+                    logger.error(f"anon 클라이언트 직접 생성 중 오류: {e}")
+                
+                # 여전히 초기화 실패한 경우, service_role로 대체
+                if not self._anon_client and self._service_client:
                     logger.warning("anon 클라이언트가 없어 service_role 클라이언트를 대신 사용합니다.")
                     return self._service_client
-                raise Exception("Supabase anon 클라이언트가 초기화되지 않았습니다.")
+                # 모든 클라이언트가 없는 경우
+                elif not self._anon_client:
+                    error_msg = "Supabase anon 클라이언트가 초기화되지 않았습니다."
+                    logger.error(error_msg)
+                    raise Exception(error_msg)
             return self._anon_client
     
     def test_connection(self, use_service_role=False):
