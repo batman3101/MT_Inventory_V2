@@ -137,29 +137,12 @@ def show_parts_add():
     """
     st.markdown(f"### 신규 부품 등록")
     
-    # 자동 생성 부품 코드 (Supabase에서 마지막 코드 조회)
-    try:
-        # 마지막 부품 코드 조회
-        result = supabase().from_("parts").select("part_code").order("part_code", desc=True).limit(1).execute()
-        
-        if result.data:
-            last_code = result.data[0]["part_code"]
-            # MT 뒤의 숫자 부분 추출
-            code_number = int(last_code[2:]) + 1
-            next_code = f"MT{code_number:03d}"
-        else:
-            next_code = "MT001"  # 첫 번째 부품인 경우
-            
-        st.info(f"시스템이 다음 부품 코드를 자동 생성합니다: {next_code}")
-    except Exception as e:
-        next_code = "MT001"  # 오류 발생 시 기본값
-        st.warning(f"부품 코드 생성 중 오류가 발생했습니다. 기본 코드를 사용합니다: {next_code}")
-    
     # 입력 폼
     with st.form("add_part_form"):
         col1, col2 = st.columns(2)
         
         with col1:
+            part_code = st.text_input(f"{get_text('part_code')}*", placeholder="MT138")
             part_name = st.text_input(f"{get_text('part_name')}*", placeholder="COOLANT FILTER")
             vietnamese_name = st.text_input(f"{get_text('vietnamese_name')}", placeholder="LỌC CHẤT LÀMÁT")
             korean_name = st.text_input(f"{get_text('korean_name')}", placeholder="냉각수 필터")
@@ -201,17 +184,25 @@ def show_parts_add():
         
         if submitted:
             # 필수 입력 확인
-            if not part_name:
+            if not part_code:
+                display_error("부품 코드는 필수 입력 항목입니다.")
+            elif not part_name:
                 display_error("부품명은 필수 입력 항목입니다.")
             else:
                 try:
+                    # 코드 중복 확인
+                    duplicate_check = supabase().from_("parts").select("part_id").eq("part_code", part_code).execute()
+                    if duplicate_check.data:
+                        display_error(f"부품 코드 '{part_code}'는 이미 사용 중입니다. 다른 코드를 입력해주세요.")
+                        return
+                    
                     # 현재 사용자 정보 가져오기
                     from utils.auth import get_current_user
                     current_user = get_current_user()
                     
                     # Supabase에 저장할 데이터 준비
                     part_data = {
-                        "part_code": next_code,
+                        "part_code": part_code,
                         "part_name": part_name,
                         "vietnamese_name": vietnamese_name,
                         "korean_name": korean_name,
@@ -237,7 +228,7 @@ def show_parts_add():
                         }
                         supabase().from_("inventory").insert(inventory_data).execute()
                         
-                        display_success(f"새 부품 '{part_name}'이(가) 등록되었습니다. (코드: {next_code})")
+                        display_success(f"새 부품 '{part_name}'이(가) 등록되었습니다. (코드: {part_code})")
                         # 폼 초기화
                         st.rerun()
                     else:
