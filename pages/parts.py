@@ -51,7 +51,21 @@ def show_parts_search():
     with col2:
         search_name = st.text_input(f"{get_text('part_name')} {get_text('search')}", placeholder="COOLANT FILTER")
     with col3:
-        status_options = ["전체", "NEW", "OLD", "OLDER"]
+        # 상태 목록 가져오기
+        try:
+            status_result = supabase().from_("parts").select("status").execute()
+            if status_result.data:
+                # 중복 제거하고 고유 상태 추출
+                statuses = list(set([item.get("status", "") for item in status_result.data if item.get("status")]))
+                status_options = ["전체"] + sorted(statuses)
+            else:
+                # 기본 상태 옵션
+                status_options = ["전체", "NEW", "OLD", "OLDER"]
+        except Exception as e:
+            st.warning(f"상태 정보를 불러오는 중 오류 발생: {e}")
+            # 오류 발생 시 기본 옵션 사용
+            status_options = ["전체", "NEW", "OLD", "OLDER"]
+        
         search_status = st.selectbox(f"{get_text('status')} {get_text('filter')}", status_options)
     
     # 검색 버튼
@@ -158,7 +172,25 @@ def show_parts_add():
             category_options = ["필터", "펌프", "모터", "밸브", "센서", "기타"]
             category = st.selectbox(f"{get_text('category')}", category_options)
             
-            status_options = ["NEW", "OLD", "OLDER"]
+            # 상태 목록 가져오기
+            try:
+                status_result = supabase().from_("parts").select("status").execute()
+                if status_result.data:
+                    # 중복 제거하고 고유 상태 추출
+                    statuses = list(set([item.get("status", "") for item in status_result.data if item.get("status")]))
+                    # 필수 상태 값이 없으면 추가
+                    required_statuses = ["NEW", "OLD", "OLDER"]
+                    for req_status in required_statuses:
+                        if req_status not in statuses:
+                            statuses.append(req_status)
+                    status_options = sorted(statuses)
+                else:
+                    # 기본 상태 옵션
+                    status_options = ["NEW", "OLD", "OLDER"]
+            except Exception as e:
+                # 오류 발생 시 기본 옵션 사용
+                status_options = ["NEW", "OLD", "OLDER"]
+            
             status = st.selectbox(f"{get_text('status')}*", status_options, index=0)
             
             min_stock = st.number_input(f"{get_text('min_stock')}", min_value=0, value=5)
@@ -278,9 +310,33 @@ def show_parts_details():
                         category = st.selectbox("카테고리", category_options, 
                                               index=category_options.index(part_data.get("category", "필터")) if part_data.get("category") in category_options else 0)
                         
-                        status_options = ["NEW", "OLD", "OLDER"]
-                        status = st.selectbox("상태*", status_options, 
-                                            index=status_options.index(part_data.get("status", "NEW")) if part_data.get("status") in status_options else 0)
+                        # 상태 목록 가져오기
+                        try:
+                            status_result = supabase().from_("parts").select("status").execute()
+                            if status_result.data:
+                                # 중복 제거하고 고유 상태 추출
+                                statuses = list(set([item.get("status", "") for item in status_result.data if item.get("status")]))
+                                # 필수 상태 값이 없으면 추가
+                                required_statuses = ["NEW", "OLD", "OLDER"]
+                                for req_status in required_statuses:
+                                    if req_status not in statuses:
+                                        statuses.append(req_status)
+                                status_options = sorted(statuses)
+                            else:
+                                # 기본 상태 옵션
+                                status_options = ["NEW", "OLD", "OLDER"]
+                        except Exception as e:
+                            # 오류 발생 시 기본 옵션 사용
+                            status_options = ["NEW", "OLD", "OLDER"]
+                        
+                        # 현재 상태를 인덱스로 변환
+                        current_status = part_data.get("status", "NEW")
+                        try:
+                            status_index = status_options.index(current_status)
+                        except ValueError:
+                            status_index = 0
+                        
+                        status = st.selectbox("상태*", status_options, index=status_index)
                         
                         min_stock = st.number_input("최소 재고량", min_value=0, value=part_data.get("min_stock", 0))
                     
