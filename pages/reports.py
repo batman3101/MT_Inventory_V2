@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # 모듈 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -198,37 +198,8 @@ def show_inout_report():
                     
             except Exception as e:
                 st.error(f"입고 내역 조회 중 오류 발생: {e}")
-                # 오류 발생 시 더미 데이터 표시
-                inbound_data = {
-                    'part_code': ['MT001', 'MT002', 'MT003'],
-                    'part_name': ['COOLANT FILTER', 'ELECTRIC FILTER', 'HYDRAULIC FILTER'],
-                    'category': ['필터', '필터', '필터'],
-                    'quantity': [10, 5, 20],
-                    'total_value': [150000, 125000, 240000],
-                    'supplier': ['SAMSOO', 'RPS', 'THT'],
-                    'inbound_date': ['2023-04-01', '2023-04-05', '2023-04-10']
-                }
-                inbound_df = pd.DataFrame(inbound_data)
-                
-                # 카테고리 필터링
-                if selected_category != "전체":
-                    inbound_df = inbound_df[inbound_df['category'] == selected_category]
-                
-                # 입고 내역 표시
-                st.dataframe(
-                    inbound_df,
-                    column_config={
-                        'part_code': st.column_config.TextColumn(get_text('part_code')),
-                        'part_name': st.column_config.TextColumn(get_text('part_name')),
-                        'category': st.column_config.TextColumn(get_text('category')),
-                        'quantity': st.column_config.NumberColumn(get_text('quantity'), format="%d"),
-                        'total_value': st.column_config.NumberColumn(get_text('total'), format="₫%d"),
-                        'supplier': st.column_config.TextColumn(get_text('supplier')),
-                        'inbound_date': st.column_config.DateColumn(get_text('inbound_date'), format="YYYY-MM-DD")
-                    },
-                    use_container_width=True,
-                    hide_index=True
-                )
+                # 오류 발생 시 더이상 더미 데이터를 사용하지 않음
+                st.warning("데이터를 불러올 수 없습니다. 나중에 다시 시도해주세요.")
             
             # 출고 상세 내역
             st.markdown("#### 출고 상세 내역")
@@ -328,13 +299,45 @@ def show_inventory_analysis_report():
     # 카테고리별 비율 차트
     st.markdown("#### 카테고리별 재고 현황")
     
-    # 데모 데이터 (실제로는 Supabase에서 가져옴)
-    category_data = {
-        'category': ['필터', '펌프', '모터', '밸브', '센서', '기타'],
-        'quantity': [120, 45, 30, 25, 15, 40],
-        'value': [3500000, 12000000, 8500000, 4200000, 1800000, 3000000]
-    }
-    category_df = pd.DataFrame(category_data)
+    try:
+        # Supabase에서 카테고리별 재고 데이터 조회
+        category_query = """
+        SELECT 
+            p.category, 
+            SUM(i.current_quantity) as quantity,
+            SUM(i.current_quantity * COALESCE(pp.unit_price, 0)) as value
+        FROM 
+            inventory i
+        JOIN 
+            parts p ON i.part_id = p.part_id
+        LEFT JOIN (
+            SELECT part_id, unit_price
+            FROM part_prices
+            WHERE is_current = true
+        ) pp ON p.part_id = pp.part_id
+        GROUP BY 
+            p.category
+        """
+        
+        result = supabase().rpc('search_inventory', {'query_sql': category_query}).execute()
+        
+        if result.data:
+            category_df = pd.DataFrame(result.data)
+        else:
+            # 결과가 없을 경우 빈 데이터프레임 생성
+            category_df = pd.DataFrame({
+                'category': ['데이터 없음'],
+                'quantity': [0],
+                'value': [0]
+            })
+    except Exception as e:
+        st.error(f"카테고리별 데이터를 불러오는 중 오류 발생: {e}")
+        # 오류 발생 시 데모 데이터 사용
+        category_df = pd.DataFrame({
+            'category': ['필터', '펌프', '모터', '밸브', '센서', '기타'],
+            'quantity': [120, 45, 30, 25, 15, 40],
+            'value': [3500000, 12000000, 8500000, 4200000, 1800000, 3000000]
+        })
     
     col1, col2 = st.columns(2)
     
@@ -364,21 +367,63 @@ def show_inventory_analysis_report():
     # 월별 재고 변화 추이
     st.markdown("#### 월별 재고 변화 추이")
     
-    # 데모 데이터 (실제로는 Supabase에서 가져옴)
-    months = ['2023-11', '2023-12', '2024-01', '2024-02', '2024-03', '2024-04']
-    stock_values = [25000000, 27000000, 26500000, 28000000, 30000000, 33000000]
+    try:
+        # 현재 날짜에서 6개월 전까지의 데이터 가져오기
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=180)  # 약 6개월
+        
+        # Supabase에서 월별 재고 변화 데이터 조회 (실제로는 이력 테이블이 필요)
+        # 현재는 임시로 입고/출고 데이터를 기반으로 추정
+        monthly_query = f"""
+        SELECT 
+            TO_CHAR(DATE_TRUNC('month', i.inbound_date), 'YYYY-MM') as month,
+            SUM(i.total_price) as value
+        FROM 
+            inbound i
+        WHERE 
+            i.inbound_date >= '{start_date.strftime('%Y-%m-%d')}'
+            AND i.inbound_date <= '{end_date.strftime('%Y-%m-%d')}'
+        GROUP BY 
+            DATE_TRUNC('month', i.inbound_date)
+        ORDER BY 
+            DATE_TRUNC('month', i.inbound_date)
+        """
+        
+        month_result = supabase().rpc('search_inventory', {'query_sql': monthly_query}).execute()
+        
+        if month_result.data:
+            stock_df = pd.DataFrame(month_result.data)
+        else:
+            # 데이터가 없을 경우 빈 데이터프레임 생성
+            months = [
+                (end_date - timedelta(days=30*i)).strftime('%Y-%m') 
+                for i in range(6, 0, -1)
+            ]
+            stock_df = pd.DataFrame({
+                '월': months,
+                '재고 가치': [0] * len(months)
+            })
+    except Exception as e:
+        st.error(f"월별 재고 데이터를 불러오는 중 오류 발생: {e}")
+        # 오류 발생 시 데모 데이터 사용
+        months = ['2023-11', '2023-12', '2024-01', '2024-02', '2024-03', '2024-04']
+        stock_values = [25000000, 27000000, 26500000, 28000000, 30000000, 33000000]
+        
+        stock_df = pd.DataFrame({
+            '월': months,
+            '재고 가치': stock_values
+        })
     
-    stock_df = pd.DataFrame({
-        '월': months,
-        '재고 가치': stock_values
-    })
+    # 컬럼명 통일
+    if 'month' in stock_df.columns and 'value' in stock_df.columns:
+        stock_df = stock_df.rename(columns={'month': '월', 'value': '재고 가치'})
     
     fig3 = px.line(
         stock_df,
         x='월',
         y='재고 가치',
-        title='월별 재고 가치 변화',
-        markers=True
+        markers=True,
+        title='월별 재고 가치 변화'
     )
     st.plotly_chart(fig3, use_container_width=True)
     

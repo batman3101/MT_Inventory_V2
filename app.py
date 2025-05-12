@@ -6,6 +6,7 @@ import streamlit as st
 import os
 import sys
 from datetime import datetime
+import pandas as pd
 
 # 모듈 경로 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -342,6 +343,9 @@ def display_dashboard():
     """
     대시보드 표시
     """
+    from database.supabase_client import supabase
+    import pandas as pd
+    
     # 대시보드 페이지 타이틀 추가
     st.markdown(f"<div class='main-header'>{get_text('dashboard')}</div>", unsafe_allow_html=True)
     
@@ -354,38 +358,187 @@ def display_dashboard():
     
     # 재고 요약
     with col1:
-        st.markdown("""
-        <div class='dashboard-card'>
-            <h3>재고 요약</h3>
-            <p>데이터베이스 연결이 필요합니다.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("<div class='dashboard-card'><h3>재고 요약</h3>", unsafe_allow_html=True)
+        try:
+            # 총 부품 수 조회
+            parts_result = supabase().from_("parts").select("part_id", count="exact").execute()
+            total_parts = parts_result.count if hasattr(parts_result, 'count') else 0
+            
+            # 총 재고 수량 및 가치 조회
+            query = """
+            SELECT 
+                SUM(i.current_quantity) as total_quantity,
+                SUM(i.current_quantity * COALESCE(pp.unit_price, 0)) as total_value
+            FROM 
+                inventory i
+            LEFT JOIN (
+                SELECT part_id, unit_price
+                FROM part_prices
+                WHERE is_current = true
+            ) pp ON i.part_id = pp.part_id
+            """
+            
+            inventory_result = supabase().rpc('search_inventory', {'query_sql': query}).execute()
+            
+            if inventory_result.data and len(inventory_result.data) > 0:
+                total_quantity = inventory_result.data[0].get('total_quantity', 0) or 0
+                total_value = inventory_result.data[0].get('total_value', 0) or 0
+                
+                st.markdown(f"""
+                <p>총 부품 종류: <strong>{total_parts}</strong>개</p>
+                <p>총 재고 수량: <strong>{total_quantity}</strong>개</p>
+                <p>총 재고 가치: <strong>{format_currency(total_value)}</strong></p>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("<p>재고 정보가 없습니다.</p>", unsafe_allow_html=True)
+                
+            # 재고 부족 품목 수 조회
+            low_stock_query = """
+            SELECT COUNT(*) as low_stock_count
+            FROM inventory i
+            JOIN parts p ON i.part_id = p.part_id
+            WHERE i.current_quantity < p.min_stock
+            """
+            
+            low_stock_result = supabase().rpc('search_inventory', {'query_sql': low_stock_query}).execute()
+            
+            if low_stock_result.data and len(low_stock_result.data) > 0:
+                low_stock_count = low_stock_result.data[0].get('low_stock_count', 0) or 0
+                
+                if low_stock_count > 0:
+                    st.markdown(f"<p style='color:red'>⚠️ 재고 부족 품목: <strong>{low_stock_count}</strong>개</p>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<p style='color:green'>✓ 모든 품목 재고 양호</p>", unsafe_allow_html=True)
+            
+        except Exception as e:
+            st.markdown(f"<p>재고 정보를 불러오는 중 오류가 발생했습니다: {str(e)}</p>", unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
     
     # 최근 입고 현황
     with col2:
-        st.markdown("""
-        <div class='dashboard-card'>
-            <h3>최근 입고 현황</h3>
-            <p>데이터베이스 연결이 필요합니다.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("<div class='dashboard-card'><h3>최근 입고 현황</h3>", unsafe_allow_html=True)
+        try:
+            # 최근 5건의 입고 내역 조회
+            inbound_result = supabase().from_("inbound").select("""
+                inbound_id,
+                inbound_date,
+                quantity,
+                parts!inner(part_code, part_name),
+                suppliers!inner(supplier_name)
+            """).order("inbound_date", desc=True).limit(5).execute()
+            
+            if inbound_result.data and len(inbound_result.data) > 0:
+                for item in inbound_result.data:
+                    part_data = item.get("parts", {})
+                    supplier_data = item.get("suppliers", {})
+                    
+                    inbound_date = item.get("inbound_date", "")
+                    if inbound_date:
+                        inbound_date = inbound_date.split("T")[0]  # 날짜만 추출
+                    
+                    st.markdown(f"""
+                    <p><strong>{part_data.get('part_code', '')}</strong> - {part_data.get('part_name', '')}<br/>
+                    수량: <strong>{item.get('quantity', 0)}</strong> | 공급: {supplier_data.get('supplier_name', '')}<br/>
+                    <small>{inbound_date}</small></p>
+                    <hr style='margin:0.5rem 0'>
+                    """, unsafe_allow_html=True)
+            else:
+                st.markdown("<p>최근 입고 내역이 없습니다.</p>", unsafe_allow_html=True)
+                
+        except Exception as e:
+            st.markdown(f"<p>입고 정보를 불러오는 중 오류가 발생했습니다: {str(e)}</p>", unsafe_allow_html=True)
+            
+        st.markdown("</div>", unsafe_allow_html=True)
     
     # 최근 출고 현황
     with col3:
-        st.markdown("""
-        <div class='dashboard-card'>
-            <h3>최근 출고 현황</h3>
-            <p>데이터베이스 연결이 필요합니다.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("<div class='dashboard-card'><h3>최근 출고 현황</h3>", unsafe_allow_html=True)
+        try:
+            # 최근 5건의 출고 내역 조회
+            outbound_result = supabase().from_("outbound").select("""
+                outbound_id,
+                outbound_date,
+                quantity,
+                requester,
+                parts!inner(part_code, part_name)
+            """).order("outbound_date", desc=True).limit(5).execute()
+            
+            if outbound_result.data and len(outbound_result.data) > 0:
+                for item in outbound_result.data:
+                    part_data = item.get("parts", {})
+                    
+                    outbound_date = item.get("outbound_date", "")
+                    if outbound_date:
+                        outbound_date = outbound_date.split("T")[0]  # 날짜만 추출
+                    
+                    st.markdown(f"""
+                    <p><strong>{part_data.get('part_code', '')}</strong> - {part_data.get('part_name', '')}<br/>
+                    수량: <strong>{item.get('quantity', 0)}</strong> | 요청자: {item.get('requester', '')}<br/>
+                    <small>{outbound_date}</small></p>
+                    <hr style='margin:0.5rem 0'>
+                    """, unsafe_allow_html=True)
+            else:
+                st.markdown("<p>최근 출고 내역이 없습니다.</p>", unsafe_allow_html=True)
+                
+        except Exception as e:
+            st.markdown(f"<p>출고 정보를 불러오는 중 오류가 발생했습니다: {str(e)}</p>", unsafe_allow_html=True)
+            
+        st.markdown("</div>", unsafe_allow_html=True)
     
     # 재고 부족 아이템 목록
-    st.markdown("""
-    <div class='dashboard-card'>
-        <h3>재고 부족 아이템</h3>
-        <p>데이터베이스 연결이 필요합니다.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("<div class='dashboard-card'><h3>재고 부족 아이템</h3>", unsafe_allow_html=True)
+    try:
+        # 재고 부족 아이템 조회
+        low_stock_items_query = """
+        SELECT 
+            p.part_id, 
+            p.part_code, 
+            p.part_name, 
+            p.category,
+            p.unit,
+            p.min_stock,
+            i.current_quantity,
+            p.min_stock - i.current_quantity AS shortage
+        FROM 
+            inventory i
+        JOIN 
+            parts p ON i.part_id = p.part_id
+        WHERE 
+            i.current_quantity < p.min_stock
+        ORDER BY 
+            shortage DESC
+        LIMIT 10
+        """
+        
+        low_stock_result = supabase().rpc('search_inventory', {'query_sql': low_stock_items_query}).execute()
+        
+        if low_stock_result.data and len(low_stock_result.data) > 0:
+            # 데이터프레임으로 변환
+            df = pd.DataFrame(low_stock_result.data)
+            
+            # 데이터프레임 표시
+            st.dataframe(
+                df,
+                column_config={
+                    'part_code': st.column_config.TextColumn(get_text('part_code')),
+                    'part_name': st.column_config.TextColumn(get_text('part_name')),
+                    'category': st.column_config.TextColumn(get_text('category')),
+                    'unit': st.column_config.TextColumn(get_text('unit')),
+                    'current_quantity': st.column_config.NumberColumn(get_text('current_stock'), format="%d"),
+                    'min_stock': st.column_config.NumberColumn(get_text('min_stock'), format="%d"),
+                    'shortage': st.column_config.NumberColumn("부족 수량", format="%d")
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+        else:
+            st.markdown("<p>재고 부족 아이템이 없습니다.</p>", unsafe_allow_html=True)
+            
+    except Exception as e:
+        st.markdown(f"<p>재고 부족 아이템을 조회하는 중 오류가 발생했습니다: {str(e)}</p>", unsafe_allow_html=True)
+        
+    st.markdown("</div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main() 

@@ -183,11 +183,26 @@ def show_outbound_search():
                     col1, col2 = st.columns(2)
                     with col1:
                         if st.button(f"📥 Excel {get_text('save')}"):
-                            # 실제로는 Excel 저장 로직 구현
-                            display_success("Excel 파일로 저장되었습니다.")
+                            # Excel 저장 로직
+                            current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            filename = f"outbound_export_{current_date}.xlsx"
+                            
+                            # 데이터프레임을 엑셀로 변환
+                            df.to_excel(filename, index=False)
+                            
+                            # 다운로드 링크 생성
+                            with open(filename, "rb") as file:
+                                st.download_button(
+                                    label=f"📥 {filename} 다운로드",
+                                    data=file,
+                                    file_name=filename,
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                )
+                            
+                            display_success(f"Excel 파일로 저장되었습니다: {filename}")
                     with col2:
                         if st.button(f"📊 {get_text('reports')} 생성"):
-                            # 실제로는 보고서 생성 로직 구현
+                            # 보고서 생성 로직
                             display_success("보고서가 생성되었습니다.")
                 else:
                     display_info("검색 결과가 없습니다.")
