@@ -492,7 +492,7 @@ def display_dashboard():
         # 재고 부족 아이템 조회
         low_stock_items_query = """
         SELECT 
-            p.part_id, 
+            p.part_id::text, 
             p.part_code, 
             p.part_name, 
             p.category,

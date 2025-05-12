@@ -65,7 +65,7 @@ def show_current_inventory():
             # Supabase에서 재고 데이터와 부품 데이터 조인하여 가져오기
             query = """
             SELECT 
-                p.part_id, 
+                p.part_id::text, 
                 p.part_code, 
                 p.part_name, 
                 p.korean_name, 
@@ -218,7 +218,7 @@ def show_low_stock_alerts():
         # Supabase에서 재고 부족 부품 데이터 조회
         query = """
         SELECT 
-            p.part_id, 
+            p.part_id::text, 
             p.part_code, 
             p.part_name, 
             p.korean_name, 
