@@ -13,6 +13,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.helpers import display_error, display_success, display_info, display_warning, format_date, format_currency
 from utils.i18n import get_text
 from database.supabase_client import supabase
+from utils.auth import get_current_user
 
 def show():
     """
@@ -57,39 +58,33 @@ def show_suppliers_search():
     # 검색 버튼
     if st.button(f"🔍 {get_text('search')}", type="primary"):
         try:
-            # 데모 데이터 (실제로는 Supabase에서 가져옴)
-            data = {
-                'supplier_id': [1, 2, 3, 4, 5, 6, 7, 8],
-                'supplier_code': ['YSCM', 'SAMSOO', 'RPS', 'THT', 'FC TECH', 'HTT', 'ATH', 'UIL'],
-                'supplier_name': ['와이에스씨엠', '삼수', '알피에스', '티에이치티', '에프씨 테크', '에이치티티', '에이티에이치', '유아이엘'],
-                'contact_person': ['홍길동', '김철수', '박영희', '이민수', '정지훈', '최유리', '한상욱', '강민정'],
-                'phone': ['02-1234-5678', '02-2345-6789', '02-3456-7890', '02-4567-8901', 
-                         '02-5678-9012', '02-6789-0123', '02-7890-1234', '02-8901-2345'],
-                'email': ['contact@yscm.com', 'info@samsoo.com', 'sales@rps.co.kr', 'support@tht.kr',
-                         'sales@fctech.com', 'info@htt.kr', 'contact@ath.co.kr', 'info@uil.com'],
-                'created_at': ['2023-01-01', '2023-01-02', '2023-01-03', '2023-01-04',
-                              '2023-01-05', '2023-01-06', '2023-01-07', '2023-01-08']
-            }
-            df = pd.DataFrame(data)
+            # Supabase에서 공급업체 데이터 조회
+            query = supabase().from_("suppliers").select("*")
             
             # 검색 필터 적용
             if search_code:
-                df = df[df['supplier_code'].str.contains(search_code, case=False)]
-            
+                query = query.ilike("supplier_code", f"%{search_code}%")
             if search_name:
-                df = df[df['supplier_name'].str.contains(search_name, case=False)]
+                query = query.ilike("supplier_name", f"%{search_name}%")
             
-            # 결과 표시
-            if len(df) > 0:
+            # 결과 조회
+            result = query.execute()
+            
+            # 데이터프레임으로 변환
+            if result.data:
+                df = pd.DataFrame(result.data)
+                
+                # 결과 표시
                 st.dataframe(
                     df,
                     column_config={
-                        'supplier_id': st.column_config.NumberColumn("공급업체 ID", format="%d"),
+                        'supplier_id': st.column_config.TextColumn("공급업체 ID"),
                         'supplier_code': st.column_config.TextColumn("공급업체 코드"),
                         'supplier_name': st.column_config.TextColumn("공급업체명"),
                         'contact_person': st.column_config.TextColumn("담당자"),
                         'phone': st.column_config.TextColumn("연락처"),
                         'email': st.column_config.TextColumn("이메일"),
+                        'address': st.column_config.TextColumn("주소"),
                         'created_at': st.column_config.DateColumn("등록일", format="YYYY-MM-DD")
                     },
                     use_container_width=True,
@@ -98,8 +93,23 @@ def show_suppliers_search():
                 
                 # 내보내기 버튼
                 if st.button(f"📥 Excel {get_text('save')}"):
-                    # 실제로는 Excel 저장 로직 구현
-                    display_success("Excel 파일로 저장되었습니다.")
+                    # Excel 저장 로직
+                    current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"suppliers_export_{current_date}.xlsx"
+                    
+                    # 데이터프레임을 엑셀로 변환
+                    df.to_excel(filename, index=False)
+                    
+                    # 다운로드 링크 생성
+                    with open(filename, "rb") as file:
+                        st.download_button(
+                            label=f"📥 {filename} 다운로드",
+                            data=file,
+                            file_name=filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                    
+                    display_success(f"Excel 파일로 저장되었습니다: {filename}")
             else:
                 display_info("검색 결과가 없습니다.")
         except Exception as e:
@@ -125,6 +135,9 @@ def show_suppliers_add():
             email = st.text_input("이메일", placeholder="contact@example.com")
             address = st.text_input("주소", placeholder="서울시 강남구")
         
+        country = st.text_input("국가", value="대한민국")
+        website = st.text_input("웹사이트", placeholder="https://example.com")
+        
         submitted = st.form_submit_button(f"✅ {get_text('save')}")
         
         if submitted:
@@ -135,11 +148,38 @@ def show_suppliers_add():
                 display_error("공급업체명은 필수 입력 항목입니다.")
             else:
                 try:
-                    # 공급업체 정보 저장 (실제로는 Supabase에 저장)
-                    display_success(f"새 공급업체 '{supplier_name}'이(가) 등록되었습니다.")
+                    # 코드 중복 확인
+                    duplicate_check = supabase().from_("suppliers").select("supplier_id").eq("supplier_code", supplier_code).execute()
+                    if duplicate_check.data:
+                        display_error(f"공급업체 코드 '{supplier_code}'는 이미 사용 중입니다. 다른 코드를 입력해주세요.")
+                        return
                     
-                    # 폼 초기화
-                    st.rerun()
+                    # 현재 사용자 정보 가져오기
+                    current_user = get_current_user()
+                    
+                    # Supabase에 저장할 데이터 준비
+                    supplier_data = {
+                        "supplier_code": supplier_code,
+                        "supplier_name": supplier_name,
+                        "contact_person": contact_person,
+                        "phone": phone,
+                        "email": email,
+                        "address": address,
+                        "country": country,
+                        "website": website,
+                        "status": "active",
+                        "created_by": current_user
+                    }
+                    
+                    # Supabase에 저장
+                    result = supabase().from_("suppliers").insert(supplier_data).execute()
+                    
+                    if result.data:
+                        display_success(f"새 공급업체 '{supplier_name}'이(가) 등록되었습니다.")
+                        # 폼 초기화
+                        st.rerun()
+                    else:
+                        display_error("공급업체 등록 중 오류가 발생했습니다.")
                 except Exception as e:
                     display_error(f"공급업체 등록 중 오류가 발생했습니다: {e}")
 
@@ -147,80 +187,111 @@ def show_suppliers_details():
     """
     공급업체 상세 정보 화면 표시
     """
-    # 공급업체 선택
-    supplier_options = ["-- 공급업체 선택 --", "YSCM", "SAMSOO", "RPS", "THT", "FC TECH", "HTT", "ATH", "UIL"]
-    selected_supplier = st.selectbox("공급업체 선택", supplier_options)
+    try:
+        # Supabase에서 공급업체 목록 조회
+        supplier_result = supabase().from_("suppliers").select("supplier_id, supplier_code, supplier_name").order("supplier_code").execute()
+        
+        if supplier_result.data:
+            supplier_options = ["-- 공급업체 선택 --"] + [f"{item['supplier_code']} - {item['supplier_name']}" for item in supplier_result.data]
+            supplier_ids = {f"{item['supplier_code']} - {item['supplier_name']}": item['supplier_id'] for item in supplier_result.data}
+        else:
+            supplier_options = ["-- 공급업체 선택 --"]
+            supplier_ids = {}
+    except Exception as e:
+        st.error(f"공급업체 목록을 불러오는 중 오류가 발생했습니다: {e}")
+        supplier_options = ["-- 공급업체 선택 --"]
+        supplier_ids = {}
     
-    if selected_supplier != "-- 공급업체 선택 --":
-        # 데모 데이터 (실제로는 Supabase에서 가져옴)
-        if selected_supplier == "SAMSOO":
-            supplier_data = {
-                'supplier_id': 2,
-                'supplier_code': 'SAMSOO',
-                'supplier_name': '삼수',
-                'contact_person': '김철수',
-                'phone': '02-2345-6789',
-                'email': 'info@samsoo.com',
-                'address': '서울시 강남구 테헤란로 123',
-                'created_at': '2023-01-02',
-                'updated_at': '2023-01-02'
-            }
+    selected_option = st.selectbox("공급업체 선택", supplier_options)
+    
+    if selected_option != "-- 공급업체 선택 --":
+        selected_code = selected_option.split(" - ")[0]
+        selected_id = supplier_ids.get(selected_option)
+        
+        try:
+            # 공급업체 기본 정보 조회
+            supplier_data_result = supabase().from_("suppliers").select("*").eq("supplier_id", selected_id).execute()
             
-            # 공급하는 부품 목록
-            parts_data = {
-                'part_id': [1, 2, 5],
-                'part_code': ['MT001', 'MT002', 'MT005'],
-                'part_name': ['COOLANT FILTER', 'ELECTRIC FILTER', 'MOTOR'],
-                'unit_price': [15000, 25000, 450000],
-                'is_current': [True, True, True],
-                'effective_date': ['2023-01-01', '2023-01-01', '2023-01-01']
-            }
+            if not supplier_data_result.data:
+                display_error("선택한 공급업체 정보를 찾을 수 없습니다.")
+                return
             
-            # 입고 이력
-            inbound_data = {
-                'inbound_id': [1, 6, 10],
-                'part_code': ['MT001', 'MT002', 'MT005'],
-                'part_name': ['COOLANT FILTER', 'ELECTRIC FILTER', 'MOTOR'],
-                'quantity': [10, 5, 2],
-                'unit_price': [15000, 25000, 450000],
-                'total_price': [150000, 125000, 900000],
-                'inbound_date': ['2023-04-01', '2023-05-10', '2023-06-15']
-            }
+            supplier_data = supplier_data_result.data[0]
+            
+            # 공급업체가 관련된 부품 가격 정보 조회
+            parts_price_result = supabase().from_("part_prices").select("""
+                price_id,
+                unit_price,
+                currency,
+                effective_from,
+                is_current,
+                parts!inner(part_id, part_code, part_name)
+            """).eq("supplier_id", selected_id).execute()
+            
+            # 입고 이력 조회
+            inbound_result = supabase().from_("inbound").select("""
+                inbound_id,
+                inbound_date,
+                quantity,
+                unit_price,
+                total_price,
+                currency,
+                parts!inner(part_id, part_code, part_name)
+            """).eq("supplier_id", selected_id).order("inbound_date", desc=True).limit(10).execute()
             
             # 상세 정보 표시
             col1, col2 = st.columns(2)
             
             with col1:
                 st.markdown("#### 기본 정보")
-                st.markdown(f"**공급업체 코드:** {supplier_data['supplier_code']}")
-                st.markdown(f"**공급업체명:** {supplier_data['supplier_name']}")
-                st.markdown(f"**담당자:** {supplier_data['contact_person']}")
-                st.markdown(f"**연락처:** {supplier_data['phone']}")
+                st.markdown(f"**공급업체 코드:** {supplier_data.get('supplier_code', '')}")
+                st.markdown(f"**공급업체명:** {supplier_data.get('supplier_name', '')}")
+                st.markdown(f"**담당자:** {supplier_data.get('contact_person', '')}")
+                st.markdown(f"**연락처:** {supplier_data.get('phone', '')}")
             
             with col2:
                 st.markdown("#### 연락처 정보")
-                st.markdown(f"**이메일:** {supplier_data['email']}")
-                st.markdown(f"**주소:** {supplier_data['address']}")
-                st.markdown(f"**등록일:** {supplier_data['created_at']}")
-                st.markdown(f"**수정일:** {supplier_data['updated_at']}")
+                st.markdown(f"**이메일:** {supplier_data.get('email', '')}")
+                st.markdown(f"**주소:** {supplier_data.get('address', '')}")
+                st.markdown(f"**등록일:** {supplier_data.get('created_at', '')}")
+                st.markdown(f"**수정일:** {supplier_data.get('updated_at', '')}")
+                st.markdown(f"**웹사이트:** {supplier_data.get('website', '')}")
             
             # 공급 부품 정보
             st.markdown("#### 공급 부품 정보")
             
-            parts_df = pd.DataFrame(parts_data)
-            
-            st.dataframe(
-                parts_df,
-                column_config={
-                    'part_code': st.column_config.TextColumn(get_text('part_code')),
-                    'part_name': st.column_config.TextColumn(get_text('part_name')),
-                    'unit_price': st.column_config.NumberColumn(get_text('price'), format="₫%d"),
-                    'is_current': st.column_config.CheckboxColumn("현재 적용"),
-                    'effective_date': st.column_config.DateColumn("적용일", format="YYYY-MM-DD")
-                },
-                use_container_width=True,
-                hide_index=True
-            )
+            if parts_price_result.data:
+                # 데이터 변환
+                parts_data = []
+                for item in parts_price_result.data:
+                    part_data = item.get('parts', {})
+                    parts_data.append({
+                        'part_id': part_data.get('part_id'),
+                        'part_code': part_data.get('part_code'),
+                        'part_name': part_data.get('part_name'),
+                        'unit_price': item.get('unit_price'),
+                        'currency': item.get('currency'),
+                        'effective_date': item.get('effective_from'),
+                        'is_current': item.get('is_current')
+                    })
+                
+                parts_df = pd.DataFrame(parts_data)
+                
+                st.dataframe(
+                    parts_df,
+                    column_config={
+                        'part_code': st.column_config.TextColumn(get_text('part_code')),
+                        'part_name': st.column_config.TextColumn(get_text('part_name')),
+                        'unit_price': st.column_config.NumberColumn(get_text('price'), format="%d"),
+                        'currency': st.column_config.TextColumn("통화"),
+                        'effective_date': st.column_config.DateColumn("적용일", format="YYYY-MM-DD"),
+                        'is_current': st.column_config.CheckboxColumn("현재 적용")
+                    },
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("등록된 부품 가격 정보가 없습니다.")
             
             # 가격 정보 업데이트 버튼
             if st.button("가격 정보 업데이트"):
@@ -230,40 +301,69 @@ def show_suppliers_details():
             # 입고 이력
             st.markdown("#### 최근 입고 이력")
             
-            inbound_df = pd.DataFrame(inbound_data)
-            
-            st.dataframe(
-                inbound_df,
-                column_config={
-                    'inbound_id': st.column_config.NumberColumn("입고 ID", format="%d"),
-                    'part_code': st.column_config.TextColumn(get_text('part_code')),
-                    'part_name': st.column_config.TextColumn(get_text('part_name')),
-                    'quantity': st.column_config.NumberColumn(get_text('quantity'), format="%d"),
-                    'unit_price': st.column_config.NumberColumn(get_text('price'), format="₫%d"),
-                    'total_price': st.column_config.NumberColumn(get_text('total'), format="₫%d"),
-                    'inbound_date': st.column_config.DateColumn(get_text('inbound_date'), format="YYYY-MM-DD")
-                },
-                use_container_width=True,
-                hide_index=True
-            )
+            if inbound_result.data:
+                # 데이터 변환
+                inbound_data = []
+                for item in inbound_result.data:
+                    part_data = item.get('parts', {})
+                    inbound_data.append({
+                        'inbound_id': item.get('inbound_id'),
+                        'part_code': part_data.get('part_code'),
+                        'part_name': part_data.get('part_name'),
+                        'quantity': item.get('quantity'),
+                        'unit_price': item.get('unit_price'),
+                        'total_price': item.get('total_price'),
+                        'currency': item.get('currency'),
+                        'inbound_date': item.get('inbound_date')
+                    })
+                
+                inbound_df = pd.DataFrame(inbound_data)
+                
+                st.dataframe(
+                    inbound_df,
+                    column_config={
+                        'inbound_id': st.column_config.TextColumn("입고 ID"),
+                        'part_code': st.column_config.TextColumn(get_text('part_code')),
+                        'part_name': st.column_config.TextColumn(get_text('part_name')),
+                        'quantity': st.column_config.NumberColumn(get_text('quantity'), format="%d"),
+                        'unit_price': st.column_config.NumberColumn(get_text('price'), format="%d"),
+                        'total_price': st.column_config.NumberColumn(get_text('total'), format="%d"),
+                        'currency': st.column_config.TextColumn("통화"),
+                        'inbound_date': st.column_config.DateColumn(get_text('inbound_date'), format="YYYY-MM-DD")
+                    },
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("입고 이력이 없습니다.")
             
             # 수정/삭제 버튼
             col1, col2 = st.columns(2)
             with col1:
                 if st.button(f"✏️ {get_text('edit')}", key="edit_supplier"):
-                    # 수정 로직 (실제로는 수정 폼으로 이동)
-                    st.session_state.edit_supplier_id = supplier_data['supplier_id']
+                    # 나중에 수정 기능 구현 예정
+                    st.session_state.edit_supplier_id = supplier_data.get('supplier_id')
                     display_info("수정 모드로 전환됩니다.")
             
             with col2:
                 if st.button(f"🗑️ {get_text('delete')}", key="delete_supplier"):
-                    # 삭제 확인 (실제로는 확인 다이얼로그 후 삭제)
-                    st.warning(f"정말로 '{supplier_data['supplier_name']}' 공급업체를 삭제하시겠습니까?")
-                    if st.button("확인", key="confirm_delete"):
-                        # 삭제 로직
-                        display_success(f"공급업체 '{supplier_data['supplier_name']}'이(가) 삭제되었습니다.")
-        else:
-            st.info(f"'{selected_supplier}' 공급업체 정보가 준비 중입니다.")
+                    # 삭제 확인
+                    delete_confirm = st.checkbox(f"정말로 '{supplier_data.get('supplier_name')}' 공급업체를 삭제하시겠습니까?", key="confirm_delete")
+                    
+                    if delete_confirm:
+                        try:
+                            # Supabase에서 삭제
+                            result = supabase().from_("suppliers").delete().eq("supplier_id", selected_id).execute()
+                            
+                            if result.data:
+                                display_success(f"공급업체 '{supplier_data.get('supplier_name')}'이(가) 삭제되었습니다.")
+                                st.rerun()
+                            else:
+                                display_error("공급업체 삭제 중 오류가 발생했습니다.")
+                        except Exception as e:
+                            display_error(f"공급업체 삭제 중 오류가 발생했습니다: {e}")
+        except Exception as e:
+            display_error(f"공급업체 상세 정보를 불러오는 중 오류가 발생했습니다: {e}")
 
 if __name__ == "__main__":
     show() 
