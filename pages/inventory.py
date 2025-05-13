@@ -432,13 +432,43 @@ def show_inventory_analysis():
         # 총 재고 가치
         total_value = sum(category_values.values())
         
-        # 재고 부족 부품 수
-        low_stock_result = supabase().from_("inventory").select("inventory.part_id").gt("parts.min_stock", "inventory.current_quantity").execute()
-        low_stock_count = len(low_stock_result.data) if low_stock_result.data else 0
+        # 재고 부족 부품 수 - 수정된 코드
+        low_stock_count = 0
         
-        # 과잉 재고 부품 수
-        excess_stock_result = supabase().from_("inventory").select("inventory.part_id").gt("inventory.current_quantity", "parts.max_stock").execute()
-        excess_stock_count = len(excess_stock_result.data) if excess_stock_result.data else 0
+        # 모든 부품 조회
+        parts_result = supabase().from_("parts").select("part_id, min_stock").execute()
+        if parts_result.data:
+            for part in parts_result.data:
+                part_id = part['part_id']
+                min_stock = part.get('min_stock', 0)
+                
+                # 해당 부품의 재고 조회
+                inv_result = supabase().from_("inventory").select("current_quantity").eq("part_id", part_id).execute()
+                if inv_result.data:
+                    current_qty = inv_result.data[0].get('current_quantity', 0)
+                    # 재고가 최소치보다 적으면 카운트 증가
+                    if current_qty < min_stock:
+                        low_stock_count += 1
+        
+        # 과잉 재고 부품 수 - 수정된 코드
+        excess_stock_count = 0
+        
+        # 모든 부품 조회
+        parts_result = supabase().from_("parts").select("part_id, max_stock").execute()
+        if parts_result.data:
+            for part in parts_result.data:
+                part_id = part['part_id']
+                max_stock = part.get('max_stock', 0)
+                
+                # 최대 재고량이 설정되어 있는 경우만 확인
+                if max_stock > 0:
+                    # 해당 부품의 재고 조회
+                    inv_result = supabase().from_("inventory").select("current_quantity").eq("part_id", part_id).execute()
+                    if inv_result.data:
+                        current_qty = inv_result.data[0].get('current_quantity', 0)
+                        # 재고가 최대치보다 많으면 카운트 증가
+                        if current_qty > max_stock:
+                            excess_stock_count += 1
         
         summary_data = {
             'total_parts': total_parts,

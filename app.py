@@ -345,6 +345,7 @@ def display_dashboard():
     """
     from database.supabase_client import supabase
     import pandas as pd
+    from utils.helpers import format_currency
     
     # 대시보드 페이지 타이틀 추가
     st.markdown(f"<div class='main-header'>{get_text('dashboard')}</div>", unsafe_allow_html=True)
@@ -422,18 +423,26 @@ def display_dashboard():
         st.markdown("<div class='dashboard-card'><h3>최근 입고 현황</h3>", unsafe_allow_html=True)
         try:
             # 최근 5건의 입고 내역 조회
-            inbound_result = supabase().from_("inbound").select("""
-                inbound_id,
-                inbound_date,
-                quantity,
-                parts!inner(part_code, part_name),
-                suppliers!inner(supplier_name)
-            """).order("inbound_date", desc=True).limit(5).execute()
+            inbound_result = supabase().from_("inbound").select("inbound_id, inbound_date, part_id, supplier_id, quantity").order("inbound_date", desc=True).limit(5).execute()
             
             if inbound_result.data and len(inbound_result.data) > 0:
                 for item in inbound_result.data:
-                    part_data = item.get("parts", {})
-                    supplier_data = item.get("suppliers", {})
+                    part_id = item.get("part_id")
+                    supplier_id = item.get("supplier_id")
+                    
+                    # 부품 정보 조회
+                    part_data = {}
+                    if part_id:
+                        part_result = supabase().from_("parts").select("part_code, part_name").eq("part_id", part_id).execute()
+                        if part_result.data:
+                            part_data = part_result.data[0]
+                    
+                    # 공급업체 정보 조회
+                    supplier_data = {}
+                    if supplier_id:
+                        supplier_result = supabase().from_("suppliers").select("supplier_name").eq("supplier_id", supplier_id).execute()
+                        if supplier_result.data:
+                            supplier_data = supplier_result.data[0]
                     
                     inbound_date = item.get("inbound_date", "")
                     if inbound_date:
@@ -458,17 +467,18 @@ def display_dashboard():
         st.markdown("<div class='dashboard-card'><h3>최근 출고 현황</h3>", unsafe_allow_html=True)
         try:
             # 최근 5건의 출고 내역 조회
-            outbound_result = supabase().from_("outbound").select("""
-                outbound_id,
-                outbound_date,
-                quantity,
-                requester,
-                parts!inner(part_code, part_name)
-            """).order("outbound_date", desc=True).limit(5).execute()
+            outbound_result = supabase().from_("outbound").select("outbound_id, outbound_date, part_id, quantity, requester").order("outbound_date", desc=True).limit(5).execute()
             
             if outbound_result.data and len(outbound_result.data) > 0:
                 for item in outbound_result.data:
-                    part_data = item.get("parts", {})
+                    part_id = item.get("part_id")
+                    
+                    # 부품 정보 조회
+                    part_data = {}
+                    if part_id:
+                        part_result = supabase().from_("parts").select("part_code, part_name").eq("part_id", part_id).execute()
+                        if part_result.data:
+                            part_data = part_result.data[0]
                     
                     outbound_date = item.get("outbound_date", "")
                     if outbound_date:
