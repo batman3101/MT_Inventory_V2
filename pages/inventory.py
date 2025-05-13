@@ -62,74 +62,84 @@ def show_current_inventory():
     # 검색 버튼
     if st.button(f"🔍 {get_text('search')}", type="primary"):
         try:
-            # Supabase에서 재고 데이터와 부품 데이터 조인하여 가져오기
-            query = """
-            SELECT 
-                p.part_id::text, 
-                p.part_code, 
-                p.part_name, 
-                p.korean_name, 
-                p.vietnamese_name, 
-                p.category, 
-                p.unit, 
-                i.current_quantity, 
-                p.min_stock, 
-                i.last_count_date,
-                pp.unit_price
-            FROM 
-                inventory i
-            JOIN 
-                parts p ON i.part_id = p.part_id
-            LEFT JOIN (
-                SELECT part_id, unit_price
-                FROM part_prices
-                WHERE is_current = true
-            ) pp ON p.part_id = pp.part_id
-            """
+            # Supabase에서 부품 데이터 가져오기
+            query = supabase().from_("parts").select("part_id, part_code, part_name, korean_name, vietnamese_name, category, unit, min_stock")
             
-            # 필터 조건 추가
-            where_conditions = []
-            
+            # 검색 필터 적용
             if search_code:
-                where_conditions.append(f"p.part_code ILIKE '%{search_code}%'")
+                query = query.ilike("part_code", f"%{search_code}%")
             
             if search_name:
                 if name_display == "영문명":
-                    where_conditions.append(f"p.part_name ILIKE '%{search_name}%'")
+                    query = query.ilike("part_name", f"%{search_name}%")
                 elif name_display == "한국어명":
-                    where_conditions.append(f"p.korean_name ILIKE '%{search_name}%'")
+                    query = query.ilike("korean_name", f"%{search_name}%")
                 else:  # 베트남어명
-                    where_conditions.append(f"p.vietnamese_name ILIKE '%{search_name}%'")
+                    query = query.ilike("vietnamese_name", f"%{search_name}%")
             
             if search_category != "전체":
-                where_conditions.append(f"p.category = '{search_category}'")
-            
-            # WHERE 절 추가
-            if where_conditions:
-                query += " WHERE " + " AND ".join(where_conditions)
+                query = query.eq("category", search_category)
             
             # 쿼리 실행
-            result = supabase().rpc('search_inventory', {'query_sql': query}).execute()
+            result = query.execute()
             
             if not result.data:
                 display_info("검색 결과가 없습니다.")
                 return
+            
+            # 재고 및 가격 정보 가져오기
+            inventory_data = {}
+            price_data = {}
+            
+            # 부품 ID 목록
+            part_ids = [item['part_id'] for item in result.data]
+            
+            # 재고 정보 일괄 조회
+            inventory_result = supabase().from_("inventory").select("part_id, current_quantity, last_count_date").in_("part_id", part_ids).execute()
+            for item in inventory_result.data:
+                inventory_data[item['part_id']] = item
+            
+            # 가격 정보 일괄 조회
+            price_result = supabase().from_("part_prices").select("part_id, unit_price").in_("part_id", part_ids).eq("is_current", True).execute()
+            for item in price_result.data:
+                price_data[item['part_id']] = item
+            
+            # 결과 데이터 조합
+            combined_data = []
+            for part in result.data:
+                part_id = part['part_id']
+                inventory_info = inventory_data.get(part_id, {})
+                price_info = price_data.get(part_id, {})
+                
+                current_quantity = inventory_info.get('current_quantity', 0)
+                unit_price = price_info.get('unit_price', 0)
+                last_count_date = inventory_info.get('last_count_date')
+                
+                # 총 가치 계산
+                total_value = current_quantity * unit_price
+                
+                # 상태 결정
+                status = '부족' if current_quantity < part['min_stock'] else '정상'
+                
+                # 결과 데이터에 추가
+                combined_data.append({
+                    'part_id': part_id,
+                    'part_code': part['part_code'],
+                    'part_name': part['part_name'],
+                    'korean_name': part.get('korean_name', ''),
+                    'vietnamese_name': part.get('vietnamese_name', ''),
+                    'category': part.get('category', ''),
+                    'unit': part.get('unit', ''),
+                    'current_quantity': current_quantity,
+                    'min_stock': part.get('min_stock', 0),
+                    'last_count_date': last_count_date,
+                    'unit_price': unit_price,
+                    'total_value': total_value,
+                    'status': status
+                })
                 
             # 데이터프레임으로 변환
-            df = pd.DataFrame(result.data)
-            
-            # 총 가치 계산 (단가가 있는 경우)
-            df['total_value'] = df.apply(
-                lambda row: row['current_quantity'] * row.get('unit_price', 0) 
-                if pd.notna(row.get('unit_price')) else 0, 
-                axis=1
-            )
-            
-            # 수량과 최소 재고량 비교하여 상태 결정
-            df['status'] = df.apply(
-                lambda row: '부족' if row['current_quantity'] < row['min_stock'] else '정상', 
-                axis=1
-            )
+            df = pd.DataFrame(combined_data)
             
             # 이름 표시 설정에 따라 표시할 이름 컬럼 선택
             display_name_column = 'part_name'
@@ -215,39 +225,64 @@ def show_low_stock_alerts():
     st.info("최소 재고량보다 현재 재고량이 적은 부품 목록입니다.")
     
     try:
-        # Supabase에서 재고 부족 부품 데이터 조회
-        query = """
-        SELECT 
-            p.part_id::text, 
-            p.part_code, 
-            p.part_name, 
-            p.korean_name, 
-            p.category, 
-            p.unit, 
-            i.current_quantity, 
-            p.min_stock,
-            p.min_stock - i.current_quantity AS shortage,
-            (SELECT MAX(inbound_date) FROM inbound WHERE part_id = p.part_id) AS last_inbound_date,
-            (SELECT MAX(outbound_date) FROM outbound WHERE part_id = p.part_id) AS last_outbound_date
-        FROM 
-            inventory i
-        JOIN 
-            parts p ON i.part_id = p.part_id
-        WHERE 
-            i.current_quantity < p.min_stock
-        ORDER BY 
-            shortage DESC, p.part_code
-        """
+        # 부품 데이터 조회
+        parts_data = supabase().from_("parts").select("part_id, part_code, part_name, korean_name, category, unit, min_stock").execute()
         
-        # 쿼리 실행
-        result = supabase().rpc('search_inventory', {'query_sql': query}).execute()
-        
-        if not result.data:
-            st.success("모든 부품이 최소 재고량을 충족하고 있습니다.")
+        if not parts_data.data:
+            st.success("부품 정보가 없습니다.")
             return
             
+        # 재고 부족 아이템 찾기
+        low_stock_items = []
+        
+        for part in parts_data.data:
+            part_id = part['part_id']
+            min_stock = part['min_stock']
+            
+            # 재고 정보 조회
+            inventory_result = supabase().from_("inventory").select("current_quantity").eq("part_id", part_id).execute()
+            
+            if inventory_result.data:
+                current_quantity = inventory_result.data[0]['current_quantity']
+                
+                # 재고가 최소 재고량보다 적은 경우
+                if current_quantity < min_stock:
+                    # 부족량 계산
+                    shortage = min_stock - current_quantity
+                    
+                    # 최근 입고일 조회
+                    inbound_result = supabase().from_("inbound").select("inbound_date").eq("part_id", part_id).order("inbound_date", desc=True).limit(1).execute()
+                    last_inbound_date = inbound_result.data[0]['inbound_date'] if inbound_result.data else None
+                    
+                    # 최근 출고일 조회
+                    outbound_result = supabase().from_("outbound").select("outbound_date").eq("part_id", part_id).order("outbound_date", desc=True).limit(1).execute()
+                    last_outbound_date = outbound_result.data[0]['outbound_date'] if outbound_result.data else None
+                    
+                    # 결과에 추가
+                    low_stock_items.append({
+                        'part_id': part_id,
+                        'part_code': part['part_code'],
+                        'part_name': part['part_name'],
+                        'korean_name': part.get('korean_name', ''),
+                        'category': part.get('category', ''),
+                        'unit': part.get('unit', ''),
+                        'current_quantity': current_quantity,
+                        'min_stock': min_stock,
+                        'shortage': shortage,
+                        'last_inbound_date': last_inbound_date,
+                        'last_outbound_date': last_outbound_date
+                    })
+        
+        # 결과가 없으면 메시지 표시
+        if not low_stock_items:
+            st.success("모든 부품이 최소 재고량을 충족하고 있습니다.")
+            return
+        
+        # 부족량 기준으로 정렬
+        low_stock_items = sorted(low_stock_items, key=lambda x: x['shortage'], reverse=True)
+        
         # 데이터프레임으로 변환
-        df = pd.DataFrame(result.data)
+        df = pd.DataFrame(low_stock_items)
             
         # 알림 표시
         st.dataframe(
