@@ -360,20 +360,21 @@ def show_inventory_analysis():
         # 상태별 부품 수 데이터 가져오기
         status_result = supabase().from_("parts").select("status").execute()
         
-        status_counts = {
-            'NEW': 0,
-            'OLD': 0,
-            'OLDER': 0
-        }
+        # 실제 상태값 집계
+        status_counts = {}
         
         for item in status_result.data:
-            status = item.get('status', '').upper()
-            if status == 'NEW':
-                status_counts['NEW'] += 1
-            elif status == 'OLD':
-                status_counts['OLD'] += 1
-            else:
-                status_counts['OLDER'] += 1
+            status = item.get('status', '')
+            if status:
+                if status in status_counts:
+                    status_counts[status] += 1
+                else:
+                    status_counts[status] = 1
+        
+        # 기본 상태값이 없는 경우 초기화
+        for status in ['NEW', 'OLD', 'REPAIR', 'NG']:
+            if status not in status_counts:
+                status_counts[status] = 0
                 
         status_data = []
         for status, count in status_counts.items():
