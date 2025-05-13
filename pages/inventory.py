@@ -300,99 +300,196 @@ def show_inventory_analysis():
     """
     st.markdown("### 재고 분석")
     
-    # 데모 데이터 (실제로는 Supabase에서 가져옴)
-    category_data = {
-        'category': ['필터', '펌프', '모터', '밸브', '센서', '기타'],
-        'count': [15, 8, 10, 12, 7, 20],
-        'total_value': [3500000, 12000000, 8500000, 4200000, 1800000, 3000000]
-    }
-    category_df = pd.DataFrame(category_data)
-    
-    status_data = {
-        'status': ['NEW', 'OLD', 'OLDER'],
-        'count': [42, 20, 10]
-    }
-    status_df = pd.DataFrame(status_data)
-    
-    # 차트 표시
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("#### 카테고리별 부품 수")
-        fig1 = px.pie(
+    try:
+        # 카테고리별 부품 수와 총 가치 쿼리
+        category_query = """
+        SELECT 
+            p.category, 
+            COUNT(p.part_id) as count,
+            COALESCE(SUM(i.current_quantity * pp.unit_price), 0) as total_value
+        FROM 
+            parts p
+        JOIN 
+            inventory i ON p.part_id = i.part_id
+        LEFT JOIN (
+            SELECT part_id, unit_price
+            FROM part_prices
+            WHERE is_current = true
+        ) pp ON p.part_id = pp.part_id
+        GROUP BY 
+            p.category
+        ORDER BY 
+            p.category
+        """
+        
+        # 상태별 부품 수 쿼리
+        status_query = """
+        SELECT 
+            CASE 
+                WHEN p.status = 'new' THEN 'NEW'
+                WHEN p.status = 'old' THEN 'OLD'
+                ELSE 'OLDER'
+            END as status,
+            COUNT(p.part_id) as count
+        FROM 
+            parts p
+        JOIN 
+            inventory i ON p.part_id = i.part_id
+        GROUP BY 
+            CASE 
+                WHEN p.status = 'new' THEN 'NEW'
+                WHEN p.status = 'old' THEN 'OLD'
+                ELSE 'OLDER'
+            END
+        """
+        
+        # 재고 요약 쿼리
+        summary_query = """
+        SELECT 
+            (SELECT COUNT(*) FROM parts) as total_parts,
+            (SELECT SUM(current_quantity) FROM inventory) as total_quantity,
+            (SELECT SUM(i.current_quantity * pp.unit_price) 
+             FROM inventory i 
+             JOIN parts p ON i.part_id = p.part_id
+             LEFT JOIN (
+                 SELECT part_id, unit_price
+                 FROM part_prices
+                 WHERE is_current = true
+             ) pp ON p.part_id = pp.part_id) as total_value,
+            (SELECT COUNT(*) FROM inventory i JOIN parts p ON i.part_id = p.part_id WHERE i.current_quantity < p.min_stock) as low_stock_parts,
+            (SELECT COUNT(*) FROM inventory i JOIN parts p ON i.part_id = p.part_id WHERE i.current_quantity > p.max_stock) as excess_stock_parts
+        """
+        
+        # 재고 회전율 쿼리 (최근 12개월)
+        turnover_query = """
+        WITH monthly_data AS (
+            SELECT 
+                TO_CHAR(date_trunc('month', o.outbound_date), 'YYYY-MM') as month,
+                SUM(o.quantity * pp.unit_price) as monthly_usage,
+                AVG(i.current_quantity * pp.unit_price) as avg_inventory_value
+            FROM 
+                outbound o
+            JOIN 
+                parts p ON o.part_id = p.part_id
+            JOIN 
+                inventory i ON p.part_id = i.part_id
+            LEFT JOIN (
+                SELECT part_id, unit_price
+                FROM part_prices
+                WHERE is_current = true
+            ) pp ON p.part_id = pp.part_id
+            WHERE 
+                o.outbound_date >= date_trunc('month', NOW()) - INTERVAL '12 months'
+            GROUP BY 
+                TO_CHAR(date_trunc('month', o.outbound_date), 'YYYY-MM')
+            ORDER BY 
+                month
+        )
+        SELECT 
+            month,
+            CASE WHEN avg_inventory_value = 0 THEN 0 ELSE monthly_usage / avg_inventory_value END as turnover_rate
+        FROM 
+            monthly_data
+        """
+        
+        # 쿼리 실행
+        category_result = supabase().rpc('search_inventory', {'query_sql': category_query}).execute()
+        status_result = supabase().rpc('search_inventory', {'query_sql': status_query}).execute()
+        summary_result = supabase().rpc('search_inventory', {'query_sql': summary_query}).execute()
+        turnover_result = supabase().rpc('search_inventory', {'query_sql': turnover_query}).execute()
+        
+        # 데이터프레임으로 변환
+        category_df = pd.DataFrame(category_result.data)
+        status_df = pd.DataFrame(status_result.data)
+        summary_data = summary_result.data[0] if summary_result.data else {}
+        turnover_df = pd.DataFrame(turnover_result.data) if turnover_result.data else pd.DataFrame({'month': [], 'turnover_rate': []})
+        
+        # 데이터가 없는 경우 처리
+        if category_df.empty:
+            st.warning("카테고리별 데이터를 가져올 수 없습니다.")
+            return
+        
+        if status_df.empty:
+            st.warning("상태별 데이터를 가져올 수 없습니다.")
+            return
+        
+        # 차트 표시
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 카테고리별 부품 수")
+            fig1 = px.pie(
+                category_df,
+                values='count',
+                names='category',
+                title='카테고리별 부품 수'
+            )
+            st.plotly_chart(fig1, use_container_width=True)
+        
+        with col2:
+            st.markdown("#### 상태별 부품 수")
+            fig2 = px.pie(
+                status_df,
+                values='count',
+                names='status',
+                title='상태별 부품 수',
+                color_discrete_sequence=px.colors.sequential.Blues
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+        
+        # 카테고리별 재고 가치
+        st.markdown("#### 카테고리별 재고 가치")
+        fig3 = px.bar(
             category_df,
-            values='count',
-            names='category',
-            title='카테고리별 부품 수'
+            x='category',
+            y='total_value',
+            title='카테고리별 재고 가치',
+            labels={'category': '카테고리', 'total_value': '재고 가치'},
+            color='category'
         )
-        st.plotly_chart(fig1, use_container_width=True)
-    
-    with col2:
-        st.markdown("#### 상태별 부품 수")
-        fig2 = px.pie(
-            status_df,
-            values='count',
-            names='status',
-            title='상태별 부품 수',
-            color_discrete_sequence=px.colors.sequential.Blues
+        st.plotly_chart(fig3, use_container_width=True)
+        
+        # 재고 현황 요약
+        st.markdown("#### 재고 현황 요약")
+        
+        # 요약 데이터 준비
+        formatted_summary = {
+            '항목': ['총 부품 종류', '총 재고량', '총 재고 가치', '재고 부족 부품 수', '과잉 재고 부품 수'],
+            '값': [
+                f"{summary_data.get('total_parts', 0)}개",
+                f"{summary_data.get('total_quantity', 0):,}개",
+                f"{format_currency(summary_data.get('total_value', 0))}",
+                f"{summary_data.get('low_stock_parts', 0)}개",
+                f"{summary_data.get('excess_stock_parts', 0)}개"
+            ]
+        }
+        summary_df = pd.DataFrame(formatted_summary)
+        
+        # 요약 표 표시
+        st.table(summary_df)
+        
+        # 추가 분석 옵션
+        st.markdown("#### 추가 분석")
+        analysis_options = st.multiselect(
+            "분석 옵션 선택",
+            ["재고 회전율", "밸류에이션 분석", "사용 패턴 분석", "예측 분석"],
+            default=["재고 회전율"]
         )
-        st.plotly_chart(fig2, use_container_width=True)
-    
-    # 카테고리별 재고 가치
-    st.markdown("#### 카테고리별 재고 가치")
-    fig3 = px.bar(
-        category_df,
-        x='category',
-        y='total_value',
-        title='카테고리별 재고 가치',
-        labels={'category': '카테고리', 'total_value': '재고 가치'},
-        color='category'
-    )
-    st.plotly_chart(fig3, use_container_width=True)
-    
-    # 재고 현황 요약
-    st.markdown("#### 재고 현황 요약")
-    
-    # 요약 데이터
-    summary_data = {
-        '항목': ['총 부품 종류', '총 재고량', '총 재고 가치', '재고 부족 부품 수', '과잉 재고 부품 수'],
-        '값': ['72개', '1,235개', '33,000,000원', '3개', '15개']
-    }
-    summary_df = pd.DataFrame(summary_data)
-    
-    # 요약 표 표시
-    st.table(summary_df)
-    
-    # 추가 분석 옵션
-    st.markdown("#### 추가 분석")
-    analysis_options = st.multiselect(
-        "분석 옵션 선택",
-        ["재고 회전율", "밸류에이션 분석", "사용 패턴 분석", "예측 분석"],
-        default=["재고 회전율"]
-    )
-    
-    if "재고 회전율" in analysis_options:
-        st.markdown("#### 재고 회전율 분석")
-        st.info("최근 12개월 동안의 재고 회전율 추세를 보여줍니다.")
         
-        # 재고 회전율 데모 데이터
-        months = ['2023-05', '2023-06', '2023-07', '2023-08', '2023-09', '2023-10', 
-                 '2023-11', '2023-12', '2024-01', '2024-02', '2024-03', '2024-04']
-        turnover_rate = [2.1, 2.2, 2.0, 2.3, 2.4, 2.5, 2.3, 2.2, 2.1, 2.0, 2.2, 2.3]
-        
-        turnover_df = pd.DataFrame({
-            '월': months,
-            '회전율': turnover_rate
-        })
-        
-        fig4 = px.line(
-            turnover_df,
-            x='월',
-            y='회전율',
-            title='월별 재고 회전율',
-            markers=True
-        )
-        st.plotly_chart(fig4, use_container_width=True)
+        if "재고 회전율" in analysis_options and not turnover_df.empty:
+            st.markdown("#### 재고 회전율 분석")
+            st.info("최근 12개월 동안의 재고 회전율 추세를 보여줍니다.")
+            
+            fig4 = px.line(
+                turnover_df,
+                x='month',
+                y='turnover_rate',
+                title='월별 재고 회전율',
+                markers=True
+            )
+            st.plotly_chart(fig4, use_container_width=True)
+    except Exception as e:
+        display_error(f"재고 분석 데이터 조회 중 오류가 발생했습니다: {e}")
 
 if __name__ == "__main__":
     show() 
