@@ -7,6 +7,7 @@ import plotly.express as px
 import sys
 import os
 from datetime import datetime
+import logging
 
 # 모듈 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,6 +15,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.helpers import display_error, display_success, display_info, display_warning, format_date, format_currency
 from utils.i18n import get_text
 from database.supabase_client import supabase
+
+logger = logging.getLogger(__name__)
 
 def show():
     """
@@ -94,32 +97,40 @@ def show_current_inventory():
             # 부품 ID 목록
             part_ids = [item['part_id'] for item in result.data]
             
-            # 재고 정보 일괄 조회
-            inventory_result = supabase().from_("inventory").select("part_id, current_quantity, last_count_date").in_("part_id", part_ids).execute()
-            for item in inventory_result.data:
-                inventory_data[item['part_id']] = item
+            # 2. 모든 부품의 재고 정보를 한 번에 가져옴 - 배치 처리로 변경
+            for i in range(0, len(part_ids), 30):
+                batch_ids = part_ids[i:i+30]
+                try:
+                    inventory_result = supabase().from_("inventory").select("part_id, current_quantity").in_("part_id", batch_ids).execute()
+                    for item in inventory_result.data:
+                        inventory_data[item['part_id']] = item['current_quantity']
+                except Exception as e:
+                    logger.error(f"재고 정보 조회 중 오류: {e}")
+                    pass  # 오류가 발생해도 계속 진행
             
-            # 가격 정보 일괄 조회
-            price_result = supabase().from_("part_prices").select("part_id, unit_price").in_("part_id", part_ids).eq("is_current", True).execute()
-            for item in price_result.data:
-                price_data[item['part_id']] = item
+            # 3. 모든 부품의 가격 정보를 한 번에 가져옴 - 배치 처리로 변경
+            for i in range(0, len(part_ids), 30):
+                batch_ids = part_ids[i:i+30]
+                try:
+                    price_result = supabase().from_("part_prices").select("part_id, unit_price").in_("part_id", batch_ids).eq("is_current", True).execute()
+                    for item in price_result.data:
+                        price_data[item['part_id']] = item['unit_price']
+                except Exception as e:
+                    logger.error(f"가격 정보 조회 중 오류: {e}")
+                    pass  # 오류가 발생해도 계속 진행
             
             # 결과 데이터 조합
             combined_data = []
             for part in result.data:
                 part_id = part['part_id']
-                inventory_info = inventory_data.get(part_id, {})
-                price_info = price_data.get(part_id, {})
-                
-                current_quantity = inventory_info.get('current_quantity', 0)
-                unit_price = price_info.get('unit_price', 0)
-                last_count_date = inventory_info.get('last_count_date')
+                inventory_info = inventory_data.get(part_id, 0)
+                unit_price = price_data.get(part_id, 0)
                 
                 # 총 가치 계산
-                total_value = current_quantity * unit_price
+                total_value = inventory_info * unit_price
                 
                 # 상태 결정
-                status = '부족' if current_quantity < part['min_stock'] else '정상'
+                status = '부족' if inventory_info < part['min_stock'] else '정상'
                 
                 # 결과 데이터에 추가
                 combined_data.append({
@@ -130,9 +141,8 @@ def show_current_inventory():
                     'vietnamese_name': part.get('vietnamese_name', ''),
                     'category': part.get('category', ''),
                     'unit': part.get('unit', ''),
-                    'current_quantity': current_quantity,
+                    'current_quantity': inventory_info,
                     'min_stock': part.get('min_stock', 0),
-                    'last_count_date': last_count_date,
                     'unit_price': unit_price,
                     'total_value': total_value,
                     'status': status
@@ -157,7 +167,6 @@ def show_current_inventory():
                 'current_quantity', 
                 'min_stock', 
                 'total_value', 
-                'last_count_date', 
                 'status'
             ]].copy()
             
@@ -170,7 +179,6 @@ def show_current_inventory():
                 get_text('current_stock'),
                 get_text('min_stock'),
                 get_text('total'),
-                get_text('last_count_date'),
                 get_text('status')
             ]
             
@@ -184,7 +192,6 @@ def show_current_inventory():
                     get_text('current_stock'): st.column_config.NumberColumn(get_text('current_stock'), format="%d"),
                     get_text('min_stock'): st.column_config.NumberColumn(get_text('min_stock'), format="%d"),
                     get_text('total'): st.column_config.NumberColumn(get_text('total'), format="₫%d"),
-                    get_text('last_count_date'): st.column_config.DateColumn(get_text('last_count_date'), format="YYYY-MM-DD"),
                     get_text('status'): st.column_config.TextColumn(get_text('status'))
                 },
                 use_container_width=True,
@@ -336,51 +343,69 @@ def show_inventory_analysis():
     st.markdown("### 재고 분석")
     
     try:
-        # 카테고리별 부품 수와 총 가치 쿼리
-        # 직접 테이블 쿼리로 수정
-        category_result = supabase().from_("parts").select("category").execute()
+        # 카테고리별 부품 수와 총 가치 계산 - 효율성 개선
+        # 1. 먼저 모든 부품 카테고리 정보를 한 번에 가져옴
+        parts_result = supabase().from_("parts").select("part_id, category").execute()
         
-        if not category_result.data:
-            st.warning("카테고리 데이터를 가져올 수 없습니다.")
-            return
-            
-        # 카테고리별 데이터 집계
+        # 카테고리별 데이터 집계 및 부품 ID 목록 준비
         categories = {}
-        for item in category_result.data:
+        part_ids_by_category = {}
+        all_part_ids = []
+        
+        for item in parts_result.data:
+            part_id = item.get('part_id')
             cat = item.get('category', '기타')
             if not cat:  # 카테고리가 None이거나 빈 문자열인 경우
                 cat = '기타'
             
+            # 카테고리별 부품 수 집계
             if cat in categories:
                 categories[cat] += 1
             else:
                 categories[cat] = 1
-                
+                part_ids_by_category[cat] = []
+            
+            # 카테고리별 부품 ID 목록 생성
+            part_ids_by_category[cat].append(part_id)
+            all_part_ids.append(part_id)
+        
+        # 2. 모든 부품의 재고 정보를 한 번에 가져옴 - 배치 처리로 변경
+        inventory_data = {}
+        # part_ids 배열을 배치로 나누어 쿼리
+        batch_size = 30  # 한 번에 처리할 ID 수
+        for i in range(0, len(all_part_ids), batch_size):
+            batch_ids = all_part_ids[i:i+batch_size]
+            try:
+                inventory_result = supabase().from_("inventory").select("part_id, current_quantity").in_("part_id", batch_ids).execute()
+                for item in inventory_result.data:
+                    inventory_data[item['part_id']] = item['current_quantity']
+            except Exception as e:
+                logger.error(f"재고 정보 조회 중 오류: {e}")
+                pass  # 오류가 발생해도 계속 진행
+        
+        # 3. 모든 부품의 가격 정보를 한 번에 가져옴 - 배치 처리로 변경
+        price_data = {}
+        for i in range(0, len(all_part_ids), batch_size):
+            batch_ids = all_part_ids[i:i+batch_size]
+            try:
+                price_result = supabase().from_("part_prices").select("part_id, unit_price").in_("part_id", batch_ids).eq("is_current", True).execute()
+                for item in price_result.data:
+                    price_data[item['part_id']] = item['unit_price']
+            except Exception as e:
+                logger.error(f"가격 정보 조회 중 오류: {e}")
+                pass  # 오류가 발생해도 계속 진행
+        
         # 카테고리별 가치 계산
         category_values = {}
-        for cat in categories.keys():
-            # 해당 카테고리의 부품 ID 목록 가져오기
-            parts_result = supabase().from_("parts").select("part_id").eq("category", cat).execute()
+        for cat, part_ids in part_ids_by_category.items():
+            total_value = 0
+            for part_id in part_ids:
+                quantity = inventory_data.get(part_id, 0)
+                price = price_data.get(part_id, 0)
+                total_value += quantity * price
             
-            if parts_result.data:
-                part_ids = [item['part_id'] for item in parts_result.data]
-                
-                total_value = 0
-                for part_id in part_ids:
-                    # 재고 수량 가져오기
-                    inventory_result = supabase().from_("inventory").select("current_quantity").eq("part_id", part_id).execute()
-                    quantity = inventory_result.data[0]['current_quantity'] if inventory_result.data else 0
-                    
-                    # 가격 가져오기
-                    price_result = supabase().from_("part_prices").select("unit_price").eq("part_id", part_id).eq("is_current", True).execute()
-                    price = price_result.data[0]['unit_price'] if price_result.data else 0
-                    
-                    total_value += quantity * price
-                
-                category_values[cat] = total_value
-            else:
-                category_values[cat] = 0
-                
+            category_values[cat] = total_value
+            
         # 데이터프레임 생성
         category_data = []
         for cat, count in categories.items():
@@ -392,7 +417,7 @@ def show_inventory_analysis():
             
         category_df = pd.DataFrame(category_data)
         
-        # 상태별 부품 수 데이터 가져오기
+        # 상태별 부품 수 집계도 개선
         status_result = supabase().from_("parts").select("status").execute()
         
         # 실제 상태값 집계
@@ -420,55 +445,40 @@ def show_inventory_analysis():
             
         status_df = pd.DataFrame(status_data)
         
-        # 재고 요약 데이터
-        # 총 부품 수
-        parts_count_result = supabase().from_("parts").select("*", count="exact").execute()
-        total_parts = parts_count_result.count if hasattr(parts_count_result, 'count') else 0
+        # 재고 요약 데이터 - 효율성 개선
+        # 총 부품 수는 이미 계산 완료
+        total_parts = len(all_part_ids)
         
-        # 총 재고량
-        total_quantity_result = supabase().from_("inventory").select("current_quantity").execute()
-        total_quantity = sum([item.get('current_quantity', 0) for item in total_quantity_result.data])
+        # 총 재고량 - 이미 inventory_data에 있는 정보 활용
+        total_quantity = sum(inventory_data.values())
         
-        # 총 재고 가치
+        # 총 재고 가치 - 이미 category_values에 있는 정보 활용
         total_value = sum(category_values.values())
         
-        # 재고 부족 부품 수 - 수정된 코드
+        # 재고 부족 부품 수 계산 - 효율성 개선
+        # 부품별 최소 재고량 정보 가져오기
+        min_stock_result = supabase().from_("parts").select("part_id, min_stock").execute()
+        min_stock_data = {item['part_id']: item.get('min_stock', 0) for item in min_stock_result.data}
+        
+        # 재고 부족 계산
         low_stock_count = 0
+        for part_id, min_stock in min_stock_data.items():
+            current_qty = inventory_data.get(part_id, 0)
+            if current_qty < min_stock:
+                low_stock_count += 1
         
-        # 모든 부품 조회
-        parts_result = supabase().from_("parts").select("part_id, min_stock").execute()
-        if parts_result.data:
-            for part in parts_result.data:
-                part_id = part['part_id']
-                min_stock = part.get('min_stock', 0)
-                
-                # 해당 부품의 재고 조회
-                inv_result = supabase().from_("inventory").select("current_quantity").eq("part_id", part_id).execute()
-                if inv_result.data:
-                    current_qty = inv_result.data[0].get('current_quantity', 0)
-                    # 재고가 최소치보다 적으면 카운트 증가
-                    if current_qty < min_stock:
-                        low_stock_count += 1
+        # 과잉 재고 부품 수 계산 - 효율성 개선
+        # 부품별 최대 재고량 정보 가져오기
+        max_stock_result = supabase().from_("parts").select("part_id, max_stock").execute()
+        max_stock_data = {item['part_id']: item.get('max_stock', 0) for item in max_stock_result.data}
         
-        # 과잉 재고 부품 수 - 수정된 코드
+        # 과잉 재고 계산
         excess_stock_count = 0
-        
-        # 모든 부품 조회
-        parts_result = supabase().from_("parts").select("part_id, max_stock").execute()
-        if parts_result.data:
-            for part in parts_result.data:
-                part_id = part['part_id']
-                max_stock = part.get('max_stock', 0)
-                
-                # 최대 재고량이 설정되어 있는 경우만 확인
-                if max_stock > 0:
-                    # 해당 부품의 재고 조회
-                    inv_result = supabase().from_("inventory").select("current_quantity").eq("part_id", part_id).execute()
-                    if inv_result.data:
-                        current_qty = inv_result.data[0].get('current_quantity', 0)
-                        # 재고가 최대치보다 많으면 카운트 증가
-                        if current_qty > max_stock:
-                            excess_stock_count += 1
+        for part_id, max_stock in max_stock_data.items():
+            if max_stock > 0:  # 최대 재고량이 설정된 경우만
+                current_qty = inventory_data.get(part_id, 0)
+                if current_qty > max_stock:
+                    excess_stock_count += 1
         
         summary_data = {
             'total_parts': total_parts,

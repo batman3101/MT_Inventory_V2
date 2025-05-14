@@ -7,6 +7,7 @@ import os
 import sys
 from datetime import datetime
 import pandas as pd
+import logging
 
 # 모듈 경로 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -347,6 +348,8 @@ def display_dashboard():
     import pandas as pd
     from utils.helpers import format_currency
     
+    logger = logging.getLogger(__name__)
+    
     # 대시보드 페이지 타이틀 추가
     st.markdown(f"<div class='main-header'>{get_text('dashboard')}</div>", unsafe_allow_html=True)
     
@@ -362,51 +365,64 @@ def display_dashboard():
         st.markdown("<div class='dashboard-card'><h3>재고 요약</h3>", unsafe_allow_html=True)
         try:
             # 총 부품 수 조회
-            parts_result = supabase().from_("parts").select("part_id", count="exact").execute()
+            parts_result = supabase().from_("parts").select("part_id, min_stock", count="exact").execute()
             total_parts = parts_result.count if hasattr(parts_result, 'count') else 0
             
-            # 총 재고 수량 계산
-            inventory_result = supabase().from_("inventory").select("current_quantity").execute()
-            total_quantity = sum([item.get('current_quantity', 0) for item in inventory_result.data]) if inventory_result.data else 0
+            # 부품 ID 목록 및 최소 재고량 정보 준비
+            part_ids = []
+            min_stock_data = {}
             
-            # 총 재고 가치 계산 (부품별 재고 * 단가의 합계)
-            total_value = 0
-            inventory_items = supabase().from_("inventory").select("part_id, current_quantity").execute()
+            if parts_result.data:
+                for part in parts_result.data:
+                    part_id = part.get('part_id')
+                    part_ids.append(part_id)
+                    min_stock_data[part_id] = part.get('min_stock', 0)
             
-            if inventory_items.data:
-                for item in inventory_items.data:
+            # 재고 정보 일괄 조회
+            inventory_result = supabase().from_("inventory").select("part_id, current_quantity").in_("part_id", part_ids).execute()
+            
+            # 부품별 재고 수량 맵 생성
+            inventory_data = {}
+            total_quantity = 0
+            
+            if inventory_result.data:
+                for item in inventory_result.data:
                     part_id = item.get('part_id')
                     quantity = item.get('current_quantity', 0)
-                    
-                    # 해당 부품의 현재 단가 조회
-                    price_result = supabase().from_("part_prices").select("unit_price").eq("part_id", part_id).eq("is_current", True).execute()
-                    unit_price = price_result.data[0].get('unit_price', 0) if price_result.data else 0
-                    
-                    # 재고 가치에 추가
-                    total_value += quantity * unit_price
+                    inventory_data[part_id] = quantity
+                    total_quantity += quantity
+            
+            # 가격 정보 일괄 조회 - 배치 처리로 변경
+            price_data = {}
+            batch_size = 30  # 한 번에 처리할 ID 수
+            
+            for i in range(0, len(part_ids), batch_size):
+                batch_ids = part_ids[i:i+batch_size]
+                try:
+                    price_result = supabase().from_("part_prices").select("part_id, unit_price").in_("part_id", batch_ids).eq("is_current", True).execute()
+                    for item in price_result.data:
+                        price_data[item.get('part_id')] = item.get('unit_price', 0)
+                except Exception as e:
+                    logger.error(f"가격 정보 조회 중 오류: {e}")
+            
+            # 총 재고 가치 계산
+            total_value = 0
+            for part_id, quantity in inventory_data.items():
+                unit_price = price_data.get(part_id, 0)
+                total_value += quantity * unit_price
+            
+            # 재고 부족 아이템 수 계산
+            low_stock_count = 0
+            for part_id, min_stock in min_stock_data.items():
+                current_quantity = inventory_data.get(part_id, 0)
+                if current_quantity < min_stock:
+                    low_stock_count += 1
             
             st.markdown(f"""
             <p>총 부품 종류: <strong>{total_parts}</strong>개</p>
             <p>총 재고 수량: <strong>{total_quantity}</strong>개</p>
             <p>총 재고 가치: <strong>{format_currency(total_value)}</strong></p>
             """, unsafe_allow_html=True)
-            
-            # 재고 부족 품목 수 조회 (부품별 최소 재고량과 현재 재고량 비교)
-            low_stock_count = 0
-            parts_result = supabase().from_("parts").select("part_id, min_stock").execute()
-            
-            if parts_result.data:
-                for part in parts_result.data:
-                    part_id = part.get('part_id')
-                    min_stock = part.get('min_stock', 0)
-                    
-                    # 현재 재고량 조회
-                    inventory_result = supabase().from_("inventory").select("current_quantity").eq("part_id", part_id).execute()
-                    current_quantity = inventory_result.data[0].get('current_quantity', 0) if inventory_result.data else 0
-                    
-                    # 최소 재고량보다 적으면 카운트 증가
-                    if current_quantity < min_stock:
-                        low_stock_count += 1
             
             if low_stock_count > 0:
                 st.markdown(f"<p style='color:red'>⚠️ 재고 부족 품목: <strong>{low_stock_count}</strong>개</p>", unsafe_allow_html=True)
@@ -501,20 +517,34 @@ def display_dashboard():
     # 재고 부족 아이템 목록
     st.markdown("<div class='dashboard-card'><h3>재고 부족 아이템</h3>", unsafe_allow_html=True)
     try:
-        # 재고 부족 아이템 조회
-        low_stock_items = []
+        # 모든 부품 정보를 한 번에 가져오기 (ID, 코드, 이름, 카테고리, 단위, 최소재고량)
         parts_result = supabase().from_("parts").select("part_id, part_code, part_name, category, unit, min_stock").execute()
         
         if parts_result.data:
+            # 모든 부품 ID 목록 생성
+            all_part_ids = [part.get('part_id') for part in parts_result.data]
+            
+            # 모든 부품의 재고 정보 한 번에 가져오기 - 배치 처리로 변경
+            inventory_map = {}
+            batch_size = 30  # 한 번에 처리할 ID 수
+            
+            for i in range(0, len(all_part_ids), batch_size):
+                batch_ids = all_part_ids[i:i+batch_size]
+                try:
+                    inventory_result = supabase().from_("inventory").select("part_id, current_quantity").in_("part_id", batch_ids).execute()
+                    for item in inventory_result.data:
+                        inventory_map[item.get('part_id')] = item.get('current_quantity', 0)
+                except Exception as e:
+                    logger.error(f"재고 정보 조회 중 오류: {e}")
+            
+            # 재고 부족 아이템 찾기
+            low_stock_items = []
             for part in parts_result.data:
                 part_id = part.get('part_id')
-                
-                # 현재 재고량 조회
-                inventory_result = supabase().from_("inventory").select("current_quantity").eq("part_id", part_id).execute()
-                current_quantity = inventory_result.data[0].get('current_quantity', 0) if inventory_result.data else 0
+                min_stock = part.get('min_stock', 0)
+                current_quantity = inventory_map.get(part_id, 0)
                 
                 # 최소 재고량보다 적으면 목록에 추가
-                min_stock = part.get('min_stock', 0)
                 if current_quantity < min_stock:
                     shortage = min_stock - current_quantity
                     low_stock_items.append({
@@ -527,32 +557,32 @@ def display_dashboard():
                         'min_stock': min_stock,
                         'shortage': shortage
                     })
-        
-        # 부족량 기준으로 정렬하고 상위 10개만 표시
-        low_stock_items = sorted(low_stock_items, key=lambda x: x.get('shortage', 0), reverse=True)[:10]
-        
-        if low_stock_items:
-            # 데이터프레임으로 변환
-            df = pd.DataFrame(low_stock_items)
             
-            # 데이터프레임 표시
-            st.dataframe(
-                df,
-                column_config={
-                    'part_code': st.column_config.TextColumn(get_text('part_code')),
-                    'part_name': st.column_config.TextColumn(get_text('part_name')),
-                    'category': st.column_config.TextColumn(get_text('category')),
-                    'unit': st.column_config.TextColumn(get_text('unit')),
-                    'current_quantity': st.column_config.NumberColumn(get_text('current_stock'), format="%d"),
-                    'min_stock': st.column_config.NumberColumn(get_text('min_stock'), format="%d"),
-                    'shortage': st.column_config.NumberColumn("부족 수량", format="%d")
-                },
-                hide_index=True,
-                use_container_width=True
-            )
-        else:
-            st.markdown("<p>재고 부족 아이템이 없습니다.</p>", unsafe_allow_html=True)
+            # 부족량 기준으로 정렬하고 상위 10개만 표시
+            low_stock_items = sorted(low_stock_items, key=lambda x: x.get('shortage', 0), reverse=True)[:10]
             
+            if low_stock_items:
+                # 데이터프레임으로 변환
+                df = pd.DataFrame(low_stock_items)
+                
+                # 데이터프레임 표시
+                st.dataframe(
+                    df,
+                    column_config={
+                        'part_code': st.column_config.TextColumn(get_text('part_code')),
+                        'part_name': st.column_config.TextColumn(get_text('part_name')),
+                        'category': st.column_config.TextColumn(get_text('category')),
+                        'unit': st.column_config.TextColumn(get_text('unit')),
+                        'current_quantity': st.column_config.NumberColumn(get_text('current_stock'), format="%d"),
+                        'min_stock': st.column_config.NumberColumn(get_text('min_stock'), format="%d"),
+                        'shortage': st.column_config.NumberColumn("부족 수량", format="%d")
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.markdown("<p>재고 부족 아이템이 없습니다.</p>", unsafe_allow_html=True)
+                
     except Exception as e:
         st.markdown(f"<p>재고 부족 아이템을 조회하는 중 오류가 발생했습니다: {str(e)}</p>", unsafe_allow_html=True)
         

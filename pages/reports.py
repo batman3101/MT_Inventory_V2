@@ -300,29 +300,54 @@ def show_inventory_analysis_report():
     st.markdown("#### 카테고리별 재고 현황")
     
     try:
-        # Supabase에서 카테고리별 재고 데이터 조회
-        category_query = """
-        SELECT 
-            p.category, 
-            SUM(i.current_quantity) as quantity,
-            SUM(i.current_quantity * COALESCE(pp.unit_price, 0)) as value
-        FROM 
-            inventory i
-        JOIN 
-            parts p ON i.part_id = p.part_id
-        LEFT JOIN (
-            SELECT part_id, unit_price
-            FROM part_prices
-            WHERE is_current = true
-        ) pp ON p.part_id = pp.part_id
-        GROUP BY 
-            p.category
-        """
+        # 직접 카테고리별 데이터 조회
+        category_result = supabase().from_("parts").select("category").execute()
         
-        result = supabase().rpc('search_inventory', {'query_sql': category_query}).execute()
-        
-        if result.data:
-            category_df = pd.DataFrame(result.data)
+        if category_result.data:
+            categories = {}
+            for item in category_result.data:
+                cat = item.get('category', '기타')
+                if not cat:  # None이나 빈 문자열인 경우
+                    cat = '기타'
+                    
+                if cat in categories:
+                    categories[cat] += 1
+                else:
+                    categories[cat] = 1
+            
+            # 카테고리별 수량과 가치 계산
+            category_data = []
+            for cat, count in categories.items():
+                # 해당 카테고리 부품 ID 목록 가져오기
+                parts_result = supabase().from_("parts").select("part_id").eq("category", cat).execute()
+                
+                total_quantity = 0
+                total_value = 0
+                
+                if parts_result.data:
+                    part_ids = [item['part_id'] for item in parts_result.data]
+                    
+                    # 해당 부품들의 재고 수량 합계 구하기
+                    for part_id in part_ids:
+                        # 재고 수량 조회
+                        inventory_result = supabase().from_("inventory").select("current_quantity").eq("part_id", part_id).execute()
+                        quantity = inventory_result.data[0]['current_quantity'] if inventory_result.data else 0
+                        total_quantity += quantity
+                        
+                        # 가격 조회
+                        price_result = supabase().from_("part_prices").select("unit_price").eq("part_id", part_id).eq("is_current", True).execute()
+                        price = price_result.data[0]['unit_price'] if price_result.data else 0
+                        
+                        # 가치 계산
+                        total_value += quantity * price
+                
+                category_data.append({
+                    'category': cat,
+                    'quantity': total_quantity,
+                    'value': total_value
+                })
+            
+            category_df = pd.DataFrame(category_data)
         else:
             # 결과가 없을 경우 빈 데이터프레임 생성
             category_df = pd.DataFrame({
@@ -372,27 +397,42 @@ def show_inventory_analysis_report():
         end_date = datetime.now()
         start_date = end_date - timedelta(days=180)  # 약 6개월
         
-        # Supabase에서 월별 재고 변화 데이터 조회 (실제로는 이력 테이블이 필요)
-        # 현재는 임시로 입고/출고 데이터를 기반으로 추정
-        monthly_query = f"""
-        SELECT 
-            TO_CHAR(DATE_TRUNC('month', i.inbound_date), 'YYYY-MM') as month,
-            SUM(i.total_price) as value
-        FROM 
-            inbound i
-        WHERE 
-            i.inbound_date >= '{start_date.strftime('%Y-%m-%d')}'
-            AND i.inbound_date <= '{end_date.strftime('%Y-%m-%d')}'
-        GROUP BY 
-            DATE_TRUNC('month', i.inbound_date)
-        ORDER BY 
-            DATE_TRUNC('month', i.inbound_date)
-        """
+        # 월별 입고 금액 집계
+        inbound_result = supabase().from_("inbound").select("inbound_date, total_price").gte("inbound_date", start_date.strftime('%Y-%m-%d')).lte("inbound_date", end_date.strftime('%Y-%m-%d')).execute()
         
-        month_result = supabase().rpc('search_inventory', {'query_sql': monthly_query}).execute()
-        
-        if month_result.data:
-            stock_df = pd.DataFrame(month_result.data)
+        if inbound_result.data:
+            # 월별로 데이터 그룹화
+            monthly_data = {}
+            
+            for item in inbound_result.data:
+                inbound_date = item.get('inbound_date', '')
+                if inbound_date:
+                    # 날짜에서 년-월 추출
+                    if isinstance(inbound_date, str):
+                        month = inbound_date[:7]  # YYYY-MM 형식
+                    else:
+                        # datetime 객체인 경우
+                        month = inbound_date.strftime('%Y-%m')
+                    
+                    total_price = item.get('total_price', 0)
+                    
+                    if month in monthly_data:
+                        monthly_data[month] += total_price
+                    else:
+                        monthly_data[month] = total_price
+            
+            # 데이터프레임으로 변환
+            months = []
+            values = []
+            
+            for month, value in sorted(monthly_data.items()):
+                months.append(month)
+                values.append(value)
+            
+            stock_df = pd.DataFrame({
+                '월': months,
+                '재고 가치': values
+            })
         else:
             # 데이터가 없을 경우 빈 데이터프레임 생성
             months = [

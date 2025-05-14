@@ -101,13 +101,24 @@ class SupabaseClient:
             # 2) SUPABASE_KEY 키로 시도
             if 'SUPABASE_KEY' in st.secrets:
                 key = st.secrets['SUPABASE_KEY']
-                if 'role":"anon"' in key:  # anon 키 확인
+                if 'role":"anon"' in key or 'role":"authenticated"' in key:  # anon/authenticated 키 확인
                     return key
         except Exception:
             logger.info("Streamlit 시크릿에서 Supabase anon 키를 찾을 수 없습니다.")
         
         # 2. 환경 변수에서 시도
-        return SUPABASE_KEY if 'role":"anon"' in SUPABASE_KEY else None
+        try:
+            # SUPABASE_KEY 환경 변수를 직접 사용 (role 체크 없이)
+            if SUPABASE_KEY:
+                # anon 키 확인 로직을 완화하여 값이 있는 경우 사용
+                logger.info(f"환경 변수에서 anon 키를 찾았습니다. 길이: {len(SUPABASE_KEY)}")
+                return SUPABASE_KEY
+            else:
+                logger.warning("환경 변수 SUPABASE_KEY가 비어 있습니다.")
+        except Exception as e:
+            logger.error(f"환경 변수에서 anon 키를 가져오는 중 오류 발생: {e}")
+        
+        return None
     
     def _get_service_key(self):
         """Supabase service_role API 키 가져오기"""
