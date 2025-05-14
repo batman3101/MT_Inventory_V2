@@ -242,6 +242,7 @@ class SupabaseClient:
             return False
 
 # 간단한 호출을 위한 함수
+@st.cache_resource
 def supabase(use_service_role=False):
     """
     Supabase 클라이언트 인스턴스 반환
