@@ -378,127 +378,128 @@ def show_current_inventory():
     
     # 검색 버튼
     if st.button(f"🔍 {get_text('search')}", type="primary"):
-        # 로딩 상태 표시
-        with st.spinner("데이터를 불러오는 중..."):
-            # 캐싱된 함수를 사용하여 부품 데이터 가져오기
-            parts_data = get_parts(search_code, search_name, search_category, name_display)
-            
-            if not parts_data:
-                display_info("검색 결과가 없습니다.")
-                return
-            
-            # 부품 ID 목록
-            part_ids = [item['part_id'] for item in parts_data]
-            
-            # 캐싱된 함수를 사용하여 재고 및 가격 정보 가져오기
-            inventory_data = get_inventory_data(part_ids)
-            price_data = get_price_data(part_ids)
-            
-            # 결과 데이터 조합
-            combined_data = []
-            for part in parts_data:
-                part_id = part['part_id']
-                inventory_info = inventory_data.get(part_id, 0)
-                unit_price = price_data.get(part_id, 0)
+        try:
+            # 로딩 상태 표시
+            with st.spinner("데이터를 불러오는 중..."):
+                # 캐싱된 함수를 사용하여 부품 데이터 가져오기
+                parts_data = get_parts(search_code, search_name, search_category, name_display)
                 
-                # None 값 안전 처리
-                min_stock = part.get('min_stock', 0) if part.get('min_stock') is not None else 0
+                if not parts_data:
+                    display_info("검색 결과가 없습니다.")
+                    return
                 
-                # 총 가치 계산
-                total_value = inventory_info * unit_price
+                # 부품 ID 목록
+                part_ids = [item['part_id'] for item in parts_data]
                 
-                # 상태 결정
-                status = '부족' if inventory_info < min_stock else '정상'
+                # 캐싱된 함수를 사용하여 재고 및 가격 정보 가져오기
+                inventory_data = get_inventory_data(part_ids)
+                price_data = get_price_data(part_ids)
                 
-                # 결과 데이터에 추가
-                combined_data.append({
-                    'part_id': part_id,
-                    'part_code': part['part_code'],
-                    'part_name': part['part_name'],
-                    'korean_name': part.get('korean_name', ''),
-                    'vietnamese_name': part.get('vietnamese_name', ''),
-                    'category': part.get('category', ''),
-                    'unit': part.get('unit', ''),
-                    'current_quantity': inventory_info,
-                    'min_stock': min_stock,
-                    'unit_price': unit_price,
-                    'total_value': total_value,
-                    'status': status
-                })
-            
-            # 데이터프레임으로 변환
-            df = pd.DataFrame(combined_data)
-            
-            # 이름 표시 설정에 따라 표시할 이름 컬럼 선택
-            display_name_column = 'part_name'
-            if name_display == "한국어명":
-                display_name_column = 'korean_name'
-            elif name_display == "베트남어명":
-                display_name_column = 'vietnamese_name'
-            
-            # 결과 표시용 컬럼 재구성
-            display_df = df[[
-                'part_code', 
-                display_name_column, 
-                'category', 
-                'unit', 
-                'current_quantity', 
-                'min_stock', 
-                'total_value', 
-                'status'
-            ]].copy()
-            
-            # 컬럼명 변경
-            display_df.columns = [
-                get_text('part_code'),
-                get_text('part_name'),
-                get_text('category'),
-                get_text('unit'),
-                get_text('current_stock'),
-                get_text('min_stock'),
-                get_text('total'),
-                get_text('status')
-            ]
-            
-            st.dataframe(
-                display_df,
-                column_config={
-                    get_text('part_code'): st.column_config.TextColumn(get_text('part_code')),
-                    get_text('part_name'): st.column_config.TextColumn(get_text('part_name')),
-                    get_text('category'): st.column_config.TextColumn(get_text('category')),
-                    get_text('unit'): st.column_config.TextColumn(get_text('unit')),
-                    get_text('current_stock'): st.column_config.NumberColumn(get_text('current_stock'), format="%d"),
-                    get_text('min_stock'): st.column_config.NumberColumn(get_text('min_stock'), format="%d"),
-                    get_text('total'): st.column_config.NumberColumn(get_text('total'), format="₫%d"),
-                    get_text('status'): st.column_config.TextColumn(get_text('status'))
-                },
-                use_container_width=True,
-                hide_index=True
-            )
-            
-            # 재고 총액 계산
-            total_inventory_value = df['total_value'].sum()
-            st.markdown(f"### 재고 총액: {format_currency(total_inventory_value)}")
-            
-            # 내보내기 버튼
-            if st.button(f"📥 Excel {get_text('save')}"):
-                # Excel 저장 로직
-                current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"inventory_export_{current_date}.xlsx"
+                # 결과 데이터 조합
+                combined_data = []
+                for part in parts_data:
+                    part_id = part['part_id']
+                    inventory_info = inventory_data.get(part_id, 0)
+                    unit_price = price_data.get(part_id, 0)
+                    
+                    # None 값 안전 처리
+                    min_stock = part.get('min_stock', 0) if part.get('min_stock') is not None else 0
+                    
+                    # 총 가치 계산
+                    total_value = inventory_info * unit_price
+                    
+                    # 상태 결정
+                    status = '부족' if inventory_info < min_stock else '정상'
+                    
+                    # 결과 데이터에 추가
+                    combined_data.append({
+                        'part_id': part_id,
+                        'part_code': part['part_code'],
+                        'part_name': part['part_name'],
+                        'korean_name': part.get('korean_name', ''),
+                        'vietnamese_name': part.get('vietnamese_name', ''),
+                        'category': part.get('category', ''),
+                        'unit': part.get('unit', ''),
+                        'current_quantity': inventory_info,
+                        'min_stock': min_stock,
+                        'unit_price': unit_price,
+                        'total_value': total_value,
+                        'status': status
+                    })
                 
-                # 데이터프레임을 엑셀로 변환
-                df.to_excel(filename, index=False)
+                # 데이터프레임으로 변환
+                df = pd.DataFrame(combined_data)
                 
-                # 다운로드 링크 생성
-                with open(filename, "rb") as file:
-                    st.download_button(
-                        label=f"📥 {filename} 다운로드",
-                        data=file,
-                        file_name=filename,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                # 이름 표시 설정에 따라 표시할 이름 컬럼 선택
+                display_name_column = 'part_name'
+                if name_display == "한국어명":
+                    display_name_column = 'korean_name'
+                elif name_display == "베트남어명":
+                    display_name_column = 'vietnamese_name'
                 
-                display_success(f"Excel 파일로 저장되었습니다: {filename}")
+                # 결과 표시용 컬럼 재구성
+                display_df = df[[
+                    'part_code', 
+                    display_name_column, 
+                    'category', 
+                    'unit', 
+                    'current_quantity', 
+                    'min_stock', 
+                    'total_value', 
+                    'status'
+                ]].copy()
+                
+                # 컬럼명 변경
+                display_df.columns = [
+                    get_text('part_code'),
+                    get_text('part_name'),
+                    get_text('category'),
+                    get_text('unit'),
+                    get_text('current_stock'),
+                    get_text('min_stock'),
+                    get_text('total'),
+                    get_text('status')
+                ]
+                
+                st.dataframe(
+                    display_df,
+                    column_config={
+                        get_text('part_code'): st.column_config.TextColumn(get_text('part_code')),
+                        get_text('part_name'): st.column_config.TextColumn(get_text('part_name')),
+                        get_text('category'): st.column_config.TextColumn(get_text('category')),
+                        get_text('unit'): st.column_config.TextColumn(get_text('unit')),
+                        get_text('current_stock'): st.column_config.NumberColumn(get_text('current_stock'), format="%d"),
+                        get_text('min_stock'): st.column_config.NumberColumn(get_text('min_stock'), format="%d"),
+                        get_text('total'): st.column_config.NumberColumn(get_text('total'), format="₫%d"),
+                        get_text('status'): st.column_config.TextColumn(get_text('status'))
+                    },
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # 재고 총액 계산
+                total_inventory_value = df['total_value'].sum()
+                st.markdown(f"### 재고 총액: {format_currency(total_inventory_value)}")
+                
+                # 내보내기 버튼
+                if st.button(f"📥 Excel {get_text('save')}"):
+                    # Excel 저장 로직
+                    current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"inventory_export_{current_date}.xlsx"
+                    
+                    # 데이터프레임을 엑셀로 변환
+                    df.to_excel(filename, index=False)
+                    
+                    # 다운로드 링크 생성
+                    with open(filename, "rb") as file:
+                        st.download_button(
+                            label=f"📥 {filename} 다운로드",
+                            data=file,
+                            file_name=filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                    
+                    display_success(f"Excel 파일로 저장되었습니다: {filename}")
         except Exception as e:
             display_error(f"데이터 검색 중 오류가 발생했습니다: {e}")
 
@@ -509,67 +510,68 @@ def show_low_stock_alerts():
     st.markdown("### 재고 부족 부품 목록")
     st.info("최소 재고량보다 현재 재고량이 적은 부품 목록입니다.")
     
-    # 로딩 상태 표시
-    with st.spinner("재고 부족 부품을 분석 중..."):
-        # 캐싱된 함수를 사용하여 재고 부족 아이템 가져오기
-        low_stock_items = get_low_stock_items()
-        
-        # 결과가 없으면 메시지 표시
-        if not low_stock_items:
-            st.success("모든 부품이 최소 재고량을 충족하고 있습니다.")
-            return
-        
-        # 최근 입출고 정보 추가
-        for item in low_stock_items:
-            last_inbound_date, last_outbound_date = get_recent_inventory_activity(item['part_id'])
-            item['last_inbound_date'] = last_inbound_date
-            item['last_outbound_date'] = last_outbound_date
-        
-        # 데이터프레임으로 변환
-        df = pd.DataFrame(low_stock_items)
+    try:
+        # 로딩 상태 표시
+        with st.spinner("재고 부족 부품을 분석 중..."):
+            # 캐싱된 함수를 사용하여 재고 부족 아이템 가져오기
+            low_stock_items = get_low_stock_items()
             
-        # 알림 표시
-        st.dataframe(
-            df,
-            column_config={
-                'part_code': st.column_config.TextColumn(get_text('part_code')),
-                'part_name': st.column_config.TextColumn(get_text('part_name')),
-                'korean_name': st.column_config.TextColumn(get_text('korean_name')),
-                'category': st.column_config.TextColumn(get_text('category')),
-                'unit': st.column_config.TextColumn(get_text('unit')),
-                'current_quantity': st.column_config.NumberColumn(get_text('current_stock'), format="%d"),
-                'min_stock': st.column_config.NumberColumn(get_text('min_stock'), format="%d"),
-                'shortage': st.column_config.NumberColumn("부족 수량", format="%d"),
-                'last_inbound_date': st.column_config.DateColumn("최근 입고일", format="YYYY-MM-DD"),
-                'last_outbound_date': st.column_config.DateColumn("최근 출고일", format="YYYY-MM-DD")
-            },
-            use_container_width=True,
-            hide_index=True
-        )
-        
-        # 발주 요청 버튼
-        if st.button("📝 발주 요청서 생성"):
-            # 발주 요청서 생성 로직
-            current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"purchase_request_{current_date}.xlsx"
+            # 결과가 없으면 메시지 표시
+            if not low_stock_items:
+                st.success("모든 부품이 최소 재고량을 충족하고 있습니다.")
+                return
             
-            # 요청서 데이터 준비
-            purchase_df = df[['part_code', 'part_name', 'korean_name', 'category', 'unit', 'current_quantity', 'min_stock', 'shortage']].copy()
-            purchase_df['요청수량'] = purchase_df['shortage']
+            # 최근 입출고 정보 추가
+            for item in low_stock_items:
+                last_inbound_date, last_outbound_date = get_recent_inventory_activity(item['part_id'])
+                item['last_inbound_date'] = last_inbound_date
+                item['last_outbound_date'] = last_outbound_date
             
-            # 데이터프레임을 엑셀로 변환
-            purchase_df.to_excel(filename, index=False)
+            # 데이터프레임으로 변환
+            df = pd.DataFrame(low_stock_items)
+                
+            # 알림 표시
+            st.dataframe(
+                df,
+                column_config={
+                    'part_code': st.column_config.TextColumn(get_text('part_code')),
+                    'part_name': st.column_config.TextColumn(get_text('part_name')),
+                    'korean_name': st.column_config.TextColumn(get_text('korean_name')),
+                    'category': st.column_config.TextColumn(get_text('category')),
+                    'unit': st.column_config.TextColumn(get_text('unit')),
+                    'current_quantity': st.column_config.NumberColumn(get_text('current_stock'), format="%d"),
+                    'min_stock': st.column_config.NumberColumn(get_text('min_stock'), format="%d"),
+                    'shortage': st.column_config.NumberColumn("부족 수량", format="%d"),
+                    'last_inbound_date': st.column_config.DateColumn("최근 입고일", format="YYYY-MM-DD"),
+                    'last_outbound_date': st.column_config.DateColumn("최근 출고일", format="YYYY-MM-DD")
+                },
+                use_container_width=True,
+                hide_index=True
+            )
             
-            # 다운로드 링크 생성
-            with open(filename, "rb") as file:
-                st.download_button(
-                    label=f"📥 {filename} 다운로드",
-                    data=file,
-                    file_name=filename,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            
-            display_success(f"발주 요청서가 생성되었습니다: {filename}")
+            # 발주 요청 버튼
+            if st.button("📝 발주 요청서 생성"):
+                # 발주 요청서 생성 로직
+                current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"purchase_request_{current_date}.xlsx"
+                
+                # 요청서 데이터 준비
+                purchase_df = df[['part_code', 'part_name', 'korean_name', 'category', 'unit', 'current_quantity', 'min_stock', 'shortage']].copy()
+                purchase_df['요청수량'] = purchase_df['shortage']
+                
+                # 데이터프레임을 엑셀로 변환
+                purchase_df.to_excel(filename, index=False)
+                
+                # 다운로드 링크 생성
+                with open(filename, "rb") as file:
+                    st.download_button(
+                        label=f"📥 {filename} 다운로드",
+                        data=file,
+                        file_name=filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                
+                display_success(f"발주 요청서가 생성되었습니다: {filename}")
     except Exception as e:
         display_error(f"데이터 검색 중 오류가 발생했습니다: {e}")
 
@@ -579,137 +581,140 @@ def show_inventory_analysis():
     """
     st.markdown("### 재고 분석")
     
-    # 로딩 상태 표시
-    with st.spinner("재고 분석 데이터를 로딩 중..."):
-        # 캐싱된 함수를 사용하여 분석 데이터 가져오기
-        analysis_data = get_inventory_analysis_data()
-        
-        if not analysis_data:
-            st.error("재고 분석 데이터를 가져오는 중 오류가 발생했습니다.")
-            return
-        
-        category_df = analysis_data['category_df']
-        status_df = analysis_data['status_df']
-        summary_data = analysis_data['summary_data']
-        turnover_df = analysis_data['turnover_df']
-        
-        # 데이터가 없는 경우 처리
-        if category_df.empty:
-            st.warning("카테고리별 데이터를 가져올 수 없습니다.")
-            return
-        
-        if status_df.empty:
-            st.warning("상태별 데이터를 가져올 수 없습니다.")
-            return
-        
-        # 차트 표시
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### 카테고리별 부품 수")
-            fig1 = px.pie(
-                category_df,
-                values='count',
-                names='category',
-                title='카테고리별 부품 수'
-            )
-            st.plotly_chart(fig1, use_container_width=True)
-        
-        with col2:
-            st.markdown("#### 상태별 부품 수")
-            fig2 = px.pie(
-                status_df,
-                values='count',
-                names='status',
-                title='상태별 부품 수',
-                color_discrete_sequence=px.colors.sequential.Blues
-            )
-            st.plotly_chart(fig2, use_container_width=True)
-        
-        # 카테고리별 재고 가치
-        st.markdown("#### 카테고리별 재고 가치")
-        fig3 = px.bar(
-            category_df,
-            x='category',
-            y='total_value',
-            title='카테고리별 재고 가치',
-            labels={'category': '카테고리', 'total_value': '재고 가치'},
-            color='category'
-        )
-        st.plotly_chart(fig3, use_container_width=True)
-        
-        # 재고 현황 요약
-        st.markdown("#### 재고 현황 요약")
-        
-        # 요약 데이터 준비
-        formatted_summary = {
-            '항목': ['총 부품 종류', '총 재고량', '총 재고 가치', '재고 부족 부품 수'],
-            '값': [
-                f"{summary_data.get('total_parts', 0)}개",
-                f"{summary_data.get('total_quantity', 0):,}개",
-                f"{format_currency(summary_data.get('total_value', 0))}",
-                f"{summary_data.get('low_stock_parts', 0)}개"
-            ]
-        }
-        summary_df = pd.DataFrame(formatted_summary)
-        
-        # 요약 표 표시
-        st.table(summary_df)
-        
-        # 추가 분석 옵션
-        st.markdown("#### 추가 분석")
-        analysis_options = st.multiselect(
-            "분석 옵션 선택",
-            ["재고 회전율", "밸류에이션 분석", "사용 패턴 분석", "예측 분석"],
-            default=["재고 회전율"]
-        )
-        
-        if "재고 회전율" in analysis_options:
-            st.markdown("#### 재고 회전율 분석")
-            st.info("최근 12개월 동안의 재고 회전율 추세를 보여줍니다.")
+    try:
+        # 로딩 상태 표시
+        with st.spinner("재고 분석 데이터를 로딩 중..."):
+            # 캐싱된 함수를 사용하여 분석 데이터 가져오기
+            analysis_data = get_inventory_analysis_data()
             
-            fig4 = px.line(
-                turnover_df,
-                x='month',
-                y='turnover_rate',
-                title='월별 재고 회전율',
-                markers=True
-            )
-            st.plotly_chart(fig4, use_container_width=True)
-        
-        # 발주 요청 버튼
-        if st.button("📝 발주 요청서 생성"):
-            # 캐싱된 함수를 사용하여 재고 부족 아이템 가져오기
-            low_stock_items = get_low_stock_items()
-            
-            if not low_stock_items:
-                st.info("재고 부족 부품이 없습니다.")
+            if not analysis_data:
+                st.error("재고 분석 데이터를 가져오는 중 오류가 발생했습니다.")
                 return
-                
-            # 발주 요청서 생성 로직
-            current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"purchase_request_{current_date}.xlsx"
             
-            # 데이터프레임 변환
-            df_request = pd.DataFrame(low_stock_items)
+            category_df = analysis_data['category_df']
+            status_df = analysis_data['status_df']
+            summary_data = analysis_data['summary_data']
+            turnover_df = analysis_data['turnover_df']
             
-            # 요청서 데이터 준비
-            purchase_df = df_request[['part_code', 'part_name', 'korean_name', 'category', 'unit', 'current_quantity', 'min_stock', 'shortage']].copy()
-            purchase_df['요청수량'] = purchase_df['shortage']
+            # 데이터가 없는 경우 처리
+            if category_df.empty:
+                st.warning("카테고리별 데이터를 가져올 수 없습니다.")
+                return
             
-            # 데이터프레임을 엑셀로 변환
-            purchase_df.to_excel(filename, index=False)
+            if status_df.empty:
+                st.warning("상태별 데이터를 가져올 수 없습니다.")
+                return
             
-            # 다운로드 링크 생성
-            with open(filename, "rb") as file:
-                st.download_button(
-                    label=f"📥 {filename} 다운로드",
-                    data=file,
-                    file_name=filename,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            # 차트 표시
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### 카테고리별 부품 수")
+                fig1 = px.pie(
+                    category_df,
+                    values='count',
+                    names='category',
+                    title='카테고리별 부품 수'
                 )
+                st.plotly_chart(fig1, use_container_width=True)
             
-            display_success(f"발주 요청서가 생성되었습니다: {filename}")
+            with col2:
+                st.markdown("#### 상태별 부품 수")
+                fig2 = px.pie(
+                    status_df,
+                    values='count',
+                    names='status',
+                    title='상태별 부품 수',
+                    color_discrete_sequence=px.colors.sequential.Blues
+                )
+                st.plotly_chart(fig2, use_container_width=True)
+            
+            # 카테고리별 재고 가치
+            st.markdown("#### 카테고리별 재고 가치")
+            fig3 = px.bar(
+                category_df,
+                x='category',
+                y='total_value',
+                title='카테고리별 재고 가치',
+                labels={'category': '카테고리', 'total_value': '재고 가치'},
+                color='category'
+            )
+            st.plotly_chart(fig3, use_container_width=True)
+            
+            # 재고 현황 요약
+            st.markdown("#### 재고 현황 요약")
+            
+            # 요약 데이터 준비
+            formatted_summary = {
+                '항목': ['총 부품 종류', '총 재고량', '총 재고 가치', '재고 부족 부품 수'],
+                '값': [
+                    f"{summary_data.get('total_parts', 0)}개",
+                    f"{summary_data.get('total_quantity', 0):,}개",
+                    f"{format_currency(summary_data.get('total_value', 0))}",
+                    f"{summary_data.get('low_stock_parts', 0)}개"
+                ]
+            }
+            summary_df = pd.DataFrame(formatted_summary)
+            
+            # 요약 표 표시
+            st.table(summary_df)
+            
+            # 추가 분석 옵션
+            st.markdown("#### 추가 분석")
+            analysis_options = st.multiselect(
+                "분석 옵션 선택",
+                ["재고 회전율", "밸류에이션 분석", "사용 패턴 분석", "예측 분석"],
+                default=["재고 회전율"]
+            )
+            
+            if "재고 회전율" in analysis_options:
+                st.markdown("#### 재고 회전율 분석")
+                st.info("최근 12개월 동안의 재고 회전율 추세를 보여줍니다.")
+                
+                fig4 = px.line(
+                    turnover_df,
+                    x='month',
+                    y='turnover_rate',
+                    title='월별 재고 회전율',
+                    markers=True
+                )
+                st.plotly_chart(fig4, use_container_width=True)
+            
+            # 발주 요청 버튼
+            if st.button("📝 발주 요청서 생성"):
+                # 캐싱된 함수를 사용하여 재고 부족 아이템 가져오기
+                low_stock_items = get_low_stock_items()
+                
+                if not low_stock_items:
+                    st.info("재고 부족 부품이 없습니다.")
+                    return
+                    
+                # 발주 요청서 생성 로직
+                current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"purchase_request_{current_date}.xlsx"
+                
+                # 데이터프레임 변환
+                df_request = pd.DataFrame(low_stock_items)
+                
+                # 요청서 데이터 준비
+                purchase_df = df_request[['part_code', 'part_name', 'korean_name', 'category', 'unit', 'current_quantity', 'min_stock', 'shortage']].copy()
+                purchase_df['요청수량'] = purchase_df['shortage']
+                
+                # 데이터프레임을 엑셀로 변환
+                purchase_df.to_excel(filename, index=False)
+                
+                # 다운로드 링크 생성
+                with open(filename, "rb") as file:
+                    st.download_button(
+                        label=f"📥 {filename} 다운로드",
+                        data=file,
+                        file_name=filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                
+                display_success(f"발주 요청서가 생성되었습니다: {filename}")
+    except Exception as e:
+        display_error(f"재고 분석 데이터 조회 중 오류가 발생했습니다: {e}")
 
 if __name__ == "__main__":
     show() 
