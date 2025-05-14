@@ -225,7 +225,7 @@ def show_suppliers_details():
                 currency,
                 effective_from,
                 is_current,
-                parts!inner(part_id, part_code, part_name)
+                part_id
             """).eq("supplier_id", selected_id).execute()
             
             # 입고 이력 조회
@@ -261,14 +261,24 @@ def show_suppliers_details():
             st.markdown("#### 공급 부품 정보")
             
             if parts_price_result.data:
+                # 부품 정보 가져오기
+                part_ids = [item.get('part_id') for item in parts_price_result.data if item.get('part_id')]
+                parts_map = {}
+                
+                if part_ids:
+                    parts_result = supabase().from_("parts").select("part_id, part_code, part_name").in_("part_id", part_ids).execute()
+                    if parts_result.data:
+                        parts_map = {p.get('part_id'): {'part_code': p.get('part_code'), 'part_name': p.get('part_name')} for p in parts_result.data}
+                
                 # 데이터 변환
                 parts_data = []
                 for item in parts_price_result.data:
-                    part_data = item.get('parts', {})
+                    part_id = item.get('part_id')
+                    part_info = parts_map.get(part_id, {})
                     parts_data.append({
-                        'part_id': part_data.get('part_id'),
-                        'part_code': part_data.get('part_code'),
-                        'part_name': part_data.get('part_name'),
+                        'part_id': part_id,
+                        'part_code': part_info.get('part_code', 'Unknown'),
+                        'part_name': part_info.get('part_name', 'Unknown'),
                         'unit_price': item.get('unit_price'),
                         'currency': item.get('currency'),
                         'effective_date': item.get('effective_from'),
@@ -301,41 +311,37 @@ def show_suppliers_details():
             # 입고 이력
             st.markdown("#### 최근 입고 이력")
             
-            if inbound_result.data:
-                # 데이터 변환
-                inbound_data = []
-                for item in inbound_result.data:
-                    part_data = item.get('parts', {})
-                    inbound_data.append({
-                        'inbound_id': item.get('inbound_id'),
-                        'part_code': part_data.get('part_code'),
-                        'part_name': part_data.get('part_name'),
-                        'quantity': item.get('quantity'),
-                        'unit_price': item.get('unit_price'),
-                        'total_price': item.get('total_price'),
-                        'currency': item.get('currency'),
-                        'inbound_date': item.get('inbound_date')
-                    })
-                
-                inbound_df = pd.DataFrame(inbound_data)
-                
-                st.dataframe(
-                    inbound_df,
-                    column_config={
-                        'inbound_id': st.column_config.TextColumn("입고 ID"),
-                        'part_code': st.column_config.TextColumn(get_text('part_code')),
-                        'part_name': st.column_config.TextColumn(get_text('part_name')),
-                        'quantity': st.column_config.NumberColumn(get_text('quantity'), format="%d"),
-                        'unit_price': st.column_config.NumberColumn(get_text('price'), format="%d"),
-                        'total_price': st.column_config.NumberColumn(get_text('total'), format="%d"),
-                        'currency': st.column_config.TextColumn("통화"),
-                        'inbound_date': st.column_config.DateColumn(get_text('inbound_date'), format="YYYY-MM-DD")
-                    },
-                    use_container_width=True,
-                    hide_index=True
-                )
-            else:
-                st.info("입고 이력이 없습니다.")
+            inbound_data = []
+            for item in inbound_result.data:
+                part_data = item.get('parts', {})
+                inbound_data.append({
+                    'inbound_id': item.get('inbound_id'),
+                    'part_code': part_data.get('part_code'),
+                    'part_name': part_data.get('part_name'),
+                    'quantity': item.get('quantity'),
+                    'unit_price': item.get('unit_price'),
+                    'total_price': item.get('total_price'),
+                    'currency': item.get('currency'),
+                    'inbound_date': item.get('inbound_date')
+                })
+            
+            inbound_df = pd.DataFrame(inbound_data)
+            
+            st.dataframe(
+                inbound_df,
+                column_config={
+                    'inbound_id': st.column_config.TextColumn("입고 ID"),
+                    'part_code': st.column_config.TextColumn(get_text('part_code')),
+                    'part_name': st.column_config.TextColumn(get_text('part_name')),
+                    'quantity': st.column_config.NumberColumn(get_text('quantity'), format="%d"),
+                    'unit_price': st.column_config.NumberColumn(get_text('price'), format="%d"),
+                    'total_price': st.column_config.NumberColumn(get_text('total'), format="%d"),
+                    'currency': st.column_config.TextColumn("통화"),
+                    'inbound_date': st.column_config.DateColumn(get_text('inbound_date'), format="YYYY-MM-DD")
+                },
+                use_container_width=True,
+                hide_index=True
+            )
             
             # 수정/삭제 버튼
             col1, col2 = st.columns(2)

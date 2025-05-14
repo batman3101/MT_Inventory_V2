@@ -414,24 +414,34 @@ def show_parts_details():
                 # 가격 정보 조회
                 price_result = supabase().from_("part_prices").select("""
                     price_id,
+                    supplier_id,
                     unit_price,
                     currency,
-                    effective_date,
-                    is_current,
-                    suppliers!inner(supplier_id, supplier_name)
+                    effective_from,
+                    is_current
                 """).eq("part_id", selected_id).execute()
                 
                 if price_result.data:
+                    # 공급업체 정보 가져오기
+                    supplier_ids = [item.get('supplier_id') for item in price_result.data if item.get('supplier_id')]
+                    supplier_map = {}
+                    
+                    if supplier_ids:
+                        supplier_result = supabase().from_("suppliers").select("supplier_id, supplier_name").in_("supplier_id", supplier_ids).execute()
+                        if supplier_result.data:
+                            supplier_map = {s.get('supplier_id'): s.get('supplier_name') for s in supplier_result.data}
+                    
                     # 데이터 변환
                     price_data = []
                     for item in price_result.data:
+                        supplier_id = item.get('supplier_id')
                         price_data.append({
                             'price_id': item.get('price_id'),
-                            'supplier_name': item.get('suppliers', {}).get('supplier_name'),
-                            'supplier_id': item.get('suppliers', {}).get('supplier_id'),
+                            'supplier_name': supplier_map.get(supplier_id, 'Unknown'),
+                            'supplier_id': supplier_id,
                             'unit_price': item.get('unit_price'),
                             'currency': item.get('currency'),
-                            'effective_date': item.get('effective_date'),
+                            'effective_date': item.get('effective_from'),
                             'is_current': item.get('is_current')
                         })
                     
@@ -487,7 +497,7 @@ def show_parts_details():
                                         "supplier_id": supplier_id,
                                         "unit_price": unit_price,
                                         "currency": currency,
-                                        "effective_date": effective_date.isoformat(),
+                                        "effective_from": effective_date.isoformat(),
                                         "is_current": is_current,
                                         "created_by": current_user
                                     }
