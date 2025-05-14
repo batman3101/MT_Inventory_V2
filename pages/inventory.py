@@ -378,7 +378,7 @@ def show_inventory_analysis():
             try:
                 inventory_result = supabase().from_("inventory").select("part_id, current_quantity").in_("part_id", batch_ids).execute()
                 for item in inventory_result.data:
-                    inventory_data[item['part_id']] = item['current_quantity']
+                    inventory_data[item['part_id']] = item.get('current_quantity', 0) or 0  # None 값 안전 처리
             except Exception as e:
                 logger.error(f"재고 정보 조회 중 오류: {e}")
                 pass  # 오류가 발생해도 계속 진행
@@ -390,7 +390,7 @@ def show_inventory_analysis():
             try:
                 price_result = supabase().from_("part_prices").select("part_id, unit_price").in_("part_id", batch_ids).eq("is_current", True).execute()
                 for item in price_result.data:
-                    price_data[item['part_id']] = item['unit_price']
+                    price_data[item['part_id']] = item.get('unit_price', 0) or 0  # None 값 안전 처리
             except Exception as e:
                 logger.error(f"가격 정보 조회 중 오류: {e}")
                 pass  # 오류가 발생해도 계속 진행

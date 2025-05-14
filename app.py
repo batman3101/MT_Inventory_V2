@@ -365,32 +365,45 @@ def display_dashboard():
         st.markdown("<div class='dashboard-card'><h3>재고 요약</h3>", unsafe_allow_html=True)
         try:
             # 총 부품 수 조회
-            parts_result = supabase().from_("parts").select("part_id, min_stock", count="exact").execute()
+            parts_result = supabase().from_("parts").select("part_id, min_stock, category", count="exact").execute()
             total_parts = parts_result.count if hasattr(parts_result, 'count') else 0
             
             # 부품 ID 목록 및 최소 재고량 정보 준비
             part_ids = []
             min_stock_data = {}
+            category_data = {}
             
             if parts_result.data:
                 for part in parts_result.data:
                     part_id = part.get('part_id')
                     part_ids.append(part_id)
                     min_stock_data[part_id] = part.get('min_stock', 0)
+                    
+                    # 카테고리별 분류
+                    category = part.get('category')
+                    if not category:
+                        category = '기타'
+                    
+                    if category not in category_data:
+                        category_data[category] = []
+                    category_data[category].append(part_id)
             
-            # 재고 정보 일괄 조회
-            inventory_result = supabase().from_("inventory").select("part_id, current_quantity").in_("part_id", part_ids).execute()
-            
-            # 부품별 재고 수량 맵 생성
+            # 재고 정보 일괄 조회 - 배치 처리로 변경
             inventory_data = {}
             total_quantity = 0
+            batch_size = 30  # 한 번에 처리할 ID 수
             
-            if inventory_result.data:
-                for item in inventory_result.data:
-                    part_id = item.get('part_id')
-                    quantity = item.get('current_quantity', 0)
-                    inventory_data[part_id] = quantity
-                    total_quantity += quantity
+            for i in range(0, len(part_ids), batch_size):
+                batch_ids = part_ids[i:i+batch_size]
+                try:
+                    inventory_result = supabase().from_("inventory").select("part_id, current_quantity").in_("part_id", batch_ids).execute()
+                    for item in inventory_result.data:
+                        part_id = item.get('part_id')
+                        quantity = item.get('current_quantity', 0) or 0  # None 값 안전 처리
+                        inventory_data[part_id] = quantity
+                        total_quantity += quantity
+                except Exception as e:
+                    logger.error(f"재고 정보 조회 중 오류: {e}")
             
             # 가격 정보 일괄 조회 - 배치 처리로 변경
             price_data = {}
@@ -401,7 +414,7 @@ def display_dashboard():
                 try:
                     price_result = supabase().from_("part_prices").select("part_id, unit_price").in_("part_id", batch_ids).eq("is_current", True).execute()
                     for item in price_result.data:
-                        price_data[item.get('part_id')] = item.get('unit_price', 0)
+                        price_data[item.get('part_id')] = item.get('unit_price', 0) or 0  # None 값 안전 처리
                 except Exception as e:
                     logger.error(f"가격 정보 조회 중 오류: {e}")
             
@@ -414,7 +427,11 @@ def display_dashboard():
             # 재고 부족 아이템 수 계산
             low_stock_count = 0
             for part_id, min_stock in min_stock_data.items():
-                current_quantity = inventory_data.get(part_id, 0)
+                # None 값을 안전하게 처리
+                min_stock = 0 if min_stock is None else min_stock
+                current_quantity = inventory_data.get(part_id, 0) or 0  # None일 경우 0으로 변환
+                
+                # 이제 안전하게 비교 가능
                 if current_quantity < min_stock:
                     low_stock_count += 1
             
@@ -429,6 +446,71 @@ def display_dashboard():
             else:
                 st.markdown("<p style='color:green'>✓ 모든 품목 재고 양호</p>", unsafe_allow_html=True)
             
+            # 카테고리별 재고 요약 추가
+            st.markdown("<hr style='margin: 10px 0;'><h4>카테고리별 요약</h4>", unsafe_allow_html=True)
+            
+            # 카테고리별 정보 계산
+            category_summary = []
+            for category, part_ids in category_data.items():
+                category_quantity = 0
+                category_value = 0
+                category_low_stock = 0
+                
+                for part_id in part_ids:
+                    current_qty = inventory_data.get(part_id, 0) or 0
+                    category_quantity += current_qty
+                    
+                    # 가치 계산
+                    unit_price = price_data.get(part_id, 0) or 0
+                    category_value += current_qty * unit_price
+                    
+                    # 재고 부족 계산
+                    min_stock = min_stock_data.get(part_id, 0) or 0
+                    if current_qty < min_stock:
+                        category_low_stock += 1
+                
+                category_summary.append({
+                    'category': category,
+                    'part_count': len(part_ids),
+                    'quantity': category_quantity,
+                    'value': category_value,
+                    'low_stock': category_low_stock
+                })
+            
+            # 카테고리별 정보 표시 (최대 5개만 표시, 나머지는 '기타'로 합산)
+            category_summary = sorted(category_summary, key=lambda x: x['value'], reverse=True)
+            
+            if len(category_summary) > 5:
+                top_categories = category_summary[:4]
+                
+                # 나머지 카테고리 합산
+                others = {
+                    'category': '기타 카테고리',
+                    'part_count': sum(item['part_count'] for item in category_summary[4:]),
+                    'quantity': sum(item['quantity'] for item in category_summary[4:]),
+                    'value': sum(item['value'] for item in category_summary[4:]),
+                    'low_stock': sum(item['low_stock'] for item in category_summary[4:])
+                }
+                
+                top_categories.append(others)
+                category_summary = top_categories
+            
+            # 간단한 테이블로 표시
+            for item in category_summary:
+                cat_name = item['category']
+                low_stock_color = "color:red;" if item['low_stock'] > 0 else ""
+                
+                st.markdown(f"""
+                <div style="margin-bottom:8px;">
+                    <p style="margin:0;"><strong>{cat_name}</strong> ({item['part_count']}개 품목)</p>
+                    <p style="margin:0;font-size:0.9em;">
+                        수량: {item['quantity']}개 | 
+                        가치: {format_currency(item['value'])} | 
+                        <span style="{low_stock_color}">재고부족: {item['low_stock']}개</span>
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
         except Exception as e:
             st.markdown(f"<p>재고 정보를 불러오는 중 오류가 발생했습니다: {str(e)}</p>", unsafe_allow_html=True)
         
@@ -533,7 +615,7 @@ def display_dashboard():
                 try:
                     inventory_result = supabase().from_("inventory").select("part_id, current_quantity").in_("part_id", batch_ids).execute()
                     for item in inventory_result.data:
-                        inventory_map[item.get('part_id')] = item.get('current_quantity', 0)
+                        inventory_map[item.get('part_id')] = item.get('current_quantity', 0) or 0  # None 값 안전 처리
                 except Exception as e:
                     logger.error(f"재고 정보 조회 중 오류: {e}")
             
@@ -541,8 +623,9 @@ def display_dashboard():
             low_stock_items = []
             for part in parts_result.data:
                 part_id = part.get('part_id')
-                min_stock = part.get('min_stock', 0)
-                current_quantity = inventory_map.get(part_id, 0)
+                # None 값을 안전하게 처리
+                min_stock = part.get('min_stock', 0) or 0  # None일 경우 0으로 변환
+                current_quantity = inventory_map.get(part_id, 0) or 0  # None일 경우 0으로 변환
                 
                 # 최소 재고량보다 적으면 목록에 추가
                 if current_quantity < min_stock:
@@ -558,12 +641,74 @@ def display_dashboard():
                         'shortage': shortage
                     })
             
-            # 부족량 기준으로 정렬하고 상위 10개만 표시
-            low_stock_items = sorted(low_stock_items, key=lambda x: x.get('shortage', 0), reverse=True)[:10]
+            # 부족량 기준으로 정렬
+            low_stock_items = sorted(low_stock_items, key=lambda x: x.get('shortage', 0), reverse=True)
             
             if low_stock_items:
-                # 데이터프레임으로 변환
-                df = pd.DataFrame(low_stock_items)
+                # 카테고리별로 분류
+                category_items = {}
+                for item in low_stock_items:
+                    category = item['category'] if item['category'] else '기타'
+                    if category not in category_items:
+                        category_items[category] = []
+                    category_items[category].append(item)
+                
+                # 페이지네이션 구현
+                # 1. 전체 보기 (기본)
+                # 2. 카테고리별 보기 (탭으로 구현)
+                
+                # 탭 생성
+                tabs = ["전체 보기"] + list(category_items.keys())
+                selected_tab = st.radio("카테고리별 보기:", tabs, horizontal=True)
+                
+                if selected_tab == "전체 보기":
+                    display_items = low_stock_items
+                else:
+                    display_items = category_items[selected_tab]
+                
+                # 페이지네이션 구현
+                items_per_page = st.slider("페이지당 항목 수:", 5, 50, 10)
+                total_pages = (len(display_items) + items_per_page - 1) // items_per_page
+                
+                if "current_page" not in st.session_state:
+                    st.session_state.current_page = 1
+                
+                def change_page(page):
+                    st.session_state.current_page = page
+                
+                # 페이지 번호 조정 (총 페이지 수를 초과하지 않도록)
+                if st.session_state.current_page > total_pages:
+                    st.session_state.current_page = 1
+                
+                # 페이지 번호 표시
+                col1, col2, col3 = st.columns([1, 3, 1])
+                with col2:
+                    # 페이지 선택기 (총 페이지가 5개 이하면 버튼으로, 아니면 슬라이더로)
+                    if total_pages <= 5:
+                        button_cols = st.columns(total_pages + 2)
+                        with button_cols[0]:
+                            if st.button("◀", disabled=st.session_state.current_page <= 1):
+                                change_page(st.session_state.current_page - 1)
+                        
+                        for i in range(1, total_pages + 1):
+                            with button_cols[i]:
+                                if st.button(f"{i}", disabled=st.session_state.current_page == i):
+                                    change_page(i)
+                        
+                        with button_cols[-1]:
+                            if st.button("▶", disabled=st.session_state.current_page >= total_pages):
+                                change_page(st.session_state.current_page + 1)
+                    else:
+                        st.slider("페이지:", 1, total_pages, st.session_state.current_page, 
+                                 key="page_slider", on_change=lambda: change_page(st.session_state.page_slider))
+                
+                # 현재 페이지에 해당하는 항목만 표시
+                start_idx = (st.session_state.current_page - 1) * items_per_page
+                end_idx = min(start_idx + items_per_page, len(display_items))
+                page_items = display_items[start_idx:end_idx]
+                
+                # 데이터프레임으로 변환하여 표시
+                df = pd.DataFrame(page_items)
                 
                 # 데이터프레임 표시
                 st.dataframe(
@@ -580,6 +725,9 @@ def display_dashboard():
                     hide_index=True,
                     use_container_width=True
                 )
+                
+                # 페이지 정보 표시
+                st.caption(f"전체 {len(display_items)}개 항목 중 {start_idx+1}-{end_idx}번 항목 표시 중")
             else:
                 st.markdown("<p>재고 부족 아이템이 없습니다.</p>", unsafe_allow_html=True)
                 
