@@ -55,7 +55,24 @@ def show_current_inventory():
     with col2:
         search_name = st.text_input(f"{get_text('part_name')} {get_text('search')}", placeholder="FILTER")
     with col3:
-        category_options = ["전체", "필터", "펌프", "모터", "밸브", "센서", "기타"]
+        # Supabase에서 distinct 카테고리 값을 가져옴
+        try:
+            category_result = supabase().from_("parts").select("category").execute()
+            categories = []
+            if category_result.data:
+                for item in category_result.data:
+                    if item.get('category') and item.get('category') not in categories:
+                        categories.append(item.get('category'))
+                # 중복 제거 및 정렬
+                categories = sorted(list(set(categories)))
+            
+            # "전체" 옵션을 맨 앞에 추가
+            category_options = ["전체"] + categories
+        except Exception as e:
+            logger.error(f"카테고리 정보 조회 중 오류: {e}")
+            # 오류 발생 시 기본 옵션 사용
+            category_options = ["전체"]
+            
         search_category = st.selectbox(f"{get_text('category')} {get_text('filter')}", category_options)
     
     # 이름 표시 옵션
@@ -244,13 +261,15 @@ def show_low_stock_alerts():
         
         for part in parts_data.data:
             part_id = part['part_id']
-            min_stock = part['min_stock']
+            # None 값 안전 처리
+            min_stock = part['min_stock'] if part['min_stock'] is not None else 0
             
             # 재고 정보 조회
             inventory_result = supabase().from_("inventory").select("current_quantity").eq("part_id", part_id).execute()
             
             if inventory_result.data:
-                current_quantity = inventory_result.data[0]['current_quantity']
+                # None 값 안전 처리
+                current_quantity = inventory_result.data[0]['current_quantity'] if inventory_result.data[0]['current_quantity'] is not None else 0
                 
                 # 재고가 최소 재고량보다 적은 경우
                 if current_quantity < min_stock:
@@ -458,7 +477,10 @@ def show_inventory_analysis():
         # 재고 부족 부품 수 계산 - 효율성 개선
         # 부품별 최소 재고량 정보 가져오기
         min_stock_result = supabase().from_("parts").select("part_id, min_stock").execute()
-        min_stock_data = {item['part_id']: item.get('min_stock', 0) for item in min_stock_result.data}
+        min_stock_data = {}
+        for item in min_stock_result.data:
+            # None 값 안전 처리
+            min_stock_data[item['part_id']] = 0 if item.get('min_stock') is None else item.get('min_stock', 0)
         
         # 재고 부족 계산
         low_stock_count = 0
@@ -467,25 +489,11 @@ def show_inventory_analysis():
             if current_qty < min_stock:
                 low_stock_count += 1
         
-        # 과잉 재고 부품 수 계산 - 효율성 개선
-        # 부품별 최대 재고량 정보 가져오기
-        max_stock_result = supabase().from_("parts").select("part_id, max_stock").execute()
-        max_stock_data = {item['part_id']: item.get('max_stock', 0) for item in max_stock_result.data}
-        
-        # 과잉 재고 계산
-        excess_stock_count = 0
-        for part_id, max_stock in max_stock_data.items():
-            if max_stock > 0:  # 최대 재고량이 설정된 경우만
-                current_qty = inventory_data.get(part_id, 0)
-                if current_qty > max_stock:
-                    excess_stock_count += 1
-        
         summary_data = {
             'total_parts': total_parts,
             'total_quantity': total_quantity,
             'total_value': total_value,
-            'low_stock_parts': low_stock_count,
-            'excess_stock_parts': excess_stock_count
+            'low_stock_parts': low_stock_count
         }
         
         # 재고 회전율 데이터 (샘플 데이터로 대체)
@@ -549,13 +557,12 @@ def show_inventory_analysis():
         
         # 요약 데이터 준비
         formatted_summary = {
-            '항목': ['총 부품 종류', '총 재고량', '총 재고 가치', '재고 부족 부품 수', '과잉 재고 부품 수'],
+            '항목': ['총 부품 종류', '총 재고량', '총 재고 가치', '재고 부족 부품 수'],
             '값': [
                 f"{summary_data.get('total_parts', 0)}개",
                 f"{summary_data.get('total_quantity', 0):,}개",
                 f"{format_currency(summary_data.get('total_value', 0))}",
-                f"{summary_data.get('low_stock_parts', 0)}개",
-                f"{summary_data.get('excess_stock_parts', 0)}개"
+                f"{summary_data.get('low_stock_parts', 0)}개"
             ]
         }
         summary_df = pd.DataFrame(formatted_summary)
