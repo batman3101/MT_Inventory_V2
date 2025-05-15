@@ -431,7 +431,7 @@ def show_parts_details():
                     currency,
                     effective_from,
                     is_current
-                """).eq("part_id", selected_id).not_.is_("unit_price", None).order("unit_price", desc=True).order("is_current", desc=True).order("effective_from", desc=True).execute()
+                """).eq("part_id", selected_id).gt("unit_price", 0).order("unit_price", desc=True).order("is_current", desc=True).order("effective_from", desc=True).execute()
                 
                 if price_result.data:
                     # 공급업체 정보 가져오기
