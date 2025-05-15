@@ -522,43 +522,32 @@ def show_parts_details():
                                     "created_by": current_user
                                 }
                                 
-                                # 중복 체크를 먼저 수행
+                                # 새로 추가
+                                price_data["is_current"] = unit_price > 0  # 단가가 0보다 크면 TRUE, 아니면 FALSE
                                 try:
-                                    check_result = supabase().from_("part_prices").select("price_id").eq("part_id", selected_id).eq("supplier_id", supplier_id).eq("effective_from", effective_date.isoformat()).execute()
+                                    # 직접 INSERT 대신 RPC 함수 사용
+                                    rpc_result = supabase().rpc(
+                                        "insert_part_price",
+                                        {
+                                            "p_part_id": selected_id,
+                                            "p_supplier_id": supplier_id,
+                                            "p_unit_price": unit_price,
+                                            "p_currency": currency,
+                                            "p_effective_from": effective_date.isoformat(),
+                                            "p_is_current": unit_price > 0,
+                                            "p_created_by": current_user
+                                        }
+                                    ).execute()
                                     
-                                    if check_result.data:
-                                        # 이미 존재하는 경우 업데이트
-                                        price_id = check_result.data[0].get('price_id')
-                                        price_update_result = supabase().from_("part_prices").update({
-                                            "unit_price": unit_price,
-                                            "currency": currency,
-                                            "is_current": unit_price > 0,  # 단가가 0보다 크면 TRUE, 아니면 FALSE
-                                            "updated_at": datetime.now().isoformat(),
-                                            "updated_by": current_user
-                                        }).eq("price_id", price_id).execute()
-                                        
-                                        if price_update_result.data:
-                                            display_success(f"기존 가격 정보가 업데이트되었습니다.")
-                                            st.rerun()
-                                        else:
-                                            display_error("가격 정보 업데이트 중 오류가 발생했습니다.")
+                                    if rpc_result.data and rpc_result.data.get('success'):
+                                        display_success(f"새 가격 정보가 추가되었습니다.")
+                                        st.rerun()
                                     else:
-                                        # 새로 추가
-                                        price_data["is_current"] = unit_price > 0  # 단가가 0보다 크면 TRUE, 아니면 FALSE
-                                        price_insert_result = supabase().from_("part_prices").insert(price_data).execute()
-                                        
-                                        if price_insert_result.data:
-                                            display_success(f"새 가격 정보가 추가되었습니다.")
-                                            st.rerun()
-                                        else:
-                                            display_error("가격 정보 추가 중 오류가 발생했습니다.")
+                                        error_msg = rpc_result.data.get('message') if rpc_result.data else "가격 정보 추가 중 오류가 발생했습니다."
+                                        display_error(error_msg)
                                 except Exception as e:
-                                    # SQL 오류 메시지에서 RLS 오류인 경우 사용자 친화적인 메시지 표시
-                                    error_msg = str(e)
-                                    if "violates row-level security policy" in error_msg:
-                                        display_error("보안 정책으로 인해 가격 정보를 추가할 수 없습니다. 관리자에게 문의하세요.")
-                                    else:
-                                        display_error(f"가격 정보 추가 중 오류가 발생했습니다: {e}")
+                                    # 일반 오류 처리
+                                    display_error(f"가격 정보 추가 중 오류가 발생했습니다: {e}")
                             except Exception as e:
                                 display_error(f"가격 정보 추가 중 오류가 발생했습니다: {e}")
                     else:
