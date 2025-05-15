@@ -425,7 +425,7 @@ def show_parts_details():
             try:
                 # 가격 정보 조회 - 실제 part_prices 테이블과 임시 temp_part_prices 테이블을 모두 조회
                 try:
-                    # 1. 실제 part_prices 테이블 조회
+                    # 1. 실제 part_prices 테이블만 조회하도록 수정
                     price_result = supabase().from_("part_prices").select("""
                         price_id,
                         supplier_id,
@@ -435,51 +435,11 @@ def show_parts_details():
                         is_current
                     """).eq("part_id", selected_id).gt("unit_price", 0).order("unit_price", desc=True).order("is_current", desc=True).order("effective_from", desc=True).execute()
                     
-                    # 2. 임시 temp_part_prices 테이블 조회
-                    try:
-                        # 부품 코드 가져오기
-                        part_code_result = supabase().from_("parts").select("part_code").eq("part_id", selected_id).execute()
-                        part_code = part_code_result.data[0].get('part_code') if part_code_result.data else None
-                        
-                        if part_code:
-                            # temp_part_prices 테이블에서 데이터 조회
-                            temp_price_result = supabase().from_("temp_part_prices").select("""
-                                part_code,
-                                supplier_code,
-                                price
-                            """).eq("part_code", part_code).gt("price", 0).execute()
-                            
-                            # supplier_code -> supplier_id 매핑
-                            if temp_price_result.data:
-                                supplier_codes = [item.get('supplier_code') for item in temp_price_result.data if item.get('supplier_code')]
-                                supplier_code_map = {}
-                                
-                                if supplier_codes:
-                                    suppliers_result = supabase().from_("suppliers").select("supplier_id, supplier_code, supplier_name").in_("supplier_code", supplier_codes).execute()
-                                    if suppliers_result.data:
-                                        supplier_code_map = {s.get('supplier_code'): {'id': s.get('supplier_id'), 'name': s.get('supplier_name')} for s in suppliers_result.data}
-                                
-                                # temp_part_prices 데이터를 price_result.data에 추가
-                                for temp_item in temp_price_result.data:
-                                    supplier_code = temp_item.get('supplier_code')
-                                    supplier_info = supplier_code_map.get(supplier_code, {})
-                                    
-                                    price_result.data.append({
-                                        'price_id': f"temp_{part_code}_{supplier_code}",
-                                        'supplier_id': supplier_info.get('id'),
-                                        'unit_price': temp_item.get('price'),
-                                        'currency': 'dong',  # 기본값
-                                        'effective_from': datetime.now().date().isoformat(),
-                                        'is_current': True,
-                                        '_temp_supplier_name': supplier_info.get('name', supplier_code),
-                                        '_is_temp': True
-                                    })
-                    except Exception as e:
-                        st.warning(f"임시 가격 정보 로딩 중 오류 발생: {e}")
+                    # 임시 테이블 조회 코드 제거
                     
                     if price_result.data:
                         # 공급업체 정보 가져오기
-                        supplier_ids = [item.get('supplier_id') for item in price_result.data if item.get('supplier_id') and not item.get('_is_temp', False)]
+                        supplier_ids = [item.get('supplier_id') for item in price_result.data if item.get('supplier_id')]
                         supplier_map = {}
                         
                         if supplier_ids:
@@ -492,37 +452,72 @@ def show_parts_details():
                         for item in price_result.data:
                             supplier_id = item.get('supplier_id')
                             unit_price = item.get('unit_price')
-                            is_temp = item.get('_is_temp', False)
-                            
                             # unit_price가 0보다 큰 경우만 표시
                             if unit_price is not None and unit_price > 0:
                                 price_data.append({
                                     'price_id': item.get('price_id'),
-                                    'supplier_name': item.get('_temp_supplier_name') if is_temp else supplier_map.get(supplier_id, 'Unknown'),
+                                    'supplier_name': supplier_map.get(supplier_id, 'Unknown'),
                                     'supplier_id': supplier_id,
                                     'unit_price': unit_price,
                                     'currency': item.get('currency'),
                                     'effective_date': item.get('effective_from'),
-                                    'is_current': item.get('is_current'),
-                                    'is_temp': is_temp
+                                    'is_current': item.get('is_current')
                                 })
                         
                         if price_data:
+                            # 가격 정보 데이터 프레임 생성
                             price_df = pd.DataFrame(price_data)
                             
-                            st.dataframe(
+                            # 선택 가능한 데이터프레임으로 변경하여 행 선택 기능 추가
+                            selected_prices = st.dataframe(
                                 price_df,
                                 column_config={
                                     'supplier_name': st.column_config.TextColumn("공급업체"),
                                     'unit_price': st.column_config.NumberColumn("단가", format="%d"),
                                     'currency': st.column_config.TextColumn("통화"),
                                     'effective_date': st.column_config.DateColumn("적용일", format="YYYY-MM-DD"),
-                                    'is_current': st.column_config.CheckboxColumn("현재 적용"),
-                                    'is_temp': st.column_config.CheckboxColumn("임시 데이터")
+                                    'is_current': st.column_config.CheckboxColumn("현재 적용")
                                 },
                                 use_container_width=True,
-                                hide_index=True
+                                hide_index=True,
+                                selection="single"  # 단일 행 선택 가능
                             )
+                            
+                            # 선택된 행이 있으면 해당 가격 정보 처리
+                            if selected_prices:
+                                selected_indices = selected_prices.get("selected_rows_indices", [])
+                                if selected_indices:
+                                    selected_idx = selected_indices[0]  # 첫 번째 선택된 행
+                                    selected_price = price_data[selected_idx]
+                                    
+                                    # 선택된 가격 정보에 대한 작업 버튼
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        if st.button("🗑️ 가격 정보 삭제", key="delete_price_btn"):
+                                            try:
+                                                # 가격 정보 삭제
+                                                delete_result = supabase().from_("part_prices").delete().eq("price_id", selected_price.get('price_id')).execute()
+                                                if delete_result.data:
+                                                    display_success("가격 정보가 삭제되었습니다.")
+                                                    st.rerun()
+                                                else:
+                                                    display_error("가격 정보 삭제 중 오류가 발생했습니다.")
+                                            except Exception as e:
+                                                display_error(f"가격 정보 삭제 중 오류가 발생했습니다: {e}")
+                                    
+                                    with col2:
+                                        if st.button("✏️ 가격 정보 수정", key="edit_price_btn"):
+                                            # 세션 상태에 수정할 가격 정보 저장
+                                            st.session_state.edit_price_info = {
+                                                'price_id': selected_price.get('price_id'),
+                                                'supplier_id': selected_price.get('supplier_id'),
+                                                'supplier_name': selected_price.get('supplier_name'),
+                                                'unit_price': selected_price.get('unit_price'),
+                                                'currency': selected_price.get('currency'),
+                                                'effective_date': selected_price.get('effective_date'),
+                                                'is_current': selected_price.get('is_current')
+                                            }
+                                            st.rerun()  # 화면 갱신
                         else:
                             st.info("유효한 단가 정보가 없습니다.")
                     else:
@@ -530,78 +525,146 @@ def show_parts_details():
                 except Exception as e:
                     st.error(f"가격 정보를 불러오는 중 오류가 발생했습니다: {e}")
                 
-                # 가격 추가 UI
-                st.markdown("#### 새 가격 정보 추가")
-                with st.form("add_price_form"):
-                    # 공급업체 목록 조회
-                    supplier_result = supabase().from_("suppliers").select("supplier_id, supplier_name").execute()
+                # 가격 추가/수정 UI
+                if "edit_price_info" in st.session_state:
+                    st.markdown("#### 가격 정보 수정")
+                    edit_info = st.session_state.edit_price_info
                     
-                    if supplier_result.data:
-                        supplier_options = [f"{s['supplier_name']}" for s in supplier_result.data]
-                        supplier_ids = {s['supplier_name']: s['supplier_id'] for s in supplier_result.data}
+                    with st.form("edit_price_form"):
+                        # 수정 대상 공급업체 표시
+                        st.markdown(f"**공급업체:** {edit_info.get('supplier_name')}")
+                        supplier_id = edit_info.get('supplier_id')
                         
-                        selected_supplier = st.selectbox("공급업체 선택", supplier_options)
-                        currency_options = ["₫", "$", "€", "¥"]
-                        
+                        # 가격 정보 입력 필드
                         col1, col2, col3 = st.columns(3)
                         with col1:
-                            unit_price = st.number_input("단가", min_value=0, value=0)
+                            unit_price = st.number_input("단가", min_value=0, value=int(edit_info.get('unit_price', 0)))
                         with col2:
-                            currency = st.selectbox("통화", currency_options, index=0)
-                        with col3:
-                            effective_date = st.date_input("적용일", datetime.now())
-                        
-                        is_current = st.checkbox("현재 적용", value=True)
-                        
-                        if st.form_submit_button("✅ 가격 추가"):
+                            currency_options = ["₫", "$", "€", "¥"]
+                            curr_idx = 0
                             try:
-                                # 현재 사용자 정보
-                                from utils.auth import get_current_user
-                                current_user = get_current_user()
-                                
-                                supplier_id = supplier_ids.get(selected_supplier)
-                                
-                                # 새 가격 데이터
-                                price_data = {
-                                    "part_id": selected_id,
-                                    "supplier_id": supplier_id,
-                                    "unit_price": unit_price,
-                                    "currency": currency,
-                                    "effective_from": effective_date.isoformat(),
-                                    "is_current": is_current,
-                                    "created_by": current_user
-                                }
-                                
-                                # 새로 추가
-                                price_data["is_current"] = unit_price > 0  # 단가가 0보다 크면 TRUE, 아니면 FALSE
+                                curr_idx = currency_options.index(edit_info.get('currency'))
+                            except (ValueError, TypeError):
+                                curr_idx = 0
+                            currency = st.selectbox("통화", currency_options, index=curr_idx)
+                        with col3:
+                            try:
+                                default_date = datetime.strptime(edit_info.get('effective_date'), "%Y-%m-%d").date()
+                            except (ValueError, TypeError):
+                                default_date = datetime.now().date()
+                            effective_date = st.date_input("적용일", value=default_date)
+                        
+                        is_current = st.checkbox("현재 적용", value=edit_info.get('is_current', True))
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("✅ 가격 수정"):
                                 try:
-                                    # 직접 INSERT 대신 RPC 함수 사용
-                                    rpc_result = supabase().rpc(
-                                        "insert_part_price",
-                                        {
-                                            "p_part_id": selected_id,
-                                            "p_supplier_id": supplier_id,
-                                            "p_unit_price": unit_price,
-                                            "p_currency": currency,
-                                            "p_effective_from": effective_date.isoformat(),
-                                            "p_is_current": unit_price > 0,
-                                            "p_created_by": current_user
-                                        }
-                                    ).execute()
+                                    # 현재 사용자 정보
+                                    from utils.auth import get_current_user
+                                    current_user = get_current_user()
                                     
-                                    if rpc_result.data and rpc_result.data.get('success'):
-                                        display_success(f"새 가격 정보가 추가되었습니다.")
+                                    # 수정할 데이터
+                                    update_data = {
+                                        "unit_price": unit_price,
+                                        "currency": currency,
+                                        "effective_from": effective_date.isoformat(),
+                                        "is_current": unit_price > 0,  # 단가가 0보다 크면 TRUE, 아니면 FALSE
+                                        "updated_at": datetime.now().isoformat(),
+                                        "updated_by": current_user
+                                    }
+                                    
+                                    # Supabase 업데이트
+                                    update_result = supabase().from_("part_prices").update(update_data).eq("price_id", edit_info.get('price_id')).execute()
+                                    
+                                    if update_result.data:
+                                        # 세션에서 수정 정보 제거
+                                        st.session_state.pop('edit_price_info', None)
+                                        display_success("가격 정보가 수정되었습니다.")
                                         st.rerun()
                                     else:
-                                        error_msg = rpc_result.data.get('message') if rpc_result.data else "가격 정보 추가 중 오류가 발생했습니다."
-                                        display_error(error_msg)
+                                        display_error("가격 정보 수정 중 오류가 발생했습니다.")
                                 except Exception as e:
-                                    # 일반 오류 처리
+                                    display_error(f"가격 정보 수정 중 오류가 발생했습니다: {e}")
+                        
+                        with col2:
+                            if st.form_submit_button("❌ 취소"):
+                                # 세션에서 수정 정보 제거
+                                st.session_state.pop('edit_price_info', None)
+                                st.rerun()
+                else:
+                    # 새 가격 정보 추가 UI
+                    st.markdown("#### 새 가격 정보 추가")
+                    with st.form("add_price_form"):
+                        # 공급업체 목록 조회
+                        supplier_result = supabase().from_("suppliers").select("supplier_id, supplier_name").execute()
+                        
+                        if supplier_result.data:
+                            supplier_options = [f"{s['supplier_name']}" for s in supplier_result.data]
+                            supplier_ids = {s['supplier_name']: s['supplier_id'] for s in supplier_result.data}
+                            
+                            selected_supplier = st.selectbox("공급업체 선택", supplier_options)
+                            currency_options = ["₫", "$", "€", "¥"]
+                            
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                unit_price = st.number_input("단가", min_value=0, value=0)
+                            with col2:
+                                currency = st.selectbox("통화", currency_options, index=0)
+                            with col3:
+                                effective_date = st.date_input("적용일", datetime.now())
+                            
+                            is_current = st.checkbox("현재 적용", value=True)
+                            
+                            if st.form_submit_button("✅ 가격 추가"):
+                                try:
+                                    # 현재 사용자 정보
+                                    from utils.auth import get_current_user
+                                    current_user = get_current_user()
+                                    
+                                    supplier_id = supplier_ids.get(selected_supplier)
+                                    
+                                    # 새 가격 데이터
+                                    price_data = {
+                                        "part_id": selected_id,
+                                        "supplier_id": supplier_id,
+                                        "unit_price": unit_price,
+                                        "currency": currency,
+                                        "effective_from": effective_date.isoformat(),
+                                        "is_current": is_current,
+                                        "created_by": current_user
+                                    }
+                                    
+                                    # 새로 추가
+                                    price_data["is_current"] = unit_price > 0  # 단가가 0보다 크면 TRUE, 아니면 FALSE
+                                    try:
+                                        # 직접 INSERT 대신 RPC 함수 사용
+                                        rpc_result = supabase().rpc(
+                                            "insert_part_price",
+                                            {
+                                                "p_part_id": selected_id,
+                                                "p_supplier_id": supplier_id,
+                                                "p_unit_price": unit_price,
+                                                "p_currency": currency,
+                                                "p_effective_from": effective_date.isoformat(),
+                                                "p_is_current": unit_price > 0,
+                                                "p_created_by": current_user
+                                            }
+                                        ).execute()
+                                        
+                                        if rpc_result.data and rpc_result.data.get('success'):
+                                            display_success(f"새 가격 정보가 추가되었습니다.")
+                                            st.rerun()
+                                        else:
+                                            error_msg = rpc_result.data.get('message') if rpc_result.data else "가격 정보 추가 중 오류가 발생했습니다."
+                                            display_error(error_msg)
+                                    except Exception as e:
+                                        # 일반 오류 처리
+                                        display_error(f"가격 정보 추가 중 오류가 발생했습니다: {e}")
+                                except Exception as e:
                                     display_error(f"가격 정보 추가 중 오류가 발생했습니다: {e}")
-                            except Exception as e:
-                                display_error(f"가격 정보 추가 중 오류가 발생했습니다: {e}")
-                    else:
-                        st.warning("등록된 공급업체가 없습니다. 먼저 공급업체를 등록해주세요.")
+                        else:
+                            st.warning("등록된 공급업체가 없습니다. 먼저 공급업체를 등록해주세요.")
             except Exception as e:
                 st.error(f"가격 정보를 불러오는 중 오류가 발생했습니다: {e}")
             
