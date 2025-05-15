@@ -423,62 +423,112 @@ def show_parts_details():
             # 가격 정보
             st.markdown("#### 공급업체별 가격 정보")
             try:
-                # 가격 정보 조회 - unit_price가 0보다 큰 경우와 is_current가 TRUE인 경우 우선 정렬
-                price_result = supabase().from_("part_prices").select("""
-                    price_id,
-                    supplier_id,
-                    unit_price,
-                    currency,
-                    effective_from,
-                    is_current
-                """).eq("part_id", selected_id).gt("unit_price", 0).order("unit_price", desc=True).order("is_current", desc=True).order("effective_from", desc=True).execute()
-                
-                if price_result.data:
-                    # 공급업체 정보 가져오기
-                    supplier_ids = [item.get('supplier_id') for item in price_result.data if item.get('supplier_id')]
-                    supplier_map = {}
+                # 가격 정보 조회 - 실제 part_prices 테이블과 임시 temp_part_prices 테이블을 모두 조회
+                try:
+                    # 1. 실제 part_prices 테이블 조회
+                    price_result = supabase().from_("part_prices").select("""
+                        price_id,
+                        supplier_id,
+                        unit_price,
+                        currency,
+                        effective_from,
+                        is_current
+                    """).eq("part_id", selected_id).gt("unit_price", 0).order("unit_price", desc=True).order("is_current", desc=True).order("effective_from", desc=True).execute()
                     
-                    if supplier_ids:
-                        supplier_result = supabase().from_("suppliers").select("supplier_id, supplier_name").in_("supplier_id", supplier_ids).execute()
-                        if supplier_result.data:
-                            supplier_map = {s.get('supplier_id'): s.get('supplier_name') for s in supplier_result.data}
-                    
-                    # 데이터 변환
-                    price_data = []
-                    for item in price_result.data:
-                        supplier_id = item.get('supplier_id')
-                        unit_price = item.get('unit_price')
-                        # unit_price가 0보다 큰 경우만 표시
-                        if unit_price is not None and unit_price > 0:
-                            price_data.append({
-                                'price_id': item.get('price_id'),
-                                'supplier_name': supplier_map.get(supplier_id, 'Unknown'),
-                                'supplier_id': supplier_id,
-                                'unit_price': unit_price,
-                                'currency': item.get('currency'),
-                                'effective_date': item.get('effective_from'),
-                                'is_current': item.get('is_current')
-                            })
-                    
-                    if price_data:
-                        price_df = pd.DataFrame(price_data)
+                    # 2. 임시 temp_part_prices 테이블 조회
+                    try:
+                        # 부품 코드 가져오기
+                        part_code_result = supabase().from_("parts").select("part_code").eq("part_id", selected_id).execute()
+                        part_code = part_code_result.data[0].get('part_code') if part_code_result.data else None
                         
-                        st.dataframe(
-                            price_df,
-                            column_config={
-                                'supplier_name': st.column_config.TextColumn("공급업체"),
-                                'unit_price': st.column_config.NumberColumn("단가", format="%d"),
-                                'currency': st.column_config.TextColumn("통화"),
-                                'effective_date': st.column_config.DateColumn("적용일", format="YYYY-MM-DD"),
-                                'is_current': st.column_config.CheckboxColumn("현재 적용")
-                            },
-                            use_container_width=True,
-                            hide_index=True
-                        )
+                        if part_code:
+                            # temp_part_prices 테이블에서 데이터 조회
+                            temp_price_result = supabase().from_("temp_part_prices").select("""
+                                part_code,
+                                supplier_code,
+                                price
+                            """).eq("part_code", part_code).gt("price", 0).execute()
+                            
+                            # supplier_code -> supplier_id 매핑
+                            if temp_price_result.data:
+                                supplier_codes = [item.get('supplier_code') for item in temp_price_result.data if item.get('supplier_code')]
+                                supplier_code_map = {}
+                                
+                                if supplier_codes:
+                                    suppliers_result = supabase().from_("suppliers").select("supplier_id, supplier_code, supplier_name").in_("supplier_code", supplier_codes).execute()
+                                    if suppliers_result.data:
+                                        supplier_code_map = {s.get('supplier_code'): {'id': s.get('supplier_id'), 'name': s.get('supplier_name')} for s in suppliers_result.data}
+                                
+                                # temp_part_prices 데이터를 price_result.data에 추가
+                                for temp_item in temp_price_result.data:
+                                    supplier_code = temp_item.get('supplier_code')
+                                    supplier_info = supplier_code_map.get(supplier_code, {})
+                                    
+                                    price_result.data.append({
+                                        'price_id': f"temp_{part_code}_{supplier_code}",
+                                        'supplier_id': supplier_info.get('id'),
+                                        'unit_price': temp_item.get('price'),
+                                        'currency': 'dong',  # 기본값
+                                        'effective_from': datetime.now().date().isoformat(),
+                                        'is_current': True,
+                                        '_temp_supplier_name': supplier_info.get('name', supplier_code),
+                                        '_is_temp': True
+                                    })
+                    except Exception as e:
+                        st.warning(f"임시 가격 정보 로딩 중 오류 발생: {e}")
+                    
+                    if price_result.data:
+                        # 공급업체 정보 가져오기
+                        supplier_ids = [item.get('supplier_id') for item in price_result.data if item.get('supplier_id') and not item.get('_is_temp', False)]
+                        supplier_map = {}
+                        
+                        if supplier_ids:
+                            supplier_result = supabase().from_("suppliers").select("supplier_id, supplier_name").in_("supplier_id", supplier_ids).execute()
+                            if supplier_result.data:
+                                supplier_map = {s.get('supplier_id'): s.get('supplier_name') for s in supplier_result.data}
+                        
+                        # 데이터 변환
+                        price_data = []
+                        for item in price_result.data:
+                            supplier_id = item.get('supplier_id')
+                            unit_price = item.get('unit_price')
+                            is_temp = item.get('_is_temp', False)
+                            
+                            # unit_price가 0보다 큰 경우만 표시
+                            if unit_price is not None and unit_price > 0:
+                                price_data.append({
+                                    'price_id': item.get('price_id'),
+                                    'supplier_name': item.get('_temp_supplier_name') if is_temp else supplier_map.get(supplier_id, 'Unknown'),
+                                    'supplier_id': supplier_id,
+                                    'unit_price': unit_price,
+                                    'currency': item.get('currency'),
+                                    'effective_date': item.get('effective_from'),
+                                    'is_current': item.get('is_current'),
+                                    'is_temp': is_temp
+                                })
+                        
+                        if price_data:
+                            price_df = pd.DataFrame(price_data)
+                            
+                            st.dataframe(
+                                price_df,
+                                column_config={
+                                    'supplier_name': st.column_config.TextColumn("공급업체"),
+                                    'unit_price': st.column_config.NumberColumn("단가", format="%d"),
+                                    'currency': st.column_config.TextColumn("통화"),
+                                    'effective_date': st.column_config.DateColumn("적용일", format="YYYY-MM-DD"),
+                                    'is_current': st.column_config.CheckboxColumn("현재 적용"),
+                                    'is_temp': st.column_config.CheckboxColumn("임시 데이터")
+                                },
+                                use_container_width=True,
+                                hide_index=True
+                            )
+                        else:
+                            st.info("유효한 단가 정보가 없습니다.")
                     else:
-                        st.info("유효한 단가 정보가 없습니다.")
-                else:
-                    st.info("등록된 가격 정보가 없습니다.")
+                        st.info("등록된 가격 정보가 없습니다.")
+                except Exception as e:
+                    st.error(f"가격 정보를 불러오는 중 오류가 발생했습니다: {e}")
                 
                 # 가격 추가 UI
                 st.markdown("#### 새 가격 정보 추가")
