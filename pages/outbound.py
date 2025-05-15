@@ -295,8 +295,30 @@ def show_outbound_add():
             # 설비 ID 입력
             equipment_id = st.text_input(f"{get_text('equipment_id')}", placeholder="EQ-001")
             
-            # 참조 번호 입력
-            reference_number = st.text_input(f"{get_text('reference_number')}", placeholder="OUT-2023-001")
+            # 참조 번호 입력 - 자동 생성 (OUT-YYYYMMDD-###)
+            today_date = datetime.now().strftime("%Y%m%d")
+            
+            # 오늘 날짜의 최신 참조번호 가져오기
+            try:
+                today_prefix = f"OUT-{today_date}"
+                latest_ref_result = supabase().from_("outbound").select("reference_number").ilike("reference_number", f"{today_prefix}%").order("reference_number", desc=True).limit(1).execute()
+                
+                if latest_ref_result.data and latest_ref_result.data[0].get('reference_number'):
+                    latest_ref = latest_ref_result.data[0].get('reference_number')
+                    # OUT-YYYYMMDD-001 형식에서 마지막 숫자 추출
+                    try:
+                        last_num = int(latest_ref.split('-')[-1])
+                        suggested_ref = f"{today_prefix}-{last_num+1:03d}"
+                    except:
+                        suggested_ref = f"{today_prefix}-001"
+                else:
+                    suggested_ref = f"{today_prefix}-001"
+            except Exception as e:
+                # 오류 발생 시 기본 참조번호 생성
+                suggested_ref = f"{today_prefix}-001"
+                
+            # 참조 번호 표시 (수정 불가)
+            reference_number = st.text_input(f"{get_text('reference_number')}", value=suggested_ref, disabled=True)
             
             # 용도 선택
             purpose_options = ["-- 용도 선택 --", "정기 교체", "고장 수리", "예방 정비", "비상 수리", "테스트", "기타"]

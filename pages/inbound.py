@@ -253,43 +253,83 @@ def show_inbound_add():
             # 입고일 선택
             inbound_date = st.date_input(f"{get_text('inbound_date')}*", datetime.now())
             
-            # 참조 번호 입력
-            reference_number = st.text_input(f"{get_text('reference_number')}", placeholder="IN-2023-001")
+            # 참조 번호 입력 - 자동 생성 (IN-YYYYMMDD-###)
+            today_date = datetime.now().strftime("%Y%m%d")
             
-            # 단가 입력 - 선택한 공급업체에 따라 자동으로 가져오거나 수동 입력
+            # 오늘 날짜의 최신 참조번호 가져오기
+            try:
+                today_prefix = f"IN-{today_date}"
+                latest_ref_result = supabase().from_("inbound").select("reference_number").ilike("reference_number", f"{today_prefix}%").order("reference_number", desc=True).limit(1).execute()
+                
+                if latest_ref_result.data and latest_ref_result.data[0].get('reference_number'):
+                    latest_ref = latest_ref_result.data[0].get('reference_number')
+                    # IN-YYYYMMDD-001 형식에서 마지막 숫자 추출
+                    try:
+                        last_num = int(latest_ref.split('-')[-1])
+                        suggested_ref = f"{today_prefix}-{last_num+1:03d}"
+                    except:
+                        suggested_ref = f"{today_prefix}-001"
+                else:
+                    suggested_ref = f"{today_prefix}-001"
+            except Exception as e:
+                # 오류 발생 시 기본 참조번호 생성
+                suggested_ref = f"{today_prefix}-001"
+                
+            # 참조 번호 표시 (수정 불가)
+            st.text_input(f"{get_text('reference_number')}", value=suggested_ref, disabled=True)
+            
+            # 단가와 총액 계산
             if selected_supplier != "-- 공급업체 선택 --" and selected_part != "-- 부품 선택 --":
-                # 선택한 부품과 공급업체의 최신 가격 정보 가져오기
+                # 선택한 부품과 공급업체의 가격 정보 가져오기
                 try:
                     part_id = part_data_dict.get(selected_part, {}).get('part_id')
                     supplier_id = supplier_data_dict.get(selected_supplier, {}).get('supplier_id')
                     
                     if part_id and supplier_id:
-                        price_result = supabase().from_("part_prices").select("unit_price, currency").eq("part_id", part_id).eq("supplier_id", supplier_id).eq("is_current", True).execute()
+                        # 해당 부품과 공급업체 조합의 가격 정보 조회
+                        price_result = supabase().from_("part_prices").select("unit_price").eq("part_id", part_id).eq("supplier_id", supplier_id).eq("is_current", True).execute()
                         
-                        suggested_price = 0
-                        currency = "₩"
+                        unit_price = 0
                         if price_result.data:
-                            suggested_price = price_result.data[0].get('unit_price', 0)
-                            currency = price_result.data[0].get('currency', '₩')
+                            unit_price = price_result.data[0].get('unit_price', 0)
                         
-                        unit_price = st.number_input("단가*", min_value=0, value=int(suggested_price))
+                        # 단가 표시 (수정 불가)
+                        st.text_input("단가*", value=format_currency(unit_price, "₫"), disabled=True)
+                        
+                        # 통화는 ₫으로 고정
+                        currency = "₫"
+                        
+                        # 총액 자동 계산 및 강조 표시 (박스 형태)
+                        total_price = quantity * unit_price
+                        st.markdown("""
+                        <style>
+                        .total-price-box {
+                            background-color: #f0f2f6;
+                            border-radius: 5px;
+                            padding: 10px;
+                            font-size: 20px;
+                            font-weight: bold;
+                            text-align: center;
+                            margin: 10px 0;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
+                        
+                        st.markdown(f"<div class='total-price-box'>총액: {format_currency(total_price, currency)}</div>", unsafe_allow_html=True)
                     else:
-                        unit_price = st.number_input("단가*", min_value=0, value=0)
+                        st.warning("부품 또는 공급업체 정보를 가져올 수 없습니다.")
+                        unit_price = 0
+                        currency = "₫"
+                        total_price = 0
                 except Exception as e:
                     st.warning(f"가격 정보를 불러오는 중 오류 발생: {e}")
-                    unit_price = st.number_input("단가*", min_value=0, value=0)
-                
-                # 통화 선택
-                currency_options = ["₩", "$", "€", "¥", "₫"]
-                currency = st.selectbox("통화", currency_options, index=0)
-                
-                # 총액 자동 계산
-                total_price = quantity * unit_price
-                st.info(f"총액: {format_currency(total_price, currency)}")
+                    unit_price = 0
+                    currency = "₫"
+                    total_price = 0
             else:
-                unit_price = st.number_input("단가*", min_value=0, value=0)
-                currency_options = ["₩", "$", "€", "¥", "₫"]
-                currency = st.selectbox("통화", currency_options, index=0)
+                st.warning("부품과 공급업체를 선택하면 단가와 총액이 표시됩니다.")
+                unit_price = 0
+                currency = "₫"
                 total_price = 0
         
         # 비고 입력
@@ -330,7 +370,7 @@ def show_inbound_add():
                         "unit_price": unit_price,
                         "total_price": total_price,
                         "currency": currency,
-                        "reference_number": reference_number,
+                        "reference_number": suggested_ref,
                         "notes": remarks,
                         "created_by": current_user
                     }
