@@ -425,7 +425,7 @@ def show_parts_details():
             try:
                 # 가격 정보 조회 - 실제 part_prices 테이블과 임시 temp_part_prices 테이블을 모두 조회
                 try:
-                    # 1. 실제 part_prices 테이블만 조회하도록 수정
+                    # 1. 실제 part_prices 테이블 조회
                     price_result = supabase().from_("part_prices").select("""
                         price_id,
                         supplier_id,
@@ -433,9 +433,25 @@ def show_parts_details():
                         currency,
                         effective_from,
                         is_current
-                    """).eq("part_id", selected_id).gt("unit_price", 0).order("unit_price", desc=True).order("is_current", desc=True).order("effective_from", desc=True).execute()
+                    """).eq("part_id", selected_id).not_.is_("unit_price", None).order("unit_price", desc=True).order("is_current", desc=True).order("effective_from", desc=True).execute()
                     
-                    # 임시 테이블 조회 코드 제거
+                    # 2. 임시 temp_part_prices 테이블 조회 - 있을 경우
+                    try:
+                        temp_price_result = supabase().from_("temp_part_prices").select("""
+                            price_id,
+                            supplier_id,
+                            unit_price,
+                            currency,
+                            effective_from,
+                            is_current
+                        """).eq("part_id", selected_id).not_.is_("unit_price", None).execute()
+                        
+                        # 결과 병합 (임시 테이블 결과 추가)
+                        if temp_price_result.data:
+                            price_result.data.extend(temp_price_result.data)
+                    except Exception as e:
+                        # 임시 테이블이 없을 수 있으므로 오류는 무시
+                        pass
                     
                     if price_result.data:
                         # 공급업체 정보 가져오기
@@ -468,8 +484,8 @@ def show_parts_details():
                             # 가격 정보 데이터 프레임 생성
                             price_df = pd.DataFrame(price_data)
                             
-                            # 선택 가능한 데이터프레임으로 변경하여 행 선택 기능 추가
-                            selected_prices = st.dataframe(
+                            # 데이터프레임 표시 (selection 파라미터 제거)
+                            st.dataframe(
                                 price_df,
                                 column_config={
                                     'supplier_name': st.column_config.TextColumn("공급업체"),
@@ -479,45 +495,10 @@ def show_parts_details():
                                     'is_current': st.column_config.CheckboxColumn("현재 적용")
                                 },
                                 use_container_width=True,
-                                hide_index=True,
-                                selection="single"  # 단일 행 선택 가능
+                                hide_index=True
                             )
                             
-                            # 선택된 행이 있으면 해당 가격 정보 처리
-                            if selected_prices:
-                                selected_indices = selected_prices.get("selected_rows_indices", [])
-                                if selected_indices:
-                                    selected_idx = selected_indices[0]  # 첫 번째 선택된 행
-                                    selected_price = price_data[selected_idx]
-                                    
-                                    # 선택된 가격 정보에 대한 작업 버튼
-                                    col1, col2 = st.columns(2)
-                                    with col1:
-                                        if st.button("🗑️ 가격 정보 삭제", key="delete_price_btn"):
-                                            try:
-                                                # 가격 정보 삭제
-                                                delete_result = supabase().from_("part_prices").delete().eq("price_id", selected_price.get('price_id')).execute()
-                                                if delete_result.data:
-                                                    display_success("가격 정보가 삭제되었습니다.")
-                                                    st.rerun()
-                                                else:
-                                                    display_error("가격 정보 삭제 중 오류가 발생했습니다.")
-                                            except Exception as e:
-                                                display_error(f"가격 정보 삭제 중 오류가 발생했습니다: {e}")
-                                    
-                                    with col2:
-                                        if st.button("✏️ 가격 정보 수정", key="edit_price_btn"):
-                                            # 세션 상태에 수정할 가격 정보 저장
-                                            st.session_state.edit_price_info = {
-                                                'price_id': selected_price.get('price_id'),
-                                                'supplier_id': selected_price.get('supplier_id'),
-                                                'supplier_name': selected_price.get('supplier_name'),
-                                                'unit_price': selected_price.get('unit_price'),
-                                                'currency': selected_price.get('currency'),
-                                                'effective_date': selected_price.get('effective_date'),
-                                                'is_current': selected_price.get('is_current')
-                                            }
-                                            st.rerun()  # 화면 갱신
+                            # 수정 및 삭제 기능은 필요한 경우 나중에 다시 추가
                         else:
                             st.info("유효한 단가 정보가 없습니다.")
                     else:
