@@ -433,7 +433,7 @@ def show_parts_details():
                         currency,
                         effective_from,
                         is_current
-                    """).eq("part_id", selected_id).not_.is_("unit_price", None).order("unit_price", desc=True).order("is_current", desc=True).order("effective_from", desc=True).execute()
+                    """).eq("part_id", selected_id).gt("unit_price", 0).order("unit_price", desc=True).order("is_current", desc=True).order("effective_from", desc=True).execute()
                     
                     # 2. 임시 temp_part_prices 테이블 조회 - 있을 경우
                     try:
@@ -444,7 +444,7 @@ def show_parts_details():
                             currency,
                             effective_from,
                             is_current
-                        """).eq("part_id", selected_id).not_.is_("unit_price", None).execute()
+                        """).eq("part_id", selected_id).gt("unit_price", 0).execute()
                         
                         # 결과 병합 (임시 테이블 결과 추가)
                         if temp_price_result.data:
@@ -484,7 +484,7 @@ def show_parts_details():
                             # 가격 정보 데이터 프레임 생성
                             price_df = pd.DataFrame(price_data)
                             
-                            # 데이터프레임 표시 (selection 파라미터 제거)
+                            # 데이터프레임 표시
                             st.dataframe(
                                 price_df,
                                 column_config={
@@ -497,8 +497,6 @@ def show_parts_details():
                                 use_container_width=True,
                                 hide_index=True
                             )
-                            
-                            # 수정 및 삭제 기능은 필요한 경우 나중에 다시 추가
                         else:
                             st.info("유효한 단가 정보가 없습니다.")
                     else:
