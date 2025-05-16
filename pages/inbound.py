@@ -221,7 +221,19 @@ def show_inbound_add():
             quantity = st.number_input(get_text('quantity'), min_value=1, value=1, step=1)
         with col2:
             inbound_date = st.date_input(get_text('inbound_date'), value=datetime.now().date(), format="YYYY-MM-DD")
-            suggested_ref = f"INB-{datetime.now().strftime('%Y%m%d')}-{str(quantity).zfill(4)}"
+            # 참조번호 자동생성 (IN-YYYYMMDD-001 형식, 오늘 날짜의 최대값+1)
+            today_str = inbound_date.strftime('%Y%m%d')
+            today_prefix = f"IN-{today_str}"
+            latest_ref_result = supabase().from_("inbound").select("reference_number").ilike("reference_number", f"{today_prefix}-%").order("reference_number", desc=True).limit(1).execute()
+            if latest_ref_result.data and latest_ref_result.data[0].get('reference_number'):
+                latest_ref = latest_ref_result.data[0]['reference_number']
+                try:
+                    last_num = int(latest_ref.split('-')[-1])
+                    suggested_ref = f"{today_prefix}-{last_num+1:03d}"
+                except:
+                    suggested_ref = f"{today_prefix}-001"
+            else:
+                suggested_ref = f"{today_prefix}-001"
             reference_number = st.text_input(get_text('reference_number'), value=suggested_ref, disabled=True)
             # 단가 자동입력: 부품+공급업체 선택 시 part_prices에서 조회
             if selected_part and selected_supplier:
@@ -298,7 +310,7 @@ def show_inbound_add():
                     "part_id": part_id,
                     "unit_price": unit_price,
                     "currency": "₫",
-                    "effective_date": inbound_date.isoformat(),
+                    "effective_from": inbound_date.isoformat(),
                     "is_current": True
                 }
                 price_insert = supabase().from_("part_prices").insert(price_data).execute()
