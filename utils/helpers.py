@@ -74,36 +74,40 @@ def display_error(message):
     오류 메시지 표시
     
     Args:
-        message: 표시할 메시지
+        message: 오류 메시지
     """
-    st.error(f"오류: {message}")
+    from utils.i18n import get_text
+    st.error(f"{get_text('error')}: {message}")
 
 def display_success(message):
     """
     성공 메시지 표시
     
     Args:
-        message: 표시할 메시지
+        message: 성공 메시지
     """
-    st.success(f"성공: {message}")
+    from utils.i18n import get_text
+    st.success(f"{get_text('success')}: {message}")
 
 def display_info(message):
     """
     정보 메시지 표시
     
     Args:
-        message: 표시할 메시지
+        message: 정보 메시지
     """
-    st.info(f"정보: {message}")
+    from utils.i18n import get_text
+    st.info(f"{get_text('info')}: {message}")
 
 def display_warning(message):
     """
     경고 메시지 표시
     
     Args:
-        message: 표시할 메시지
+        message: 경고 메시지
     """
-    st.warning(f"경고: {message}")
+    from utils.i18n import get_text
+    st.warning(f"{get_text('warning')}: {message}")
 
 def create_empty_df(columns):
     """

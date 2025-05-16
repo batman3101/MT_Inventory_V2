@@ -70,4 +70,22 @@ SET department_id = (
     FROM departments 
     WHERE department_name = outbound.department::text
 )
-WHERE department IS NOT NULL; 
+WHERE department IS NOT NULL;
+
+-- 출고 테이블에 reference_number 필드 추가
+ALTER TABLE outbound ADD COLUMN IF NOT EXISTS reference_number VARCHAR(50);
+
+-- 입고 테이블에 reference_number 필드 추가
+ALTER TABLE inbound ADD COLUMN IF NOT EXISTS reference_number VARCHAR(50);
+
+-- RLS 정책 수정 - 모든 사용자가 inbound 테이블에 입력할 수 있도록 함
+DROP POLICY IF EXISTS "쓰기 권한" ON inbound;
+CREATE POLICY "쓰기 권한" ON inbound FOR INSERT WITH CHECK (true);
+
+-- RLS 정책 수정 - 모든 사용자가 outbound 테이블에 입력할 수 있도록 함
+DROP POLICY IF EXISTS "쓰기 권한" ON outbound;
+CREATE POLICY "쓰기 권한" ON outbound FOR INSERT WITH CHECK (true);
+
+-- RLS 정책 수정 - 모든 사용자가 inventory 테이블을 업데이트할 수 있도록 함
+DROP POLICY IF EXISTS "업데이트 권한" ON inventory;
+CREATE POLICY "업데이트 권한" ON inventory FOR UPDATE USING (true); 

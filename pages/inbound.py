@@ -129,13 +129,13 @@ def show_inbound_search():
                 if len(df) > 0:
                     # 총액 합계 계산
                     total_amount = df['total_price'].sum()
-                    st.info(f"검색 결과: {len(df)}건, 총액: {format_currency(total_amount)}")
+                    st.info(f"{get_text('search_results')}: {len(df)}{get_text('items')}, {get_text('total')}: {format_currency(total_amount)}")
                     
                     # 입고 이력 표시
                     st.dataframe(
                         df,
                         column_config={
-                            'inbound_id': st.column_config.TextColumn("입고 ID"),
+                            'inbound_id': st.column_config.TextColumn(get_text('inbound_id')),
                             'part_code': st.column_config.TextColumn(get_text('part_code')),
                             'part_name': st.column_config.TextColumn(get_text('part_name')),
                             'supplier_name': st.column_config.TextColumn(get_text('supplier')),
@@ -143,7 +143,7 @@ def show_inbound_search():
                             'unit': st.column_config.TextColumn(get_text('unit')),
                             'unit_price': st.column_config.NumberColumn(get_text('price'), format="%d"),
                             'total_price': st.column_config.NumberColumn(get_text('total'), format="%d"),
-                            'currency': st.column_config.TextColumn("통화"),
+                            'currency': st.column_config.TextColumn(get_text('currency')),
                             'inbound_date': st.column_config.DateColumn(get_text('inbound_date'), format="YYYY-MM-DD"),
                             'reference_number': st.column_config.TextColumn(get_text('reference_number')),
                             'created_by': st.column_config.TextColumn(get_text('created_by'))
@@ -166,245 +166,240 @@ def show_inbound_search():
                             # 다운로드 링크 생성
                             with open(filename, "rb") as file:
                                 st.download_button(
-                                    label=f"📥 {filename} 다운로드",
+                                    label=f"📥 {filename} {get_text('download')}",
                                     data=file,
                                     file_name=filename,
                                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                 )
                             
-                            display_success(f"Excel 파일로 저장되었습니다: {filename}")
+                            display_success(get_text('success_excel'))
                     with col2:
-                        if st.button(f"📊 {get_text('reports')} 생성"):
+                        if st.button(f"📊 {get_text('reports')} {get_text('create')}"):
                             # 보고서 생성 로직
-                            display_success("보고서가 생성되었습니다.")
+                            display_success(get_text('success_report'))
                 else:
-                    display_info("검색 결과가 없습니다.")
+                    display_info(get_text('no_search_results'))
             else:
-                display_info("검색 결과가 없습니다.")
+                display_info(get_text('no_search_results'))
                 
         except Exception as e:
-            display_error(f"데이터 검색 중 오류가 발생했습니다: {e}")
+            display_error(f"{get_text('error_search')}: {e}")
 
 def show_inbound_add():
     """
-    입고 등록 화면 표시
+    신규 입고 등록 페이지 표시
     """
-    st.markdown("### 신규 입고 등록")
+    st.markdown(f"## {get_text('add_inbound')}")
     
-    # 입력 폼
-    with st.form("add_inbound_form"):
-        col1, col2 = st.columns(2)
+    # 현재 사용자 정보 가져오기
+    from utils.auth import get_current_username
+    current_user = get_current_username()
+    
+    # 폼으로 감싸기
+    with st.form(key="inbound_form"):
+        # 날짜 선택기
+        inbound_date = st.date_input(
+            get_text('inbound_date'),
+            value=datetime.now().date(),
+            format="YYYY-MM-DD"
+        )
         
-        with col1:
-            # 부품 선택
-            try:
-                part_result = supabase().from_("parts").select("part_id, part_code, part_name, unit, min_stock").execute()
-                if part_result.data:
-                    part_options = ["-- 부품 선택 --"] + [f"{item['part_code']} - {item['part_name']}" for item in part_result.data]
-                    part_data_dict = {f"{item['part_code']} - {item['part_name']}": item for item in part_result.data}
-                else:
-                    part_options = ["-- 부품 선택 --"]
-                    part_data_dict = {}
-            except Exception as e:
-                display_error(f"부품 정보를 불러오는 중 오류 발생: {e}")
-                part_options = ["-- 부품 선택 --"]
-                part_data_dict = {}
-                
-            selected_part = st.selectbox(f"{get_text('part_name')}*", part_options)
-            
-            if selected_part != "-- 부품 선택 --":
-                part_code = selected_part.split(" - ")[0]
-                part_name = selected_part.split(" - ")[1]
-                part_data = part_data_dict.get(selected_part, {})
-                
-                # 부품 정보 표시
-                try:
-                    # 현재 재고 조회
-                    inventory_result = supabase().from_("inventory").select("current_quantity").eq("part_id", part_data.get('part_id')).execute()
-                    current_quantity = 0
-                    if inventory_result.data:
-                        current_quantity = inventory_result.data[0].get('current_quantity', 0)
-                    
-                    # 부품 정보 표시
-                    st.info(f"단위: {part_data.get('unit', 'EA')}, 현재 재고: {current_quantity}, 최소 재고: {part_data.get('min_stock', 0)}")
-                except Exception as e:
-                    st.warning(f"재고 정보를 불러오는 중 오류 발생: {e}")
-            
-            # 공급업체 선택
-            try:
-                supplier_result = supabase().from_("suppliers").select("supplier_id, supplier_code, supplier_name").execute()
-                if supplier_result.data:
-                    supplier_options = ["-- 공급업체 선택 --"] + [f"{item['supplier_code']} - {item['supplier_name']}" for item in supplier_result.data]
-                    supplier_data_dict = {f"{item['supplier_code']} - {item['supplier_name']}": item for item in supplier_result.data}
-                else:
-                    supplier_options = ["-- 공급업체 선택 --"]
-                    supplier_data_dict = {}
-            except Exception as e:
-                display_error(f"공급업체 정보를 불러오는 중 오류 발생: {e}")
-                supplier_options = ["-- 공급업체 선택 --"]
-                supplier_data_dict = {}
-                
-            selected_supplier = st.selectbox(f"{get_text('supplier')}*", supplier_options)
-            
-            # 수량 입력
-            quantity = st.number_input(f"{get_text('quantity')}*", min_value=1, value=1)
+        # 부품 선택
+        part_result = supabase().from_("parts").select("part_id, part_code, part_name, unit").execute()
         
-        with col2:
-            # 입고일 선택
-            inbound_date = st.date_input(f"{get_text('inbound_date')}*", datetime.now())
-            
-            # 참조 번호 입력 - 자동 생성 (IN-YYYYMMDD-###)
-            today_date = datetime.now().strftime("%Y%m%d")
-            
-            # 오늘 날짜의 최신 참조번호 가져오기
-            try:
-                today_prefix = f"IN-{today_date}"
-                latest_ref_result = supabase().from_("inbound").select("reference_number").ilike("reference_number", f"{today_prefix}%").order("reference_number", desc=True).limit(1).execute()
-                
-                if latest_ref_result.data and latest_ref_result.data[0].get('reference_number'):
-                    latest_ref = latest_ref_result.data[0].get('reference_number')
-                    # IN-YYYYMMDD-001 형식에서 마지막 숫자 추출
-                    try:
-                        last_num = int(latest_ref.split('-')[-1])
-                        suggested_ref = f"{today_prefix}-{last_num+1:03d}"
-                    except:
-                        suggested_ref = f"{today_prefix}-001"
-                else:
-                    suggested_ref = f"{today_prefix}-001"
-            except Exception as e:
-                # 오류 발생 시 기본 참조번호 생성
-                suggested_ref = f"{today_prefix}-001"
-                
-            # 참조 번호 표시 (수정 불가)
-            st.text_input(f"{get_text('reference_number')}", value=suggested_ref, disabled=True)
-            
-            # 단가와 총액 계산
-            if selected_supplier != "-- 공급업체 선택 --" and selected_part != "-- 부품 선택 --":
-                # 선택한 부품과 공급업체의 가격 정보 가져오기
-                try:
-                    part_id = part_data_dict.get(selected_part, {}).get('part_id')
-                    supplier_id = supplier_data_dict.get(selected_supplier, {}).get('supplier_id')
-                    
-                    if part_id and supplier_id:
-                        # 해당 부품과 공급업체 조합의 가격 정보 조회
-                        price_result = supabase().from_("part_prices").select("unit_price").eq("part_id", part_id).eq("supplier_id", supplier_id).eq("is_current", True).execute()
-                        
-                        unit_price = 0
-                        if price_result.data:
-                            unit_price = price_result.data[0].get('unit_price', 0)
-                        
-                        # 단가 표시 (수정 불가)
-                        st.text_input("단가*", value=format_currency(unit_price, "₫"), disabled=True)
-                        
-                        # 통화는 ₫으로 고정
-                        currency = "₫"
-                        
-                        # 총액 자동 계산 및 강조 표시 (박스 형태)
-                        total_price = quantity * unit_price
-                        st.markdown("""
-                        <style>
-                        .total-price-box {
-                            background-color: #f0f2f6;
-                            border-radius: 5px;
-                            padding: 10px;
-                            font-size: 20px;
-                            font-weight: bold;
-                            text-align: center;
-                            margin: 10px 0;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
-                        
-                        st.markdown(f"<div class='total-price-box'>총액: {format_currency(total_price, currency)}</div>", unsafe_allow_html=True)
-                    else:
-                        st.warning("부품 또는 공급업체 정보를 가져올 수 없습니다.")
-                        unit_price = 0
-                        currency = "₫"
-                        total_price = 0
-                except Exception as e:
-                    st.warning(f"가격 정보를 불러오는 중 오류 발생: {e}")
-                    unit_price = 0
-                    currency = "₫"
-                    total_price = 0
-            else:
-                st.warning("부품과 공급업체를 선택하면 단가와 총액이 표시됩니다.")
-                unit_price = 0
-                currency = "₫"
-                total_price = 0
+        if not part_result.data:
+            st.error(get_text('error_info_sync'))
+            return
         
-        # 비고 입력
-        remarks = st.text_area(f"{get_text('remarks')}", placeholder="특이사항 입력")
+        # 부품 정보를 딕셔너리로 정리
+        parts_dict = {f"{p['part_code']} - {p['part_name']}": p for p in part_result.data}
+        part_options = list(parts_dict.keys())
         
-        submitted = st.form_submit_button(f"✅ {get_text('save')}")
+        selected_part = st.selectbox(
+            get_text('part_name'),
+            options=[""] + part_options,
+            index=0,
+            format_func=lambda x: x if x else f"-- {get_text('select_part')} --"
+        )
+        
+        # 공급업체 선택
+        supplier_result = supabase().from_("suppliers").select("supplier_id, supplier_name").execute()
+        
+        if not supplier_result.data:
+            st.error(get_text('error_info_sync'))
+            return
+        
+        # 공급업체 정보를 딕셔너리로 정리
+        suppliers_dict = {s['supplier_name']: s for s in supplier_result.data}
+        supplier_options = list(suppliers_dict.keys())
+        
+        selected_supplier = st.selectbox(
+            get_text('supplier'),
+            options=[""] + supplier_options,
+            index=0,
+            format_func=lambda x: x if x else f"-- {get_text('select_supplier')} --"
+        )
+        
+        # 수량 입력
+        quantity = st.number_input(
+            get_text('quantity'),
+            min_value=1,
+            value=1,
+            step=1
+        )
+        
+        # 단가 입력
+        unit_price = st.number_input(
+            get_text('price'),
+            min_value=0.0,
+            value=0.0,
+            step=1000.0,
+            format="%f"
+        )
+        
+        # 통화 선택
+        currency = st.selectbox(
+            get_text('currency'),
+            options=["₫", "$", "€", "¥", "₩"],
+            index=0
+        )
+        
+        # 총액 계산 및 표시 (읽기 전용)
+        total_price = quantity * unit_price
+        st.text(f"{get_text('total')}: {format_currency(total_price)}")
+        
+        # 참조 번호 처리
+        suggested_ref = f"INB-{datetime.now().strftime('%Y%m%d')}-{str(quantity).zfill(4)}"
+        remarks = st.text_area(get_text('remarks'), "", help=f"{get_text('reference_number')}: {suggested_ref}")
+        
+        # 제출 버튼
+        submitted = st.form_submit_button(get_text('save'))
         
         if submitted:
-            # 필수 입력 확인
-            if selected_part == "-- 부품 선택 --":
-                display_error("부품을 선택해주세요.")
-            elif selected_supplier == "-- 공급업체 선택 --":
-                display_error("공급업체를 선택해주세요.")
-            elif quantity <= 0:
-                display_error("수량은 1 이상이어야 합니다.")
-            elif unit_price <= 0:
-                display_error("단가는 0보다 커야 합니다.")
-            else:
-                try:
-                    # 현재 사용자 정보 가져오기
-                    from utils.auth import get_current_user
-                    current_user = get_current_user()
+            # 필수 값 검증
+            if not selected_part:
+                display_error(get_text('select_part'))
+                return
+            
+            if not selected_supplier:
+                display_error(get_text('select_supplier'))
+                return
+            
+            if quantity < 1:
+                display_error(get_text('quantity_min'))
+                return
+            
+            if unit_price <= 0:
+                display_error(get_text('price_min'))
+                return
+            
+            try:
+                # 선택된 부품과 공급업체 정보 가져오기
+                part_id = parts_dict[selected_part]['part_id']
+                supplier_id = suppliers_dict[selected_supplier]['supplier_id']
+                
+                # 입고 데이터 준비
+                inbound_data = {
+                    "inbound_date": inbound_date.isoformat(),
+                    "part_id": part_id,
+                    "supplier_id": supplier_id,
+                    "quantity": quantity,
+                    "unit_price": unit_price,
+                    "total_price": total_price,
+                    "currency": currency,
+                    "reference_number": suggested_ref,
+                    "notes": remarks,
+                    "created_by": current_user
+                }
+                
+                # Supabase에 입고 정보 저장
+                inbound_result = supabase().from_("inbound").insert(inbound_data).execute()
+                
+                if not inbound_result.data:
+                    display_error(get_text('error_save'))
+                    return
+                
+                # 재고 업데이트
+                # 현재 재고 가져오기
+                inventory_result = supabase().from_("inventory").select("inventory_id, current_quantity").eq("part_id", part_id).execute()
+                
+                if inventory_result.data:
+                    # 기존 재고가 있는 경우 업데이트
+                    inventory_id = inventory_result.data[0]['inventory_id']
+                    current_quantity = inventory_result.data[0]['current_quantity'] or 0
                     
-                    # 선택한 부품과 공급업체 ID 가져오기
-                    part_id = part_data_dict.get(selected_part, {}).get('part_id')
-                    supplier_id = supplier_data_dict.get(selected_supplier, {}).get('supplier_id')
-                    
-                    if not part_id or not supplier_id:
-                        display_error("부품 또는 공급업체 정보를 가져올 수 없습니다.")
-                        return
-                    
-                    # 입고 데이터 준비
-                    inbound_data = {
-                        "inbound_date": inbound_date.isoformat(),
-                        "part_id": part_id,
-                        "supplier_id": supplier_id,
-                        "quantity": quantity,
-                        "unit_price": unit_price,
-                        "total_price": total_price,
-                        "currency": currency,
-                        "reference_number": suggested_ref,
-                        "notes": remarks,
-                        "created_by": current_user
-                    }
-                    
-                    # Supabase에 입고 정보 저장
-                    inbound_result = supabase().from_("inbound").insert(inbound_data).execute()
-                    
-                    if not inbound_result.data:
-                        display_error("입고 정보 저장 중 오류가 발생했습니다.")
-                        return
+                    # 새 수량 계산
+                    new_quantity = current_quantity + quantity
                     
                     # 재고 업데이트
-                    inventory_result = supabase().from_("inventory").select("inventory_id, current_quantity").eq("part_id", part_id).execute()
+                    inventory_update = supabase().from_("inventory").update({"current_quantity": new_quantity}).eq("inventory_id", inventory_id).execute()
                     
-                    if inventory_result.data:
-                        inventory_id = inventory_result.data[0]["inventory_id"]
-                        current_quantity = inventory_result.data[0]["current_quantity"]
-                        
-                        # 재고 수량 증가
-                        new_quantity = current_quantity + quantity
-                        
-                        inventory_update = {
-                            "current_quantity": new_quantity,
-                            "last_count_date": datetime.now().isoformat(),
-                            "updated_by": current_user
-                        }
-                        
-                        supabase().from_("inventory").update(inventory_update).eq("inventory_id", inventory_id).execute()
+                    if not inventory_update.data:
+                        display_warning(f"{get_text('success_save')}, {get_text('error_info_sync')}")
+                        return
+                else:
+                    # 기존 재고가 없는 경우 새로 생성
+                    inventory_data = {
+                        "part_id": part_id,
+                        "current_quantity": quantity
+                    }
                     
-                    # 성공 메시지 및 폼 초기화
-                    display_success(f"새 입고 정보가 등록되었습니다. (부품: {part_code}, 수량: {quantity})")
-                    st.rerun()
-                except Exception as e:
-                    display_error(f"입고 정보 등록 중 오류가 발생했습니다: {e}")
+                    inventory_insert = supabase().from_("inventory").insert(inventory_data).execute()
+                    
+                    if not inventory_insert.data:
+                        display_warning(f"{get_text('success_save')}, {get_text('error_info_sync')}")
+                        return
+                
+                # 부품 가격 정보 업데이트
+                # 현재 가격 정보 가져오기
+                price_result = supabase().from_("part_prices").select("price_id").eq("part_id", part_id).eq("is_current", True).execute()
+                
+                if price_result.data:
+                    # 기존 가격 정보를 현재 가격이 아닌 것으로 업데이트
+                    for item in price_result.data:
+                        price_id = item['price_id']
+                        supabase().from_("part_prices").update({"is_current": False}).eq("price_id", price_id).execute()
+                
+                # 새 가격 정보 추가
+                price_data = {
+                    "part_id": part_id,
+                    "unit_price": unit_price,
+                    "currency": currency,
+                    "effective_date": inbound_date.isoformat(),
+                    "is_current": True
+                }
+                
+                price_insert = supabase().from_("part_prices").insert(price_data).execute()
+                
+                if not price_insert.data:
+                    display_warning(f"{get_text('success_save')}, {get_text('error_info_sync')}")
+                    return
+                
+                # 성공 메시지 표시
+                display_success(get_text('success_save'))
+                
+                # 부품 정보 표시
+                st.markdown(f"### {get_text('part_info')}")
+                st.write(f"**{get_text('part_code')}:** {parts_dict[selected_part]['part_code']}")
+                st.write(f"**{get_text('part_name')}:** {parts_dict[selected_part]['part_name']}")
+                st.write(f"**{get_text('unit')}:** {parts_dict[selected_part]['unit']}")
+                
+                # 공급업체 정보 표시
+                st.markdown(f"### {get_text('supplier_info')}")
+                st.write(f"**{get_text('name')}:** {suppliers_dict[selected_supplier]['supplier_name']}")
+                
+                # 입고 내역 요약 표시
+                st.markdown(f"### {get_text('inbound_history')}")
+                st.write(f"**{get_text('inbound_date')}:** {inbound_date}")
+                st.write(f"**{get_text('quantity')}:** {quantity}")
+                st.write(f"**{get_text('unit_price')}:** {format_currency(unit_price)}")
+                st.write(f"**{get_text('total')}:** {format_currency(total_price)}")
+                st.write(f"**{get_text('reference_number')}:** {suggested_ref}")
+                if remarks:
+                    st.write(f"**{get_text('remarks')}:** {remarks}")
+                
+            except Exception as e:
+                display_error(f"{get_text('error_save')}: {str(e)}")
 
 if __name__ == "__main__":
     show() 

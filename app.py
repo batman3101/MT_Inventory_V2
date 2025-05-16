@@ -242,7 +242,7 @@ def main():
         
         # 앱 이름
         st.markdown("<div style='text-align: center; margin-top: 0.5rem;'><div style='font-weight: bold; color: #1E3A8A; font-size: 1.2rem;'>ALMUS EqMS SYSTEM</div></div>", unsafe_allow_html=True)
-        st.markdown("<div class='sidebar-text'>설비 유지보수 부품 관리 시스템</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sidebar-text'>{get_text('app_name')}</div>", unsafe_allow_html=True)
         
         st.divider()
         
@@ -308,20 +308,20 @@ def main():
     # 메인 화면
     if not check_authentication():
         # 첫 번째 이미지 스타일처럼 로그인 화면 구성
-        st.markdown("""
+        st.markdown(f"""
         <div class='login-container'>
-            <h1 class='login-title'>설비 유지보수 부품 관리 시스템 (EqMS)</h1>
+            <h1 class='login-title'>{get_text('app_name')}</h1>
         """, unsafe_allow_html=True)
         
         # 로그인 폼 - 간단한 디자인으로
         with st.form(key="login_form", clear_on_submit=False):
-            username = st.text_input("이메일", key="username_input", placeholder="사용자 아이디를 입력하세요", value="")
-            password = st.text_input("비밀번호", type="password", key="password_input", placeholder="비밀번호를 입력하세요", value="")
+            username = st.text_input(get_text('email'), key="username_input", placeholder=f"{get_text('username')}", value="")
+            password = st.text_input(get_text('password'), type="password", key="password_input", placeholder=f"{get_text('password')}", value="")
             
             # 디버깅 정보 표시 체크박스 (선택적)
             debug_info = st.checkbox("디버그 정보 표시", value=True, key="debug_checkbox")
             
-            submit_button = st.form_submit_button("로그인", use_container_width=True)
+            submit_button = st.form_submit_button(get_text('login'), use_container_width=True)
             
             if submit_button:
                 if debug_info:
@@ -346,7 +346,7 @@ def main():
                         config = load_auth_config()
                         if config:
                             st.write(f"사용 가능한 계정: {list(config['credentials']['usernames'].keys())}")
-                    st.error(f"아이디 또는 비밀번호가 올바르지 않습니다. (입력한 이메일: {username})")
+                    st.error(f"{get_text('error_info_sync')} ({get_text('email')}: {username})")
         
         # HTML 닫기
         st.markdown("</div>", unsafe_allow_html=True)
@@ -406,7 +406,7 @@ def display_dashboard():
     st.markdown(f"<div class='main-header'>{get_text('dashboard')}</div>", unsafe_allow_html=True)
     
     # 현재 날짜 표시
-    current_date = datetime.now().strftime("%Y년 %m월 %d일")
+    current_date = datetime.now().strftime(f"%Y{get_text('year')} %m{get_text('month')} %d{get_text('day')}")
     st.markdown(f"<div style='text-align:right; margin-bottom:1rem;'>{current_date}</div>", unsafe_allow_html=True)
     
     # 대시보드 컨텐츠
@@ -415,7 +415,7 @@ def display_dashboard():
     # 재고 요약
     with col1:
         with st.container():
-            st.markdown("### 재고 요약")
+            st.markdown(f"### {get_text('stock_summary')}")
             try:
                 # 총 부품 수 조회
                 parts_result = supabase().from_("parts").select("part_id, min_stock, category", count="exact").execute()
@@ -489,22 +489,22 @@ def display_dashboard():
                         low_stock_count += 1
                 
                 # 표시할 내용
-                st.metric("총 부품 종류", f"{total_parts}개")
-                st.metric("총 재고 수량", f"{total_quantity}개")
-                st.metric("총 재고 가치", format_currency(total_value))
+                st.metric(get_text('total_parts'), f"{total_parts}{get_text('items')}")
+                st.metric(get_text('total_quantity'), f"{total_quantity}{get_text('items')}")
+                st.metric(get_text('total_value'), format_currency(total_value))
                 
                 if low_stock_count > 0:
-                    st.error(f"⚠️ 재고 부족 품목: {low_stock_count}개")
+                    st.error(f"{get_text('low_stock_warning')}: {low_stock_count}{get_text('items')}")
                 else:
-                    st.success("✓ 모든 품목 재고 양호")
+                    st.success(get_text('all_stock_good'))
                 
             except Exception as e:
-                st.error(f"재고 정보를 불러오는 중 오류가 발생했습니다: {str(e)}")
+                st.error(f"{get_text('error_loading_data')}: {str(e)}")
 
     # 최근 입고 현황
     with col2:
         with st.container():
-            st.markdown("### 최근 입고 현황")
+            st.markdown(f"### {get_text('recent_inbound')}")
             try:
                 # 최근 5건의 입고 내역 조회
                 inbound_result = supabase().from_("inbound").select("inbound_id, inbound_date, part_id, supplier_id, quantity").order("inbound_date", desc=True).limit(5).execute()
@@ -534,19 +534,19 @@ def display_dashboard():
                         
                         with st.container():
                             st.markdown(f"**{part_data.get('part_code', '')}** - {part_data.get('part_name', '')}")
-                            st.markdown(f"수량: **{item.get('quantity', 0)}** | 공급: {supplier_data.get('supplier_name', '')}")
+                            st.markdown(f"{get_text('quantity')}: **{item.get('quantity', 0)}** | {get_text('supplier')}: {supplier_data.get('supplier_name', '')}")
                             st.caption(f"{inbound_date}")
                             st.divider()
                 else:
-                    st.info("최근 입고 내역이 없습니다.")
+                    st.info(get_text('no_inbound_history'))
                     
             except Exception as e:
-                st.error(f"입고 정보를 불러오는 중 오류가 발생했습니다: {str(e)}")
+                st.error(f"{get_text('error_loading_data')}: {str(e)}")
                 
     # 최근 출고 현황
     with col3:
         with st.container():
-            st.markdown("### 최근 출고 현황")
+            st.markdown(f"### {get_text('recent_outbound')}")
             try:
                 # 최근 5건의 출고 내역 조회
                 outbound_result = supabase().from_("outbound").select("outbound_id, outbound_date, part_id, quantity, requester").order("outbound_date", desc=True).limit(5).execute()
@@ -568,17 +568,17 @@ def display_dashboard():
                         
                         with st.container():
                             st.markdown(f"**{part_data.get('part_code', '')}** - {part_data.get('part_name', '')}")
-                            st.markdown(f"수량: **{item.get('quantity', 0)}** | 요청자: {item.get('requester', '')}")
+                            st.markdown(f"{get_text('quantity')}: **{item.get('quantity', 0)}** | {get_text('requester')}: {item.get('requester', '')}")
                             st.caption(f"{outbound_date}")
                             st.divider()
                 else:
-                    st.info("최근 출고 내역이 없습니다.")
+                    st.info(get_text('no_outbound_history'))
                     
             except Exception as e:
-                st.error(f"출고 정보를 불러오는 중 오류가 발생했습니다: {str(e)}")
+                st.error(f"{get_text('error_loading_data')}: {str(e)}")
     
     # 재고 부족 아이템 목록
-    st.markdown("### 재고 부족 아이템")
+    st.markdown(f"### {get_text('low_stock_items')}")
     try:
         # 모든 부품 정보를 한 번에 가져오기 (ID, 코드, 이름, 카테고리, 단위, 최소재고량)
         parts_result = supabase().from_("parts").select("part_id, part_code, part_name, category, unit, min_stock").execute()
@@ -645,18 +645,18 @@ def display_dashboard():
                 show_df = df.iloc[start_idx:end_idx].copy()
                 
                 # 페이지 정보 표시
-                st.caption(f"전체 {len(df)}개 중 {start_idx+1}-{end_idx}개 표시 (총 {total_pages} 페이지)")
+                st.caption(f"{get_text('search_results')} {len(df)}{get_text('items')} {get_text('from')} {start_idx+1}-{end_idx} ({total_pages} {get_text('total')})")
                 
                 # 데이터프레임 표시
                 st.dataframe(
                     show_df,
                     column_config={
-                        'part_code': st.column_config.TextColumn("부품 코드"),
-                        'part_name': st.column_config.TextColumn("부품명"),
-                        'category': st.column_config.TextColumn("카테고리"),
-                        'current_quantity': st.column_config.NumberColumn("재고", format="%d"),
-                        'min_stock': st.column_config.NumberColumn("최소", format="%d"),
-                        'shortage': st.column_config.NumberColumn("부족량", format="%d")
+                        'part_code': st.column_config.TextColumn(get_text("part_code")),
+                        'part_name': st.column_config.TextColumn(get_text("part_name")),
+                        'category': st.column_config.TextColumn(get_text("category")),
+                        'current_quantity': st.column_config.NumberColumn(get_text("current_stock"), format="%d"),
+                        'min_stock': st.column_config.NumberColumn(get_text("min_stock"), format="%d"),
+                        'shortage': st.column_config.NumberColumn(get_text("items"), format="%d")
                     },
                     hide_index=True,
                     use_container_width=True
@@ -667,7 +667,7 @@ def display_dashboard():
                 
                 with col1:
                     if current_page > 1:
-                        if st.button("◀ 이전"):
+                        if st.button(f"◀ {get_text('back')}"):
                             st.session_state.low_stock_page -= 1
                             st.rerun()
                 
@@ -691,16 +691,16 @@ def display_dashboard():
                 
                 with col3:
                     if current_page < total_pages:
-                        if st.button("다음 ▶"):
+                        if st.button(f"{get_text('next')} ▶"):
                             st.session_state.low_stock_page += 1
                             st.rerun()
             else:
-                st.info("재고 부족 아이템이 없습니다.")
+                st.info(get_text('all_stock_good'))
     except Exception as e:
-        st.error(f"재고 부족 아이템을 조회하는 중 오류가 발생했습니다: {str(e)}")
+        st.error(f"{get_text('error_loading_data')}: {str(e)}")
 
     # 카테고리별 요약
-    st.markdown("### 카테고리별 요약")
+    st.markdown(f"### {get_text('category')} {get_text('stock_summary')}")
     try:
         # 카테고리별 정보 계산
         category_summary = []
@@ -738,7 +738,7 @@ def display_dashboard():
             
             # 나머지 카테고리 합산
             others = {
-                'category': '기타 카테고리',
+                'category': get_text('category'),
                 'part_count': sum(item['part_count'] for item in category_summary[4:]),
                 'quantity': sum(item['quantity'] for item in category_summary[4:]),
                 'value': sum(item['value'] for item in category_summary[4:]),
@@ -758,17 +758,17 @@ def display_dashboard():
         st.dataframe(
             df,
             column_config={
-                'category': st.column_config.TextColumn("카테고리"),
-                'part_count': st.column_config.NumberColumn("품목 수", format="%d개"),
-                'quantity': st.column_config.NumberColumn("재고 수량", format="%d개"),
-                'value_formatted': st.column_config.TextColumn("재고 가치"),
-                'low_stock': st.column_config.NumberColumn("부족 품목", format="%d개")
+                'category': st.column_config.TextColumn(get_text('category')),
+                'part_count': st.column_config.NumberColumn(f"{get_text('part_code')} {get_text('quantity')}", format="%d{get_text('items')}"),
+                'quantity': st.column_config.NumberColumn(get_text('quantity'), format="%d{get_text('items')}"),
+                'value_formatted': st.column_config.TextColumn(get_text('total_value')),
+                'low_stock': st.column_config.NumberColumn(get_text('low_stock_items'), format="%d{get_text('items')}")
             },
             hide_index=True,
             use_container_width=True
         )
     except Exception as e:
-        st.error(f"카테고리별 요약 정보를 계산하는 중 오류가 발생했습니다: {str(e)}")
+        st.error(f"{get_text('error_loading_data')}: {str(e)}")
 
 if __name__ == "__main__":
     main() 
