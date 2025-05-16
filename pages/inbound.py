@@ -221,7 +221,6 @@ def show_inbound_add():
             quantity = st.number_input(get_text('quantity'), min_value=1, value=1, step=1)
         with col2:
             inbound_date = st.date_input(get_text('inbound_date'), value=datetime.now().date(), format="YYYY-MM-DD")
-            # 참조번호 자동생성
             suggested_ref = f"INB-{datetime.now().strftime('%Y%m%d')}-{str(quantity).zfill(4)}"
             reference_number = st.text_input(get_text('reference_number'), value=suggested_ref, disabled=True)
             # 단가 자동입력: 부품+공급업체 선택 시 part_prices에서 조회
@@ -235,7 +234,7 @@ def show_inbound_add():
                     auto_unit_price = 0.0
             unit_price = st.number_input(get_text('price'), min_value=0.0, value=auto_unit_price, step=1000.0, format="%f")
             total_price = quantity * unit_price
-            st.text(f"{get_text('total')}: {format_currency(total_price)}")
+            st.markdown(f'<div style="background-color:#e3f2fd;padding:12px 0 12px 0;text-align:center;font-size:1.5em;font-weight:bold;">{get_text('total')}: {format_currency(total_price)}</div>', unsafe_allow_html=True)
         remarks = st.text_area(get_text('remarks'), "")
         submitted = st.form_submit_button(get_text('save'))
         if submitted:
