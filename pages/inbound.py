@@ -311,7 +311,8 @@ def show_inbound_add():
                     "unit_price": unit_price,
                     "currency": "₫",
                     "effective_from": inbound_date.isoformat(),
-                    "is_current": True
+                    "is_current": True,
+                    "created_by": current_user
                 }
                 price_insert = supabase().from_("part_prices").insert(price_data).execute()
                 if not price_insert.data:
