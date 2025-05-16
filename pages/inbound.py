@@ -192,8 +192,8 @@ def show_inbound_add():
     st.markdown(f"## {get_text('add_inbound')}")
     
     # 현재 사용자 정보 가져오기
-    from utils.auth import get_current_username
-    current_user = get_current_username()
+    from utils.auth import get_current_user
+    current_user = get_current_user()
     
     # 폼으로 감싸기
     with st.form(key="inbound_form"):
