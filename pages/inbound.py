@@ -80,8 +80,8 @@ def show_inbound_search():
                 invoice_number,
                 reference_number,
                 created_by,
-                parts!inner(part_id, part_code, part_name, unit),
-                suppliers!inner(supplier_id, supplier_name)
+                parts!left(part_id, part_code, part_name, unit),
+                suppliers!left(supplier_id, supplier_name)
             """)
             
             # 검색 필터 적용
@@ -100,8 +100,8 @@ def show_inbound_search():
                 # 결과 처리
                 inbound_data = []
                 for item in result.data:
-                    part_data = item.get("parts", {})
-                    supplier_data = item.get("suppliers", {})
+                    part_data = item.get("parts") or {}
+                    supplier_data = item.get("suppliers") or {}
                     
                     # 부품 코드 필터링 (클라이언트 측에서 처리)
                     part_code = part_data.get('part_code', '')
