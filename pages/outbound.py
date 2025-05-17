@@ -89,21 +89,16 @@ def show_outbound_search():
     # 검색 버튼
     if st.button(f"🔍 {get_text('search')}", type="primary"):
         try:
-            # Supabase에서 출고 데이터 조회
-            query = supabase().from_("outbound").select("""
-                outbound_id,
-                outbound_date,
-                parts!inner(part_id, part_code, part_name),
-                quantity,
-                requester,
-                department_id,
-                departments:department_id(department_name),
-                equipment,
-                reason,
-                reference_number,
-                created_by,
-                created_at
-            """)
+            # parts, departments 전체를 미리 조회하여 딕셔너리로 매핑
+            parts_result = supabase().from_("parts").select("part_id, part_code, part_name, unit").execute()
+            parts_dict = {p["part_id"]: p for p in parts_result.data} if parts_result.data else {}
+            departments_result = supabase().from_("departments").select("department_id, department_name").execute()
+            departments_dict = {d["department_id"]: d for d in departments_result.data} if departments_result.data else {}
+
+            # Supabase에서 출고 데이터 조회 (조인 없이 part_id, department_id만)
+            query = supabase().from_("outbound").select(
+                "outbound_id, outbound_date, quantity, unit, requester, equipment_id, purpose, reference_number, created_by, part_id, department_id"
+            )
             
             # 검색 필터 적용
             if selected_date_range != "전체" and start_date and end_date:
@@ -127,23 +122,25 @@ def show_outbound_search():
             
             # 데이터프레임으로 변환
             if result.data:
-                # 결과 처리
                 outbound_data = []
                 for item in result.data:
-                    part_data = item.get("parts", {})
-                    dept_data = item.get("departments", {})
+                    part = parts_dict.get(item.get("part_id"), {})
+                    department = departments_dict.get(item.get("department_id"), {})
+                    part_code = part.get('part_code', '')
+                    part_name = part.get('part_name', '')
+                    department_name = department.get('department_name', '')
                     
                     outbound_data.append({
                         'outbound_id': item.get('outbound_id'),
-                        'part_code': part_data.get('part_code'),
-                        'part_name': part_data.get('part_name'),
+                        'part_code': part_code,
+                        'part_name': part_name,
                         'quantity': item.get('quantity'),
-                        'unit': part_data.get('unit', 'EA'),  # 부품에서 단위 가져오기
+                        'unit': part.get('unit', 'EA'),  # 부품에서 단위 가져오기
                         'outbound_date': item.get('outbound_date'),
                         'requestor': item.get('requester'),
-                        'department': dept_data.get('department_name', ''),
-                        'equipment_id': item.get('equipment'),
-                        'purpose': item.get('reason'),
+                        'department': department_name,
+                        'equipment_id': item.get('equipment_id'),
+                        'purpose': item.get('purpose'),
                         'reference_number': item.get('reference_number'),
                         'created_by': item.get('created_by')
                     })
