@@ -550,7 +550,7 @@ def show_low_stock_alerts():
             )
             
             # 발주 요청 버튼
-            if st.button("📝 발주 요청서 생성"):
+            if st.button("📝 발주 요청서 생성", key="purchase_request_low_stock"):
                 # 발주 요청서 생성 로직
                 current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"purchase_request_{current_date}.xlsx"
@@ -681,7 +681,7 @@ def show_inventory_analysis():
                 st.plotly_chart(fig4, use_container_width=True)
             
             # 발주 요청 버튼
-            if st.button("📝 발주 요청서 생성"):
+            if st.button("📝 발주 요청서 생성", key="purchase_request_analysis"):
                 # 캐싱된 함수를 사용하여 재고 부족 아이템 가져오기
                 low_stock_items = get_low_stock_items()
                 
