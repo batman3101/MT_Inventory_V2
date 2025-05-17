@@ -414,6 +414,9 @@ def display_dashboard():
     
     # 재고 요약
     with col1:
+        st.markdown("""
+        <div style='background: #e3f2fd; border-radius: 16px; box-shadow: 0 2px 8px rgba(30,58,138,0.08); padding: 2rem 1.5rem; margin-bottom: 1.5rem; min-height: 420px;'>
+        """, unsafe_allow_html=True)
         with st.container():
             st.markdown(f"### {get_text('stock_summary')}")
             try:
@@ -500,9 +503,13 @@ def display_dashboard():
                 
             except Exception as e:
                 st.error(f"{get_text('error_loading_data')}: {str(e)}")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # 최근 입고 현황
     with col2:
+        st.markdown("""
+        <div style='background: #f5f7fa; border-radius: 16px; box-shadow: 0 2px 8px rgba(30,58,138,0.08); padding: 2rem 1.5rem; margin-bottom: 1.5rem; min-height: 420px;'>
+        """, unsafe_allow_html=True)
         with st.container():
             st.markdown(f"### {get_text('recent_inbound')}")
             try:
@@ -542,9 +549,13 @@ def display_dashboard():
                     
             except Exception as e:
                 st.error(f"{get_text('error_loading_data')}: {str(e)}")
+        st.markdown("</div>", unsafe_allow_html=True)
                 
     # 최근 출고 현황
     with col3:
+        st.markdown("""
+        <div style='background: #e3f2fd; border-radius: 16px; box-shadow: 0 2px 8px rgba(30,58,138,0.08); padding: 2rem 1.5rem; margin-bottom: 1.5rem; min-height: 420px;'>
+        """, unsafe_allow_html=True)
         with st.container():
             st.markdown(f"### {get_text('recent_outbound')}")
             try:
@@ -576,6 +587,7 @@ def display_dashboard():
                     
             except Exception as e:
                 st.error(f"{get_text('error_loading_data')}: {str(e)}")
+        st.markdown("</div>", unsafe_allow_html=True)
     
     # 재고 부족 아이템 목록
     st.markdown(f"### {get_text('low_stock_items')}")
