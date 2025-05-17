@@ -300,27 +300,27 @@ def show_inbound_add():
                     if not inventory_insert.data:
                         display_warning(f"{get_text('success_save')}, {get_text('error_info_sync')}")
                         return
-                # 부품 가격 정보 업데이트
+                # 부품 가격 정보 업데이트 (part_prices insert/update 비활성화)
                 # 동일한 가격 정보가 이미 존재하는지 확인
-                price_exists = supabase().from_("part_prices").select("price_id").eq("part_id", part_id).eq("supplier_id", supplier_id).eq("unit_price", unit_price).eq("effective_from", inbound_date.isoformat()).execute()
-                if not price_exists.data:
-                    # 기존 현재 가격 정보 is_current = False 처리
-                    price_result = supabase().from_("part_prices").select("price_id").eq("part_id", part_id).eq("is_current", True).execute()
-                    if price_result.data:
-                        for item in price_result.data:
-                            price_id = item['price_id']
-                            supabase().from_("part_prices").update({"is_current": False}).eq("price_id", price_id).execute()
-                    # 새로운 가격 정보 insert
-                    price_data = {
-                        "part_id": part_id,
-                        "supplier_id": supplier_id,
-                        "unit_price": unit_price,
-                        "currency": "₫",
-                        "effective_from": inbound_date.isoformat(),
-                        "is_current": True,
-                        "created_by": current_user
-                    }
-                    supabase().from_("part_prices").insert(price_data).execute()
+                # price_exists = supabase().from_("part_prices").select("price_id").eq("part_id", part_id).eq("supplier_id", supplier_id).eq("unit_price", unit_price).eq("effective_from", inbound_date.isoformat()).execute()
+                # if not price_exists.data:
+                #     # 기존 현재 가격 정보 is_current = False 처리
+                #     price_result = supabase().from_("part_prices").select("price_id").eq("part_id", part_id).eq("is_current", True).execute()
+                #     if price_result.data:
+                #         for item in price_result.data:
+                #             price_id = item['price_id']
+                #             supabase().from_("part_prices").update({"is_current": False}).eq("price_id", price_id).execute()
+                #     # 새로운 가격 정보 insert
+                #     price_data = {
+                #         "part_id": part_id,
+                #         "supplier_id": supplier_id,
+                #         "unit_price": unit_price,
+                #         "currency": "₫",
+                #         "effective_from": inbound_date.isoformat(),
+                #         "is_current": True,
+                #         "created_by": current_user
+                #     }
+                #     supabase().from_("part_prices").insert(price_data).execute()
                 display_success(get_text('success_save'))
                 st.markdown(f"### {get_text('part_info')}")
                 st.write(f"**{get_text('part_code')}:** {parts_dict[selected_part]['part_code']}")
