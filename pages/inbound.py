@@ -101,7 +101,11 @@ def show_inbound_search():
                 inbound_data = []
                 for item in result.data:
                     part_data = item.get("parts") or {}
+                    if isinstance(part_data, list) and part_data:
+                        part_data = part_data[0]
                     supplier_data = item.get("suppliers") or {}
+                    if isinstance(supplier_data, list) and supplier_data:
+                        supplier_data = supplier_data[0]
                     
                     # 부품 코드 필터링 (클라이언트 측에서 처리)
                     part_code = part_data.get('part_code', '')
