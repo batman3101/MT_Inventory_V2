@@ -69,56 +69,47 @@ def show_inbound_search():
     # 검색 버튼
     if st.button(f"🔍 {get_text('search')}", type="primary"):
         try:
-            # Supabase에서 입고 데이터 조회
-            query = supabase().from_("inbound").select("""
-                inbound_id,
-                inbound_date,
-                quantity,
-                unit_price,
-                total_price,
-                currency,
-                invoice_number,
-                reference_number,
-                created_by,
-                parts!left(part_id, part_code, part_name, unit),
-                suppliers!left(supplier_id, supplier_name)
-            """)
-            
+            # parts, suppliers 전체를 미리 조회하여 딕셔너리로 매핑
+            parts_result = supabase().from_("parts").select("part_id, part_code, part_name, unit").execute()
+            parts_dict = {p["part_id"]: p for p in parts_result.data} if parts_result.data else {}
+            suppliers_result = supabase().from_("suppliers").select("supplier_id, supplier_name").execute()
+            suppliers_dict = {s["supplier_id"]: s for s in suppliers_result.data} if suppliers_result.data else {}
+
+            # Supabase에서 입고 데이터 조회 (조인 없이 part_id, supplier_id만)
+            query = supabase().from_("inbound").select(
+                "inbound_id, inbound_date, quantity, unit_price, total_price, currency, invoice_number, reference_number, created_by, part_id, supplier_id"
+            )
             # 검색 필터 적용
             if selected_date_range != "전체" and start_date and end_date:
                 query = query.gte("inbound_date", format_date(start_date)).lte("inbound_date", format_date(end_date))
-            
             if selected_supplier != "전체":
-                # suppliers.supplier_name으로 필터링
-                query = query.like("suppliers.supplier_name", selected_supplier)
-            
+                # suppliers_dict에서 이름으로 id 찾기
+                supplier_id_filter = None
+                for sid, s in suppliers_dict.items():
+                    if s.get("supplier_name") == selected_supplier:
+                        supplier_id_filter = sid
+                        break
+                if supplier_id_filter:
+                    query = query.eq("supplier_id", supplier_id_filter)
             # 결과 조회
             result = query.execute()
             
             # 데이터프레임으로 변환
             if result.data:
-                # 결과 처리
                 inbound_data = []
                 for item in result.data:
-                    part_data = item.get("parts") or {}
-                    if isinstance(part_data, list) and part_data:
-                        part_data = part_data[0]
-                    supplier_data = item.get("suppliers") or {}
-                    if isinstance(supplier_data, list) and supplier_data:
-                        supplier_data = supplier_data[0]
-                    
-                    # 부품 코드 필터링 (클라이언트 측에서 처리)
-                    part_code = part_data.get('part_code', '')
+                    part = parts_dict.get(item.get("part_id"), {})
+                    supplier = suppliers_dict.get(item.get("supplier_id"), {})
+                    part_code = part.get('part_code', '')
                     if search_code and search_code.lower() not in part_code.lower():
                         continue
-                        
                     inbound_data.append({
                         'inbound_id': item.get('inbound_id'),
-                        'part_code': part_code,
-                        'part_name': part_data.get('part_name', ''),
-                        'supplier_name': supplier_data.get('supplier_name', ''),
+                        'part_code': item.get('part_code', ''),
+                        'part_name': item.get('part_name', ''),
+                        'supplier_name': item.get('supplier_name', ''),
                         'quantity': item.get('quantity', 0),
-                        'unit': part_data.get('unit', 'EA'),
+                        'unit': item.get('part_unit', 'EA'),
                         'unit_price': item.get('unit_price', 0),
                         'total_price': item.get('total_price', 0),
                         'currency': item.get('currency', '₫'),
@@ -269,6 +260,10 @@ def show_inbound_add():
             try:
                 part_id = parts_dict[selected_part]['part_id']
                 supplier_id = suppliers_dict[selected_supplier]['supplier_id']
+                part_code = parts_dict[selected_part]['part_code'] if selected_part in parts_dict else ''
+                part_name = parts_dict[selected_part]['part_name'] if selected_part in parts_dict else ''
+                part_unit = parts_dict[selected_part]['unit'] if selected_part in parts_dict else 'EA'
+                supplier_name = suppliers_dict[selected_supplier]['supplier_name'] if selected_supplier in suppliers_dict else ''
                 inbound_data = {
                     "inbound_date": inbound_date.isoformat(),
                     "part_id": part_id,
@@ -279,7 +274,11 @@ def show_inbound_add():
                     "currency": "₫",
                     "reference_number": reference_number,
                     "notes": remarks,
-                    "created_by": current_user
+                    "created_by": current_user,
+                    "part_code": part_code,
+                    "part_name": part_name,
+                    "supplier_name": supplier_name,
+                    "part_unit": part_unit
                 }
                 inbound_result = supabase().from_("inbound").insert(inbound_data).execute()
                 if not inbound_result.data:
