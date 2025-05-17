@@ -414,180 +414,163 @@ def display_dashboard():
     
     # 재고 요약
     with col1:
-        st.markdown("""
-        <div style='background: #e3f2fd; border-radius: 16px; box-shadow: 0 2px 8px rgba(30,58,138,0.08); padding: 2rem 1.5rem; margin-bottom: 1.5rem; min-height: 420px;'>
-        """, unsafe_allow_html=True)
-        with st.container():
-            st.markdown(f"### {get_text('stock_summary')}")
-            try:
-                # 총 부품 수 조회
-                parts_result = supabase().from_("parts").select("part_id, min_stock, category", count="exact").execute()
-                total_parts = parts_result.count if hasattr(parts_result, 'count') else 0
-                
-                # 부품 ID 목록 및 최소 재고량 정보 준비
-                part_ids = []
-                min_stock_data = {}
-                category_data = {}
-                
-                if parts_result.data:
-                    for part in parts_result.data:
-                        part_id = part.get('part_id')
-                        part_ids.append(part_id)
-                        min_stock_data[part_id] = part.get('min_stock', 0)
-                        
-                        # 카테고리별 분류
-                        category = part.get('category')
-                        if not category:
-                            category = '기타'
-                        
-                        if category not in category_data:
-                            category_data[category] = []
-                        category_data[category].append(part_id)
-                
-                # 재고 정보 일괄 조회 - 배치 처리로 변경
-                inventory_data = {}
-                total_quantity = 0
-                batch_size = 30  # 한 번에 처리할 ID 수
-                
-                for i in range(0, len(part_ids), batch_size):
-                    batch_ids = part_ids[i:i+batch_size]
-                    try:
-                        inventory_result = supabase().from_("inventory").select("part_id, current_quantity").in_("part_id", batch_ids).execute()
-                        for item in inventory_result.data:
-                            part_id = item.get('part_id')
-                            quantity = item.get('current_quantity', 0) or 0  # None 값 안전 처리
-                            inventory_data[part_id] = quantity
-                            total_quantity += quantity
-                    except Exception as e:
-                        logger.error(f"재고 정보 조회 중 오류: {e}")
-                
-                # 가격 정보 일괄 조회 - 배치 처리로 변경
-                price_data = {}
-                batch_size = 30  # 한 번에 처리할 ID 수
-                
-                for i in range(0, len(part_ids), batch_size):
-                    batch_ids = part_ids[i:i+batch_size]
-                    try:
-                        price_result = supabase().from_("part_prices").select("part_id, unit_price").in_("part_id", batch_ids).eq("is_current", True).execute()
-                        for item in price_result.data:
-                            price_data[item.get('part_id')] = item.get('unit_price', 0) or 0  # None 값 안전 처리
-                    except Exception as e:
-                        logger.error(f"가격 정보 조회 중 오류: {e}")
-                
-                # 총 재고 가치 계산
-                total_value = 0
-                for part_id, quantity in inventory_data.items():
-                    unit_price = price_data.get(part_id, 0)
-                    total_value += quantity * unit_price
-                
-                # 재고 부족 아이템 수 계산
-                low_stock_count = 0
-                for part_id, min_stock in min_stock_data.items():
-                    # None 값을 안전하게 처리
-                    min_stock = 0 if min_stock is None else min_stock
-                    current_quantity = inventory_data.get(part_id, 0) or 0  # None일 경우 0으로 변환
+        st.subheader(get_text('stock_summary'))
+        try:
+            # 총 부품 수 조회
+            parts_result = supabase().from_("parts").select("part_id, min_stock, category", count="exact").execute()
+            total_parts = parts_result.count if hasattr(parts_result, 'count') else 0
+            
+            # 부품 ID 목록 및 최소 재고량 정보 준비
+            part_ids = []
+            min_stock_data = {}
+            category_data = {}
+            
+            if parts_result.data:
+                for part in parts_result.data:
+                    part_id = part.get('part_id')
+                    part_ids.append(part_id)
+                    min_stock_data[part_id] = part.get('min_stock', 0)
                     
-                    # 이제 안전하게 비교 가능
-                    if current_quantity < min_stock:
-                        low_stock_count += 1
+                    # 카테고리별 분류
+                    category = part.get('category')
+                    if not category:
+                        category = '기타'
+                    
+                    if category not in category_data:
+                        category_data[category] = []
+                    category_data[category].append(part_id)
+            
+            # 재고 정보 일괄 조회 - 배치 처리로 변경
+            inventory_data = {}
+            total_quantity = 0
+            batch_size = 30  # 한 번에 처리할 ID 수
+            
+            for i in range(0, len(part_ids), batch_size):
+                batch_ids = part_ids[i:i+batch_size]
+                try:
+                    inventory_result = supabase().from_("inventory").select("part_id, current_quantity").in_("part_id", batch_ids).execute()
+                    for item in inventory_result.data:
+                        part_id = item.get('part_id')
+                        quantity = item.get('current_quantity', 0) or 0  # None 값 안전 처리
+                        inventory_data[part_id] = quantity
+                        total_quantity += quantity
+                except Exception as e:
+                    logger.error(f"재고 정보 조회 중 오류: {e}")
+            
+            # 가격 정보 일괄 조회 - 배치 처리로 변경
+            price_data = {}
+            batch_size = 30  # 한 번에 처리할 ID 수
+            
+            for i in range(0, len(part_ids), batch_size):
+                batch_ids = part_ids[i:i+batch_size]
+                try:
+                    price_result = supabase().from_("part_prices").select("part_id, unit_price").in_("part_id", batch_ids).eq("is_current", True).execute()
+                    for item in price_result.data:
+                        price_data[item.get('part_id')] = item.get('unit_price', 0) or 0  # None 값 안전 처리
+                except Exception as e:
+                    logger.error(f"가격 정보 조회 중 오류: {e}")
+            
+            # 총 재고 가치 계산
+            total_value = 0
+            for part_id, quantity in inventory_data.items():
+                unit_price = price_data.get(part_id, 0)
+                total_value += quantity * unit_price
+            
+            # 재고 부족 아이템 수 계산
+            low_stock_count = 0
+            for part_id, min_stock in min_stock_data.items():
+                # None 값을 안전하게 처리
+                min_stock = 0 if min_stock is None else min_stock
+                current_quantity = inventory_data.get(part_id, 0) or 0  # None일 경우 0으로 변환
                 
-                # 표시할 내용
-                st.metric(get_text('total_parts'), f"{total_parts}{get_text('items')}")
-                st.metric(get_text('total_quantity'), f"{total_quantity}{get_text('items')}")
-                st.metric(get_text('total_value'), format_currency(total_value))
-                
-                if low_stock_count > 0:
-                    st.error(f"{get_text('low_stock_warning')}: {low_stock_count}{get_text('items')}")
-                else:
-                    st.success(get_text('all_stock_good'))
-                
-            except Exception as e:
-                st.error(f"{get_text('error_loading_data')}: {str(e)}")
-        st.markdown("</div>", unsafe_allow_html=True)
+                # 이제 안전하게 비교 가능
+                if current_quantity < min_stock:
+                    low_stock_count += 1
+            
+            # 표시할 내용
+            st.metric(get_text('total_parts'), f"{total_parts}{get_text('items')}")
+            st.metric(get_text('total_quantity'), f"{total_quantity}{get_text('items')}")
+            st.metric(get_text('total_value'), format_currency(total_value))
+            
+            if low_stock_count > 0:
+                st.error(f"{get_text('low_stock_warning')}: {low_stock_count}{get_text('items')}")
+            else:
+                st.success(get_text('all_stock_good'))
+            
+        except Exception as e:
+            st.error(f"{get_text('error_loading_data')}: {str(e)}")
 
     # 최근 입고 현황
     with col2:
-        st.markdown("""
-        <div style='background: #f5f7fa; border-radius: 16px; box-shadow: 0 2px 8px rgba(30,58,138,0.08); padding: 2rem 1.5rem; margin-bottom: 1.5rem; min-height: 420px;'>
-        """, unsafe_allow_html=True)
-        with st.container():
-            st.markdown(f"### {get_text('recent_inbound')}")
-            try:
-                # 최근 5건의 입고 내역 조회
-                inbound_result = supabase().from_("inbound").select("inbound_id, inbound_date, part_id, supplier_id, quantity").order("inbound_date", desc=True).limit(5).execute()
-                
-                if inbound_result.data and len(inbound_result.data) > 0:
-                    for item in inbound_result.data:
-                        part_id = item.get("part_id")
-                        supplier_id = item.get("supplier_id")
-                        
-                        # 부품 정보 조회
-                        part_data = {}
-                        if part_id:
-                            part_result = supabase().from_("parts").select("part_code, part_name").eq("part_id", part_id).execute()
-                            if part_result.data:
-                                part_data = part_result.data[0]
-                        
-                        # 공급업체 정보 조회
-                        supplier_data = {}
-                        if supplier_id:
-                            supplier_result = supabase().from_("suppliers").select("supplier_name").eq("supplier_id", supplier_id).execute()
-                            if supplier_result.data:
-                                supplier_data = supplier_result.data[0]
-                        
-                        inbound_date = item.get("inbound_date", "")
-                        if inbound_date:
-                            inbound_date = inbound_date.split("T")[0]  # 날짜만 추출
-                        
-                        with st.container():
-                            st.markdown(f"**{part_data.get('part_code', '')}** - {part_data.get('part_name', '')}")
-                            st.markdown(f"{get_text('quantity')}: **{item.get('quantity', 0)}** | {get_text('supplier')}: {supplier_data.get('supplier_name', '')}")
-                            st.caption(f"{inbound_date}")
-                            st.divider()
-                else:
-                    st.info(get_text('no_inbound_history'))
+        st.subheader(get_text('recent_inbound'))
+        try:
+            # 최근 5건의 입고 내역 조회
+            inbound_result = supabase().from_("inbound").select("inbound_id, inbound_date, part_id, supplier_id, quantity").order("inbound_date", desc=True).limit(5).execute()
+            
+            if inbound_result.data and len(inbound_result.data) > 0:
+                for item in inbound_result.data:
+                    part_id = item.get("part_id")
+                    supplier_id = item.get("supplier_id")
                     
-            except Exception as e:
-                st.error(f"{get_text('error_loading_data')}: {str(e)}")
-        st.markdown("</div>", unsafe_allow_html=True)
+                    # 부품 정보 조회
+                    part_data = {}
+                    if part_id:
+                        part_result = supabase().from_("parts").select("part_code, part_name").eq("part_id", part_id).execute()
+                        if part_result.data:
+                            part_data = part_result.data[0]
+                    
+                    # 공급업체 정보 조회
+                    supplier_data = {}
+                    if supplier_id:
+                        supplier_result = supabase().from_("suppliers").select("supplier_name").eq("supplier_id", supplier_id).execute()
+                        if supplier_result.data:
+                            supplier_data = supplier_result.data[0]
+                    
+                    inbound_date = item.get("inbound_date", "")
+                    if inbound_date:
+                        inbound_date = inbound_date.split("T")[0]  # 날짜만 추출
+                    
+                    st.markdown(f"**{part_data.get('part_code', '')}** - {part_data.get('part_name', '')}")
+                    st.markdown(f"{get_text('quantity')}: **{item.get('quantity', 0)}** | {get_text('supplier')}: {supplier_data.get('supplier_name', '')}")
+                    st.caption(f"{inbound_date}")
+                    st.divider()
+            else:
+                st.info(get_text('no_inbound_history'))
+                
+        except Exception as e:
+            st.error(f"{get_text('error_loading_data')}: {str(e)}")
                 
     # 최근 출고 현황
     with col3:
-        st.markdown("""
-        <div style='background: #e3f2fd; border-radius: 16px; box-shadow: 0 2px 8px rgba(30,58,138,0.08); padding: 2rem 1.5rem; margin-bottom: 1.5rem; min-height: 420px;'>
-        """, unsafe_allow_html=True)
-        with st.container():
-            st.markdown(f"### {get_text('recent_outbound')}")
-            try:
-                # 최근 5건의 출고 내역 조회
-                outbound_result = supabase().from_("outbound").select("outbound_id, outbound_date, part_id, quantity, requester").order("outbound_date", desc=True).limit(5).execute()
-                
-                if outbound_result.data and len(outbound_result.data) > 0:
-                    for item in outbound_result.data:
-                        part_id = item.get("part_id")
-                        
-                        # 부품 정보 조회
-                        part_data = {}
-                        if part_id:
-                            part_result = supabase().from_("parts").select("part_code, part_name").eq("part_id", part_id).execute()
-                            if part_result.data:
-                                part_data = part_result.data[0]
-                        
-                        outbound_date = item.get("outbound_date", "")
-                        if outbound_date:
-                            outbound_date = outbound_date.split("T")[0]  # 날짜만 추출
-                        
-                        with st.container():
-                            st.markdown(f"**{part_data.get('part_code', '')}** - {part_data.get('part_name', '')}")
-                            st.markdown(f"{get_text('quantity')}: **{item.get('quantity', 0)}** | {get_text('requester')}: {item.get('requester', '')}")
-                            st.caption(f"{outbound_date}")
-                            st.divider()
-                else:
-                    st.info(get_text('no_outbound_history'))
+        st.subheader(get_text('recent_outbound'))
+        try:
+            # 최근 5건의 출고 내역 조회
+            outbound_result = supabase().from_("outbound").select("outbound_id, outbound_date, part_id, quantity, requester").order("outbound_date", desc=True).limit(5).execute()
+            
+            if outbound_result.data and len(outbound_result.data) > 0:
+                for item in outbound_result.data:
+                    part_id = item.get("part_id")
                     
-            except Exception as e:
-                st.error(f"{get_text('error_loading_data')}: {str(e)}")
-        st.markdown("</div>", unsafe_allow_html=True)
+                    # 부품 정보 조회
+                    part_data = {}
+                    if part_id:
+                        part_result = supabase().from_("parts").select("part_code, part_name").eq("part_id", part_id).execute()
+                        if part_result.data:
+                            part_data = part_result.data[0]
+                    
+                    outbound_date = item.get("outbound_date", "")
+                    if outbound_date:
+                        outbound_date = outbound_date.split("T")[0]  # 날짜만 추출
+                    
+                    st.markdown(f"**{part_data.get('part_code', '')}** - {part_data.get('part_name', '')}")
+                    st.markdown(f"{get_text('quantity')}: **{item.get('quantity', 0)}** | {get_text('requester')}: {item.get('requester', '')}")
+                    st.caption(f"{outbound_date}")
+                    st.divider()
+            else:
+                st.info(get_text('no_outbound_history'))
+                
+        except Exception as e:
+            st.error(f"{get_text('error_loading_data')}: {str(e)}")
     
     # 재고 부족 아이템 목록
     st.markdown(f"### {get_text('low_stock_items')}")

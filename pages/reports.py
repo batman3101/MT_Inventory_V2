@@ -139,23 +139,28 @@ def show_inout_report():
             st.markdown("#### 입고 상세 내역")
             try:
                 # Supabase에서 입고 데이터 조회
-                inbound_detail_query = supabase().from_("inbound").select("""
-                    inbound_id,
-                    inbound_date,
-                    quantity,
-                    unit_price,
-                    total_price,
-                    currency,
-                    parts!inner(part_id, part_code, part_name, category),
-                    suppliers!inner(supplier_id, supplier_name)
-                """).gte("inbound_date", start_date_str).lte("inbound_date", end_date_str).order("inbound_date", desc=True).execute()
+                inbound_detail_query = supabase().from_("inbound").select("*").gte("inbound_date", start_date_str).lte("inbound_date", end_date_str).order("inbound_date", desc=True).execute()
                 
                 if inbound_detail_query.data:
                     # 결과 처리
                     inbound_details = []
                     for item in inbound_detail_query.data:
-                        part_data = item.get("parts", {})
-                        supplier_data = item.get("suppliers", {})
+                        part_id = item.get("part_id")
+                        supplier_id = item.get("supplier_id")
+                        
+                        # 부품 정보 직접 조회
+                        part_data = {}
+                        if part_id:
+                            part_result = supabase().from_("parts").select("part_code, part_name, category").eq("part_id", part_id).execute()
+                            if part_result.data and len(part_result.data) > 0:
+                                part_data = part_result.data[0]
+                            
+                        # 공급업체 정보 직접 조회
+                        supplier_data = {}
+                        if supplier_id:
+                            supplier_result = supabase().from_("suppliers").select("supplier_name").eq("supplier_id", supplier_id).execute()
+                            if supplier_result.data and len(supplier_result.data) > 0:
+                                supplier_data = supplier_result.data[0]
                         
                         category = part_data.get("category", "")
                         
@@ -205,22 +210,28 @@ def show_inout_report():
             st.markdown("#### 출고 상세 내역")
             try:
                 # Supabase에서 출고 데이터 조회
-                outbound_detail_query = supabase().from_("outbound").select("""
-                    outbound_id,
-                    outbound_date,
-                    quantity,
-                    requester,
-                    department_id,
-                    departments:department_id(department_name),
-                    parts!inner(part_id, part_code, part_name, category)
-                """).gte("outbound_date", start_date_str).lte("outbound_date", end_date_str).order("outbound_date", desc=True).execute()
+                outbound_detail_query = supabase().from_("outbound").select("*").gte("outbound_date", start_date_str).lte("outbound_date", end_date_str).order("outbound_date", desc=True).execute()
                 
                 if outbound_detail_query.data:
                     # 결과 처리
                     outbound_details = []
                     for item in outbound_detail_query.data:
-                        part_data = item.get("parts", {})
-                        department_data = item.get("departments", {})
+                        part_id = item.get("part_id")
+                        department_id = item.get("department_id")
+                        
+                        # 부품 정보 직접 조회
+                        part_data = {}
+                        if part_id:
+                            part_result = supabase().from_("parts").select("part_code, part_name, category").eq("part_id", part_id).execute()
+                            if part_result.data and len(part_result.data) > 0:
+                                part_data = part_result.data[0]
+                            
+                        # 부서 정보 직접 조회
+                        department_data = {}
+                        if department_id:
+                            department_result = supabase().from_("departments").select("department_name").eq("department_id", department_id).execute()
+                            if department_result.data and len(department_result.data) > 0:
+                                department_data = department_result.data[0]
                         
                         category = part_data.get("category", "")
                         
@@ -535,24 +546,84 @@ def show_cost_analysis_report():
     # 보고서 생성 버튼
     if st.button(f"🔍 보고서 생성", type="primary", key="generate_cost_report"):
         try:
+            # 날짜 범위 설정
+            if selected_date_range != "전체" and start_date and end_date:
+                start_date_str = format_date(start_date)
+                end_date_str = format_date(end_date)
+            else:
+                # 전체 선택 시 최근 6개월 데이터 조회
+                end_date = datetime.now()
+                start_date = end_date.replace(month=end_date.month - 6) if end_date.month > 6 else end_date.replace(year=end_date.year - 1, month=end_date.month + 6)
+                start_date_str = start_date.strftime('%Y-%m-%d')
+                end_date_str = end_date.strftime('%Y-%m-%d')
+            
             # 월별 구매 비용 추이
             st.markdown("#### 월별 구매 비용 추이")
             
-            # 데모 데이터 (실제로는 Supabase에서 가져옴)
-            months = ['2023-11', '2023-12', '2024-01', '2024-02', '2024-03', '2024-04']
-            cost_values = [2500000, 3200000, 1800000, 2900000, 2200000, 3500000]
-            
-            cost_df = pd.DataFrame({
-                '월': months,
-                '구매 비용': cost_values
-            })
+            try:
+                # 월별 입고 금액 집계
+                inbound_result = supabase().from_("inbound").select("inbound_date, total_price").gte("inbound_date", start_date_str).lte("inbound_date", end_date_str).execute()
+                
+                if inbound_result.data:
+                    # 월별로 데이터 그룹화
+                    monthly_data = {}
+                    
+                    for item in inbound_result.data:
+                        inbound_date = item.get('inbound_date', '')
+                        if inbound_date:
+                            # 날짜에서 년-월 추출
+                            if isinstance(inbound_date, str):
+                                month = inbound_date[:7]  # YYYY-MM 형식
+                            else:
+                                # datetime 객체인 경우
+                                month = inbound_date.strftime('%Y-%m')
+                            
+                            total_price = item.get('total_price', 0)
+                            
+                            if month in monthly_data:
+                                monthly_data[month] += total_price
+                            else:
+                                monthly_data[month] = total_price
+                    
+                    # 데이터프레임으로 변환
+                    months = []
+                    values = []
+                    
+                    for month, value in sorted(monthly_data.items()):
+                        months.append(month)
+                        values.append(value)
+                    
+                    cost_df = pd.DataFrame({
+                        '월': months,
+                        '구매 비용': values
+                    })
+                else:
+                    # 데이터가 없을 경우 빈 데이터프레임 생성
+                    months = [
+                        (end_date - timedelta(days=30*i)).strftime('%Y-%m') 
+                        for i in range(6, 0, -1)
+                    ]
+                    cost_df = pd.DataFrame({
+                        '월': months,
+                        '구매 비용': [0] * len(months)
+                    })
+            except Exception as e:
+                st.error(f"월별 비용 데이터를 불러오는 중 오류 발생: {e}")
+                # 최소한의 데모 데이터 사용
+                months = ['2023-11', '2023-12', '2024-01', '2024-02', '2024-03', '2024-04']
+                cost_values = [2500000, 3200000, 1800000, 2900000, 2200000, 3500000]
+                
+                cost_df = pd.DataFrame({
+                    '월': months,
+                    '구매 비용': cost_values
+                })
             
             fig1 = px.bar(
                 cost_df,
                 x='월',
                 y='구매 비용',
                 title='월별 구매 비용',
-                labels={'월': '월', '구매 비용': '구매 비용 (원)'},
+                labels={'월': '월', '구매 비용': '구매 비용 (VND)'},
                 color='구매 비용',
                 color_continuous_scale='Reds'
             )
@@ -561,80 +632,224 @@ def show_cost_analysis_report():
             # 공급업체별 구매 비용 분석
             st.markdown("#### 공급업체별 구매 비용")
             
-            # 데모 데이터 (실제로는 Supabase에서 가져옴)
-            supplier_cost_data = {
-                'supplier': ['SAMSOO', 'RPS', 'THT', 'FC TECH', 'HTT', 'ATH', 'UIL'],
-                'total_cost': [5200000, 3800000, 4100000, 2900000, 1800000, 1200000, 800000]
-            }
-            supplier_cost_df = pd.DataFrame(supplier_cost_data)
+            try:
+                # 공급업체별 데이터 조회
+                supplier_query = """
+                SELECT s.supplier_name as supplier, SUM(i.total_price) as total_cost
+                FROM inbound i
+                JOIN suppliers s ON i.supplier_id = s.supplier_id
+                WHERE i.inbound_date >= '{}' AND i.inbound_date <= '{}'
+                GROUP BY s.supplier_name
+                ORDER BY total_cost DESC
+                """.format(start_date_str, end_date_str)
+                
+                supplier_result = supabase().rpc('run_sql', {'query': supplier_query}).execute()
+                
+                if supplier_result.data:
+                    supplier_cost_df = pd.DataFrame(supplier_result.data)
+                else:
+                    # 결과가 없을 경우 조회 방식 변경
+                    # 모든 공급업체 목록 조회
+                    all_suppliers = supabase().from_("suppliers").select("supplier_id, supplier_name").execute()
+                    
+                    supplier_costs = []
+                    if all_suppliers.data:
+                        for supplier in all_suppliers.data:
+                            supplier_id = supplier.get('supplier_id')
+                            supplier_name = supplier.get('supplier_name')
+                            
+                            # 해당 공급업체의 입고 금액 합계 조회
+                            inbound_sum = supabase().from_("inbound").select("total_price").eq("supplier_id", supplier_id).gte("inbound_date", start_date_str).lte("inbound_date", end_date_str).execute()
+                            
+                            total_cost = 0
+                            if inbound_sum.data:
+                                for item in inbound_sum.data:
+                                    total_cost += item.get('total_price', 0)
+                            
+                            supplier_costs.append({
+                                'supplier': supplier_name,
+                                'total_cost': total_cost
+                            })
+                        
+                        supplier_cost_df = pd.DataFrame(supplier_costs)
+                    else:
+                        # 공급업체 데이터가 없는 경우 최소한의 데모 데이터
+                        supplier_cost_df = pd.DataFrame({
+                            'supplier': ['SAMSOO', 'RPS', 'THT', 'FC TECH', 'HTT', 'ATH', 'UIL'],
+                            'total_cost': [5200000, 3800000, 4100000, 2900000, 1800000, 1200000, 800000]
+                        })
+            except Exception as e:
+                st.error(f"공급업체별 비용 데이터를 불러오는 중 오류 발생: {e}")
+                # 최소한의 데모 데이터 사용
+                supplier_cost_df = pd.DataFrame({
+                    'supplier': ['SAMSOO', 'RPS', 'THT', 'FC TECH', 'HTT', 'ATH', 'UIL'],
+                    'total_cost': [5200000, 3800000, 4100000, 2900000, 1800000, 1200000, 800000]
+                })
             
             # 공급업체 필터링
             if selected_supplier != "전체":
                 supplier_cost_df = supplier_cost_df[supplier_cost_df['supplier'] == selected_supplier]
             
-            fig2 = px.pie(
-                supplier_cost_df,
-                values='total_cost',
-                names='supplier',
-                title='공급업체별 구매 비용 비율',
-                hole=0.4
-            )
-            st.plotly_chart(fig2, use_container_width=True)
+            # 데이터가 있는 경우에만 차트 표시
+            if not supplier_cost_df.empty and supplier_cost_df['total_cost'].sum() > 0:
+                fig2 = px.pie(
+                    supplier_cost_df,
+                    values='total_cost',
+                    names='supplier',
+                    title='공급업체별 구매 비용 비율',
+                    hole=0.4
+                )
+                st.plotly_chart(fig2, use_container_width=True)
+            else:
+                st.info("해당 기간에 공급업체별 구매 데이터가 없습니다.")
             
             # 카테고리별 구매 비용
             st.markdown("#### 카테고리별 구매 비용")
             
-            # 데모 데이터 (실제로는 Supabase에서 가져옴)
-            category_cost_data = {
-                'category': ['필터', '펌프', '모터', '밸브', '센서', '기타'],
-                'cost': [6500000, 5200000, 4800000, 3100000, 2400000, 1800000]
-            }
-            category_cost_df = pd.DataFrame(category_cost_data)
+            try:
+                # 카테고리별 데이터 조회
+                category_query = """
+                SELECT p.category, SUM(i.total_price) as cost
+                FROM inbound i
+                JOIN parts p ON i.part_id = p.part_id
+                WHERE i.inbound_date >= '{}' AND i.inbound_date <= '{}'
+                GROUP BY p.category
+                ORDER BY cost DESC
+                """.format(start_date_str, end_date_str)
+                
+                category_result = supabase().rpc('run_sql', {'query': category_query}).execute()
+                
+                if category_result.data:
+                    category_cost_df = pd.DataFrame(category_result.data)
+                else:
+                    # 결과가 없을 경우 조회 방식 변경
+                    # 모든 카테고리 목록 조회
+                    all_categories = []
+                    categories_result = supabase().from_("parts").select("category").execute()
+                    
+                    if categories_result.data:
+                        for item in categories_result.data:
+                            category = item.get('category')
+                            if category and category not in all_categories:
+                                all_categories.append(category)
+                    
+                    if not all_categories:
+                        all_categories = ['필터', '펌프', '모터', '밸브', '센서', '기타']
+                    
+                    category_costs = []
+                    for category in all_categories:
+                        # 해당 카테고리의 부품 ID 목록 조회
+                        parts_result = supabase().from_("parts").select("part_id").eq("category", category).execute()
+                        
+                        total_cost = 0
+                        if parts_result.data:
+                            part_ids = [item.get('part_id') for item in parts_result.data]
+                            
+                            # 각 부품의 입고 금액 합계 조회
+                            for part_id in part_ids:
+                                inbound_sum = supabase().from_("inbound").select("total_price").eq("part_id", part_id).gte("inbound_date", start_date_str).lte("inbound_date", end_date_str).execute()
+                                
+                                if inbound_sum.data:
+                                    for item in inbound_sum.data:
+                                        total_cost += item.get('total_price', 0)
+                        
+                        category_costs.append({
+                            'category': category,
+                            'cost': total_cost
+                        })
+                    
+                    category_cost_df = pd.DataFrame(category_costs)
+            except Exception as e:
+                st.error(f"카테고리별 비용 데이터를 불러오는 중 오류 발생: {e}")
+                # 최소한의 데모 데이터 사용
+                category_cost_df = pd.DataFrame({
+                    'category': ['필터', '펌프', '모터', '밸브', '센서', '기타'],
+                    'cost': [6500000, 5200000, 4800000, 3100000, 2400000, 1800000]
+                })
             
-            fig3 = px.bar(
-                category_cost_df,
-                x='category',
-                y='cost',
-                title='카테고리별 구매 비용',
-                labels={'category': '카테고리', 'cost': '구매 비용 (원)'},
-                color='cost',
-                color_continuous_scale='Blues'
-            )
-            st.plotly_chart(fig3, use_container_width=True)
+            # 데이터가 있는 경우에만 차트 표시
+            if not category_cost_df.empty and category_cost_df['cost'].sum() > 0:
+                fig3 = px.bar(
+                    category_cost_df,
+                    x='category',
+                    y='cost',
+                    title='카테고리별 구매 비용',
+                    labels={'category': '카테고리', 'cost': '구매 비용 (VND)'},
+                    color='cost',
+                    color_continuous_scale='Blues'
+                )
+                st.plotly_chart(fig3, use_container_width=True)
+            else:
+                st.info("해당 기간에 카테고리별 구매 데이터가 없습니다.")
             
             # 상세 구매 내역
             st.markdown("#### 상세 구매 내역")
             
-            # 데모 데이터 (실제로는 Supabase에서 가져옴)
-            purchase_data = {
-                'part_code': ['MT001', 'MT002', 'MT003', 'MT004', 'MT005'],
-                'part_name': ['COOLANT FILTER', 'ELECTRIC FILTER', 'HYDRAULIC FILTER', 'PUMP', 'MOTOR'],
-                'supplier': ['SAMSOO', 'RPS', 'THT', 'FC TECH', 'HTT'],
-                'quantity': [10, 5, 20, 3, 2],
-                'unit_price': [15000, 25000, 12000, 450000, 950000],
-                'total_price': [150000, 125000, 240000, 1350000, 1900000],
-                'purchase_date': ['2024-04-01', '2024-04-05', '2024-04-10', '2024-04-15', '2024-04-20']
-            }
-            purchase_df = pd.DataFrame(purchase_data)
-            
-            # 공급업체 필터링
-            if selected_supplier != "전체":
-                purchase_df = purchase_df[purchase_df['supplier'] == selected_supplier]
-            
-            st.dataframe(
-                purchase_df,
-                column_config={
-                    'part_code': st.column_config.TextColumn(get_text('part_code')),
-                    'part_name': st.column_config.TextColumn(get_text('part_name')),
-                    'supplier': st.column_config.TextColumn(get_text('supplier')),
-                    'quantity': st.column_config.NumberColumn(get_text('quantity'), format="%d"),
-                    'unit_price': st.column_config.NumberColumn(get_text('price'), format="₫%d"),
-                    'total_price': st.column_config.NumberColumn(get_text('total'), format="₫%d"),
-                    'purchase_date': st.column_config.DateColumn(get_text('inbound_date'), format="YYYY-MM-DD")
-                },
-                use_container_width=True,
-                hide_index=True
-            )
+            try:
+                # 상세 구매 내역 조회
+                purchase_query = supabase().from_("inbound").select("*").gte("inbound_date", start_date_str).lte("inbound_date", end_date_str).order("inbound_date", desc=True).execute()
+                
+                if purchase_query.data:
+                    # 결과 처리
+                    purchase_details = []
+                    for item in purchase_query.data:
+                        part_id = item.get("part_id")
+                        supplier_id = item.get("supplier_id")
+                        
+                        # 부품 정보 직접 조회
+                        part_data = {}
+                        if part_id:
+                            part_result = supabase().from_("parts").select("part_code, part_name").eq("part_id", part_id).execute()
+                            if part_result.data and len(part_result.data) > 0:
+                                part_data = part_result.data[0]
+                        
+                        # 공급업체 정보 직접 조회
+                        supplier_data = {}
+                        if supplier_id:
+                            supplier_result = supabase().from_("suppliers").select("supplier_name").eq("supplier_id", supplier_id).execute()
+                            if supplier_result.data and len(supplier_result.data) > 0:
+                                supplier_data = supplier_result.data[0]
+                        
+                        # 공급업체 필터링
+                        if selected_supplier != "전체" and supplier_data.get('supplier_name') != selected_supplier:
+                            continue
+                            
+                        purchase_details.append({
+                            'part_code': part_data.get('part_code', ''),
+                            'part_name': part_data.get('part_name', ''),
+                            'supplier': supplier_data.get('supplier_name', ''),
+                            'quantity': item.get('quantity', 0),
+                            'unit_price': item.get('unit_price', 0),
+                            'total_price': item.get('total_price', 0),
+                            'purchase_date': item.get('inbound_date', '')
+                        })
+                    
+                    if purchase_details:
+                        purchase_df = pd.DataFrame(purchase_details)
+                        
+                        # 상세 구매 내역 표시
+                        st.dataframe(
+                            purchase_df,
+                            column_config={
+                                'part_code': st.column_config.TextColumn(get_text('part_code')),
+                                'part_name': st.column_config.TextColumn(get_text('part_name')),
+                                'supplier': st.column_config.TextColumn(get_text('supplier')),
+                                'quantity': st.column_config.NumberColumn(get_text('quantity'), format="%d"),
+                                'unit_price': st.column_config.NumberColumn(get_text('price'), format="₫%d"),
+                                'total_price': st.column_config.NumberColumn(get_text('total'), format="₫%d"),
+                                'purchase_date': st.column_config.DateColumn(get_text('inbound_date'), format="YYYY-MM-DD")
+                            },
+                            use_container_width=True,
+                            hide_index=True
+                        )
+                    else:
+                        st.info("해당 기간에 구매 내역이 없습니다.")
+                else:
+                    st.info("해당 기간에 구매 내역이 없습니다.")
+            except Exception as e:
+                st.error(f"상세 구매 내역을 불러오는 중 오류 발생: {e}")
+                # 상세 구매 내역은 오류 시 빈 상태로 표시
+                st.warning("상세 구매 내역을 불러올 수 없습니다. 나중에 다시 시도해주세요.")
             
             # 내보내기 버튼
             if st.button(f"📥 Excel {get_text('save')}", key="export_cost_analysis"):
