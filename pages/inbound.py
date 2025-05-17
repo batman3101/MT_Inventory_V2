@@ -77,7 +77,7 @@ def show_inbound_search():
 
             # Supabase에서 입고 데이터 조회 (조인 없이 part_id, supplier_id만)
             query = supabase().from_("inbound").select(
-                "inbound_id, inbound_date, quantity, unit_price, total_price, currency, invoice_number, reference_number, created_by, part_id, supplier_id"
+                "inbound_id, inbound_date, quantity, unit_price, total_price, currency, reference_number, created_by, part_id, supplier_id, part_code, part_name, supplier_name, part_unit"
             )
             # 검색 필터 적용
             if selected_date_range != "전체" and start_date and end_date:

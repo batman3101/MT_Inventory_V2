@@ -97,7 +97,7 @@ def show_outbound_search():
 
             # Supabase에서 출고 데이터 조회 (조인 없이 part_id, department_id만)
             query = supabase().from_("outbound").select(
-                "outbound_id, outbound_date, quantity, unit, requester, equipment_id, purpose, reference_number, created_by, part_id, department_id"
+                "outbound_id, outbound_date, quantity, requester, equipment, reason, reference_number, created_by, department_id, part_id, part_code, part_name, department_name, part_unit"
             )
             
             # 검색 필터 적용
@@ -135,12 +135,12 @@ def show_outbound_search():
                         'part_code': part_code,
                         'part_name': part_name,
                         'quantity': item.get('quantity'),
-                        'unit': part.get('unit', 'EA'),  # 부품에서 단위 가져오기
+                        'unit': item.get('unit', 'EA'),
                         'outbound_date': item.get('outbound_date'),
                         'requestor': item.get('requester'),
                         'department': department_name,
-                        'equipment_id': item.get('equipment_id'),
-                        'purpose': item.get('purpose'),
+                        'equipment_id': item.get('equipment'),
+                        'purpose': item.get('reason'),
                         'reference_number': item.get('reference_number'),
                         'created_by': item.get('created_by')
                     })
@@ -383,17 +383,19 @@ def show_outbound_add():
                         if st.button("출고 진행", key="confirm_outbound"):
                             # 출고 정보 Supabase에 저장
                             save_outbound_data(part_id, quantity, outbound_date, requestor, department_id, 
-                                            equipment_id, purpose, reference_number, remarks, current_user)
+                                              equipment_id, purpose, reference_number, remarks, current_user,
+                                              part_code, selected_part.split(' - ')[1], department, part_unit)
                             
                     else:
                         # 출고 정보 Supabase에 저장
                         save_outbound_data(part_id, quantity, outbound_date, requestor, department_id, 
-                                        equipment_id, purpose, reference_number, remarks, current_user)
+                                          equipment_id, purpose, reference_number, remarks, current_user,
+                                          part_code, selected_part.split(' - ')[1], department, part_unit)
                 except Exception as e:
                     display_error(f"출고 정보 등록 중 오류가 발생했습니다: {e}")
 
 # 출고 정보 저장 함수 추가
-def save_outbound_data(part_id, quantity, outbound_date, requester, department_id, equipment, reason, reference_number, notes, created_by):
+def save_outbound_data(part_id, quantity, outbound_date, requester, department_id, equipment, reason, reference_number, notes, created_by, part_code, part_name, department_name, part_unit):
     """
     출고 정보를 Supabase에 저장
     """
@@ -409,7 +411,11 @@ def save_outbound_data(part_id, quantity, outbound_date, requester, department_i
             "reason": reason,
             "reference_number": reference_number,
             "notes": notes,
-            "created_by": created_by
+            "created_by": created_by,
+            "part_code": part_code,
+            "part_name": part_name,
+            "department_name": department_name,
+            "part_unit": part_unit
         }
         
         # 출고 정보 저장
