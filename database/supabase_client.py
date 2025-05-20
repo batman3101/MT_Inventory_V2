@@ -10,7 +10,7 @@ from supabase import create_client, Client
 # 상위 디렉토리를 path에 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.config import SUPABASE_URL, SUPABASE_KEY
+from config.config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -146,14 +146,17 @@ class SupabaseClient:
             if SUPABASE_KEY and 'role":"service_role"' in SUPABASE_KEY:
                 logger.info("환경 변수에서 service_role 키를 찾았습니다.")
                 return SUPABASE_KEY
+            elif SUPABASE_SERVICE_KEY:
+                logger.info(f"환경 변수 SUPABASE_SERVICE_KEY를 사용합니다. 길이: {len(SUPABASE_SERVICE_KEY)}")
+                return SUPABASE_SERVICE_KEY
             else:
-                logger.warning("환경 변수의 SUPABASE_KEY가 service_role 키가 아니거나 비어 있습니다.")
+                logger.warning("환경 변수의 SUPABASE_KEY가 service_role 키가 아니거나 비어 있고, SUPABASE_SERVICE_KEY도 없습니다.")
         except Exception as e:
             logger.error(f"환경 변수에서 service_role 키를 가져오는 중 오류 발생: {e}")
         
-        # 3. 하드코딩된 키 반환 (최후의 수단)
-        logger.warning("서비스 롤 키를 찾을 수 없어 하드코딩된 키를 사용합니다.")
-        return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlldWN1Z3BjeXdtdGZ5dHZ0enVtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NjYwNjEzOCwiZXhwIjoyMDYyMTgyMTM4fQ.Pl166ZVAS6xj1joMgp33KNfRBRnVZmMldoZh8yvnmWs"
+        # 3. 키를 찾을 수 없는 경우
+        logger.error("서비스 롤 키를 찾을 수 없습니다. 환경 변수 또는 Streamlit 시크릿 설정을 확인하세요.")
+        return None
     
     def get_client(self, use_service_role=False) -> Client:
         """
