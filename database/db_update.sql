@@ -77,4 +77,18 @@ EXECUTE FUNCTION update_timestamp();
 DO $$
 BEGIN
     RAISE NOTICE 'Database migration completed successfully';
+END $$;
+
+-- 추가: parts 테이블에 updated_by 칼럼 추가 (2025-05-20 업데이트)
+DO $$
+BEGIN
+    -- 칼럼이 존재하는지 확인
+    IF NOT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'parts' AND column_name = 'updated_by'
+    ) THEN
+        -- 칼럼 추가
+        ALTER TABLE parts ADD COLUMN updated_by text DEFAULT 'system' NOT NULL;
+        RAISE NOTICE 'parts 테이블에 updated_by 칼럼이 추가되었습니다.';
+    END IF;
 END $$; 
