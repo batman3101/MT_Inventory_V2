@@ -47,16 +47,19 @@ def update_part(part_id, update_data):
         # RPC 함수 호출 - 사용자 정의 함수를 만들었다고 가정
         # 실제로는 Supabase에서 이 함수를 만들어야 합니다
         try:
+            # service_role 권한으로 Supabase 클라이언트 가져오기
+            client = supabase(use_service_role=True)
+            
             # 기존 부품 조회 (테스트용)
-            part = supabase().from_("parts").select("*").eq("part_id", part_id).execute()
+            part = client.from_("parts").select("*").eq("part_id", part_id).execute()
             logger.info(f"업데이트 전 부품 정보: {part.data if part.data else 'No data'}")
             
-            # 직접 업데이트 실행
-            result = supabase().from_("parts").update(update_data).eq("part_id", part_id).execute()
+            # 직접 업데이트 실행 (service_role 권한 사용)
+            result = client.from_("parts").update(update_data).eq("part_id", part_id).execute()
             logger.info(f"업데이트 결과: {result.data if hasattr(result, 'data') else 'No data'}")
             
             # 업데이트된 부품 조회 (확인용)
-            updated_part = supabase().from_("parts").select("*").eq("part_id", part_id).execute()
+            updated_part = client.from_("parts").select("*").eq("part_id", part_id).execute()
             logger.info(f"업데이트 후 부품 정보: {updated_part.data if updated_part.data else 'No data'}")
             
             # 결과 확인 - 빈 배열이라도 오류가 없으면 성공으로 처리
@@ -130,8 +133,11 @@ def update_inventory(part_id, current_quantity):
             "updated_at": datetime.now().isoformat()
         }
         
+        # service_role 권한으로 Supabase 클라이언트 가져오기
+        client = supabase(use_service_role=True)
+        
         # 업데이트 실행
-        result = supabase().from_("inventory").update(update_data).eq("part_id", part_id).execute()
+        result = client.from_("inventory").update(update_data).eq("part_id", part_id).execute()
         logger.info(f"재고 업데이트 결과: {result.data if hasattr(result, 'data') else 'No data'}")
         
         return {
