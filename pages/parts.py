@@ -68,6 +68,35 @@ def get_statuses():
         # 오류 발생 시 기본 옵션 사용
         return ["NEW", "OLD", "OLDER", "NG", "REPAIR"]
 
+@st.cache_data(ttl=3600)  # 1시간 동안 캐싱
+def get_units():
+    """단위 목록을 가져옵니다."""
+    try:
+        unit_result = supabase().from_("parts").select("unit").execute()
+        units = []
+        if unit_result.data:
+            # 중복 제거하고 고유 단위 추출
+            for item in unit_result.data:
+                if item.get("unit") and item.get("unit") not in units:
+                    units.append(item.get("unit"))
+            
+            # 필수 단위 값이 없으면 추가
+            required_units = ["EA", "SET", "BOX", "KG", "L", "M", "PC", "ROLL", "CUỘN", "HỘP"]
+            for req_unit in required_units:
+                if req_unit not in units:
+                    units.append(req_unit)
+            
+            # 정렬
+            units = sorted(units)
+        else:
+            # 기본 단위 옵션
+            units = ["EA", "SET", "BOX", "KG", "L", "M", "PC", "ROLL", "CUỘN", "HỘP"]
+        
+        return units
+    except Exception as e:
+        # 오류 발생 시 기본 옵션 사용
+        return ["EA", "SET", "BOX", "KG", "L", "M", "PC", "ROLL", "CUỘN", "HỘP"]
+
 def show():
     """
     부품 관리 페이지 표시
@@ -191,7 +220,7 @@ def show_parts_add():
             spec = st.text_input(f"{get_text('spec')}", placeholder="10in/200μm")
         
         with col2:
-            unit_options = ["EA", "SET", "BOX", "KG", "L", "M", "PC"]
+            unit_options = get_units()
             unit = st.selectbox(f"{get_text('unit')}*", unit_options, index=0)
             
             # 카테고리 목록 가져오기
@@ -321,7 +350,7 @@ def show_parts_details():
                         spec = st.text_input("사양", value=part_data.get("spec", ""))
                     
                     with col2:
-                        unit_options = ["EA", "SET", "BOX", "KG", "L", "M", "PC"]
+                        unit_options = get_units()
                         unit = st.selectbox("단위*", unit_options, index=unit_options.index(part_data.get("unit", "EA")))
                         
                         # 카테고리 목록 가져오기
