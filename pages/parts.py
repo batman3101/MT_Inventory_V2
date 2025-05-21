@@ -16,6 +16,29 @@ from utils.i18n import get_text
 from database.supabase_client import supabase
 from database.update_part import update_part, update_inventory  # 새로 만든 모듈 import
 
+@st.cache_data(ttl=3600)  # 1시간 동안 캐싱
+def get_categories():
+    """카테고리 목록을 가져옵니다."""
+    try:
+        category_result = supabase().from_("parts").select("category").execute()
+        categories = []
+        if category_result.data:
+            for item in category_result.data:
+                if item.get('category') and item.get('category') not in categories:
+                    categories.append(item.get('category'))
+            # 중복 제거 및 정렬
+            categories = sorted(list(set(categories)))
+            # 빈 목록이면 기본값 설정
+            if not categories:
+                categories = ["필터", "펌프", "모터", "밸브", "센서", "기타"]
+        else:
+            # 기본 카테고리 옵션
+            categories = ["필터", "펌프", "모터", "밸브", "센서", "기타"]
+        return categories
+    except Exception as e:
+        # 오류 발생 시 기본 옵션 사용
+        return ["필터", "펌프", "모터", "밸브", "센서", "기타"]
+
 def show():
     """
     부품 관리 페이지 표시
@@ -154,8 +177,10 @@ def show_parts_add():
             unit_options = ["EA", "SET", "BOX", "KG", "L", "M", "PC"]
             unit = st.selectbox(f"{get_text('unit')}*", unit_options, index=0)
             
-            category_options = ["필터", "펌프", "모터", "밸브", "센서", "기타"]
-            category = st.selectbox(f"{get_text('category')}", category_options)
+            # 카테고리 목록 가져오기
+            categories = get_categories()
+            
+            category = st.selectbox(f"{get_text('category')}", categories)
             
             # 상태 목록 가져오기
             try:
@@ -298,9 +323,11 @@ def show_parts_details():
                         unit_options = ["EA", "SET", "BOX", "KG", "L", "M", "PC"]
                         unit = st.selectbox("단위*", unit_options, index=unit_options.index(part_data.get("unit", "EA")))
                         
-                        category_options = ["필터", "펌프", "모터", "밸브", "센서", "기타"]
-                        category = st.selectbox("카테고리", category_options, 
-                                              index=category_options.index(part_data.get("category", "필터")) if part_data.get("category") in category_options else 0)
+                        # 카테고리 목록 가져오기
+                        categories = get_categories()
+                        
+                        category = st.selectbox("카테고리", categories, 
+                                              index=categories.index(part_data.get("category", "필터")) if part_data.get("category") in categories else 0)
                         
                         # 상태 목록 가져오기
                         try:
