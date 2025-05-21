@@ -6,6 +6,7 @@ import pandas as pd
 import sys
 import os
 from datetime import datetime
+import time
 
 # 모듈 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.helpers import display_error, display_success, display_info, display_warning, format_date, format_currency
 from utils.i18n import get_text
 from database.supabase_client import supabase
+from database.update_part import update_part, update_inventory  # 새로 만든 모듈 import
 
 def show():
     """
@@ -138,7 +140,7 @@ def show_parts_add():
     st.markdown(f"### 신규 부품 등록")
     
     # 입력 폼
-    with st.form("add_part_form"):
+    with st.form("add_part_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
         
         with col1:
@@ -180,7 +182,7 @@ def show_parts_add():
         
         description = st.text_area(f"{get_text('description')}", placeholder="부품에 대한 상세 설명")
         
-        submitted = st.form_submit_button(f"✅ {get_text('save')}")
+        submitted = st.form_submit_button(f"✅ {get_text('save')}", use_container_width=True)
         
         if submitted:
             # 필수 입력 확인
@@ -223,8 +225,7 @@ def show_parts_add():
                         part_id = result.data[0]["part_id"]
                         inventory_data = {
                             "part_id": part_id,
-                            "current_quantity": 0,
-                            "updated_by": current_user
+                            "current_quantity": 0
                         }
                         supabase().from_("inventory").insert(inventory_data).execute()
                         
@@ -279,11 +280,11 @@ def show_parts_details():
                 current_stock = inventory_result.data[0]["current_quantity"]
             
             # 수정 모드 토글
-            edit_mode = st.checkbox("수정 모드", key="edit_part_mode")
+            edit_mode = st.checkbox("수정 모드")
             
             if edit_mode:
                 # 수정 폼
-                with st.form("edit_part_form"):
+                with st.form("edit_part_form", clear_on_submit=False):
                     st.markdown("#### 부품 정보 수정")
                     col1, col2 = st.columns(2)
                     
@@ -336,52 +337,62 @@ def show_parts_details():
                     
                     description = st.text_area("설명", value=part_data.get("description", ""))
                     
-                    submitted = st.form_submit_button("✅ 저장")
+                    # 저장 버튼을 명확하게 보이도록 col 사용하지 않고 전체 너비 사용
+                    save_button = st.form_submit_button("✅ 저장", use_container_width=True)
                     
-                    if submitted:
+                    if save_button:
                         try:
-                            # 현재 사용자 정보
+                            # 현재 사용자 정보 가져오기
                             from utils.auth import get_current_user
                             current_user = get_current_user()
                             
-                            # 업데이트할 데이터 준비
+                            # 업데이트할 기본 데이터만 준비 (최소한의 필수 필드만)
                             update_data = {
                                 "part_name": part_name,
-                                "vietnamese_name": vietnamese_name,
-                                "korean_name": korean_name,
-                                "spec": spec,
                                 "unit": unit,
-                                "category": category,
                                 "status": status,
-                                "min_stock": min_stock,
-                                "description": description,
                                 "updated_at": datetime.now().isoformat(),
                                 "updated_by": current_user
                             }
                             
-                            # Supabase 업데이트
-                            result = supabase().from_("parts").update(update_data).eq("part_id", selected_id).execute()
+                            # 나머지 필드들을 조건부로 추가
+                            if vietnamese_name:
+                                update_data["vietnamese_name"] = vietnamese_name
+                            if korean_name:
+                                update_data["korean_name"] = korean_name
+                            if spec:
+                                update_data["spec"] = spec
+                            if category:
+                                update_data["category"] = category
+                            if min_stock is not None:
+                                update_data["min_stock"] = min_stock
+                            if description:
+                                update_data["description"] = description
                             
-                            # 재고 정보 업데이트 - 현재 재고량이 변경된 경우에만
+                            # 외부 모듈을 사용하여 업데이트 실행
+                            update_result = update_part(selected_id, update_data)
+                            
+                            # 재고 정보 업데이트는 별도 처리
                             if current_quantity != current_stock:
-                                inventory_update = {
-                                    "current_quantity": current_quantity,
-                                    "updated_at": datetime.now().isoformat(),
-                                    "updated_by": current_user
-                                }
-                                inventory_result = supabase().from_("inventory").update(inventory_update).eq("part_id", selected_id).execute()
+                                # 외부 모듈을 사용하여 재고 업데이트
+                                inventory_result = update_inventory(selected_id, current_quantity)
                             
-                            if result.data:
+                            # 결과 처리
+                            if update_result["success"]:
                                 display_success(f"부품 '{part_name}' 정보가 업데이트되었습니다.")
+                                time.sleep(1)  # 잠시 대기 후 리로드
                                 st.rerun()
                             else:
-                                display_error("부품 정보 업데이트 중 오류가 발생했습니다.")
+                                display_error(f"부품 정보 업데이트 실패: {update_result['message']}")
                         except Exception as e:
-                            display_error(f"부품 정보 업데이트 중 오류가 발생했습니다: {e}")
+                            st.error(f"부품 정보 업데이트 중 오류가 발생했습니다: {e}")
+                            st.error(f"오류 유형: {type(e).__name__}")
+                            import traceback
+                            st.error(f"상세 오류 내역: {traceback.format_exc()}")
                 
                 # 삭제 기능
-                if st.button("🗑️ 부품 삭제", key="delete_part_button"):
-                    delete_confirm = st.checkbox(f"정말로 '{part_data.get('part_name')}' 부품을 삭제하시겠습니까?", key="delete_confirm")
+                if st.button("🗑️ 부품 삭제"):
+                    delete_confirm = st.checkbox(f"정말로 '{part_data.get('part_name')}' 부품을 삭제하시겠습니까?")
                     
                     if delete_confirm:
                         try:
@@ -509,7 +520,7 @@ def show_parts_details():
                     st.markdown("#### 가격 정보 수정")
                     edit_info = st.session_state.edit_price_info
                     
-                    with st.form("edit_price_form"):
+                    with st.form("edit_price_form", clear_on_submit=False):
                         # 수정 대상 공급업체 표시
                         st.markdown(f"**공급업체:** {edit_info.get('supplier_name')}")
                         supplier_id = edit_info.get('supplier_id')
@@ -535,9 +546,12 @@ def show_parts_details():
                         
                         is_current = st.checkbox("현재 적용", value=edit_info.get('is_current', True))
                         
+                        # 두 버튼의 레이아웃 개선
                         col1, col2 = st.columns(2)
                         with col1:
-                            if st.form_submit_button("✅ 가격 수정"):
+                            submit_button = st.form_submit_button("✅ 가격 수정", use_container_width=True)
+                            
+                            if submit_button:
                                 try:
                                     # 현재 사용자 정보
                                     from utils.auth import get_current_user
@@ -567,14 +581,15 @@ def show_parts_details():
                                     display_error(f"가격 정보 수정 중 오류가 발생했습니다: {e}")
                         
                         with col2:
-                            if st.form_submit_button("❌ 취소"):
+                            cancel_button = st.form_submit_button("❌ 취소", use_container_width=True)
+                            if cancel_button:
                                 # 세션에서 수정 정보 제거
                                 st.session_state.pop('edit_price_info', None)
                                 st.rerun()
                 else:
                     # 새 가격 정보 추가 UI
                     st.markdown("#### 새 가격 정보 추가")
-                    with st.form("add_price_form"):
+                    with st.form("add_price_form", clear_on_submit=True):
                         # 공급업체 목록 조회
                         supplier_result = supabase().from_("suppliers").select("supplier_id, supplier_name").execute()
                         
@@ -595,7 +610,9 @@ def show_parts_details():
                             
                             is_current = st.checkbox("현재 적용", value=True)
                             
-                            if st.form_submit_button("✅ 가격 추가"):
+                            submit_button = st.form_submit_button("✅ 가격 추가", use_container_width=True)
+                            
+                            if submit_button:
                                 try:
                                     # 현재 사용자 정보
                                     from utils.auth import get_current_user
@@ -644,6 +661,8 @@ def show_parts_details():
                                     display_error(f"가격 정보 추가 중 오류가 발생했습니다: {e}")
                         else:
                             st.warning("등록된 공급업체가 없습니다. 먼저 공급업체를 등록해주세요.")
+                            # 폼 submit 버튼 추가 (필수) - 빈 폼이라도 submit 버튼이 있어야 함
+                            st.form_submit_button("➕ 공급업체 등록 필요", use_container_width=True)
             except Exception as e:
                 st.error(f"가격 정보를 불러오는 중 오류가 발생했습니다: {e}")
             
