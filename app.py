@@ -252,10 +252,11 @@ def main():
             user_role = get_user_role()
             
             # 메뉴 옵션 및 아이콘
-            admin_icons = ["👥", "🔐", "🔧", "📊", "📦", "📥", "📤", "🏢", "📝"]
+            admin_icons = ["👥", "🔐", "🔓", "🔧", "📊", "📦", "📥", "📤", "🏢", "📝"]
             admin_pages = {
                 "admin_management": "관리자 관리",
-                "user_management": "사용자 관리", 
+                "user_management": "사용자 관리",
+                "permissions_management": "권한 관리",
                 "supabase_settings": "Supabase 설정",
                 **PAGES
             }
@@ -383,6 +384,9 @@ def main():
                 admin_management()
             elif selected_menu == "user_management":
                 user_management()
+            elif selected_menu == "permissions_management":
+                from pages.permissions import show
+                show()
             elif selected_menu == "supabase_settings":
                 supabase_settings()
         except ImportError as e:
