@@ -633,51 +633,37 @@ def show_cost_analysis_report():
             st.markdown("#### 공급업체별 구매 비용")
             
             try:
-                # 공급업체별 데이터 조회
-                supplier_query = """
-                SELECT s.supplier_name as supplier, SUM(i.total_price) as total_cost
-                FROM inbound i
-                JOIN suppliers s ON i.supplier_id = s.supplier_id
-                WHERE i.inbound_date >= '{}' AND i.inbound_date <= '{}'
-                GROUP BY s.supplier_name
-                ORDER BY total_cost DESC
-                """.format(start_date_str, end_date_str)
+                # 공급업체별 데이터 조회 - 기존 방식 제거하고 직접 조회로 변경
+                # 모든 공급업체 목록 조회
+                all_suppliers = supabase().from_("suppliers").select("supplier_id, supplier_name").execute()
                 
-                supplier_result = supabase().rpc('run_sql', {'query': supplier_query}).execute()
-                
-                if supplier_result.data:
-                    supplier_cost_df = pd.DataFrame(supplier_result.data)
-                else:
-                    # 결과가 없을 경우 조회 방식 변경
-                    # 모든 공급업체 목록 조회
-                    all_suppliers = supabase().from_("suppliers").select("supplier_id, supplier_name").execute()
-                    
-                    supplier_costs = []
-                    if all_suppliers.data:
-                        for supplier in all_suppliers.data:
-                            supplier_id = supplier.get('supplier_id')
-                            supplier_name = supplier.get('supplier_name')
-                            
-                            # 해당 공급업체의 입고 금액 합계 조회
-                            inbound_sum = supabase().from_("inbound").select("total_price").eq("supplier_id", supplier_id).gte("inbound_date", start_date_str).lte("inbound_date", end_date_str).execute()
-                            
-                            total_cost = 0
-                            if inbound_sum.data:
-                                for item in inbound_sum.data:
-                                    total_cost += item.get('total_price', 0)
-                            
+                supplier_costs = []
+                if all_suppliers.data:
+                    for supplier in all_suppliers.data:
+                        supplier_id = supplier.get('supplier_id')
+                        supplier_name = supplier.get('supplier_name')
+                        
+                        # 해당 공급업체의 입고 금액 합계 조회
+                        inbound_sum = supabase().from_("inbound").select("total_price").eq("supplier_id", supplier_id).gte("inbound_date", start_date_str).lte("inbound_date", end_date_str).execute()
+                        
+                        total_cost = 0
+                        if inbound_sum.data:
+                            for item in inbound_sum.data:
+                                total_cost += item.get('total_price', 0)
+                        
+                        if total_cost > 0:  # 구매 금액이 있는 경우만 추가
                             supplier_costs.append({
                                 'supplier': supplier_name,
                                 'total_cost': total_cost
                             })
-                        
-                        supplier_cost_df = pd.DataFrame(supplier_costs)
-                    else:
-                        # 공급업체 데이터가 없는 경우 최소한의 데모 데이터
-                        supplier_cost_df = pd.DataFrame({
-                            'supplier': ['SAMSOO', 'RPS', 'THT', 'FC TECH', 'HTT', 'ATH', 'UIL'],
-                            'total_cost': [5200000, 3800000, 4100000, 2900000, 1800000, 1200000, 800000]
-                        })
+                    
+                    supplier_cost_df = pd.DataFrame(supplier_costs)
+                else:
+                    # 공급업체 데이터가 없는 경우 빈 데이터프레임
+                    supplier_cost_df = pd.DataFrame({
+                        'supplier': [],
+                        'total_cost': []
+                    })
             except Exception as e:
                 st.error(f"공급업체별 비용 데이터를 불러오는 중 오류 발생: {e}")
                 # 최소한의 데모 데이터 사용
@@ -707,58 +693,44 @@ def show_cost_analysis_report():
             st.markdown("#### 카테고리별 구매 비용")
             
             try:
-                # 카테고리별 데이터 조회
-                category_query = """
-                SELECT p.category, SUM(i.total_price) as cost
-                FROM inbound i
-                JOIN parts p ON i.part_id = p.part_id
-                WHERE i.inbound_date >= '{}' AND i.inbound_date <= '{}'
-                GROUP BY p.category
-                ORDER BY cost DESC
-                """.format(start_date_str, end_date_str)
+                # 카테고리별 데이터 조회 - 기존 방식 제거하고 직접 조회로 변경
+                # 모든 카테고리 목록 조회
+                all_categories = []
+                categories_result = supabase().from_("parts").select("category").execute()
                 
-                category_result = supabase().rpc('run_sql', {'query': category_query}).execute()
+                if categories_result.data:
+                    for item in categories_result.data:
+                        category = item.get('category')
+                        if category and category not in all_categories:
+                            all_categories.append(category)
                 
-                if category_result.data:
-                    category_cost_df = pd.DataFrame(category_result.data)
-                else:
-                    # 결과가 없을 경우 조회 방식 변경
-                    # 모든 카테고리 목록 조회
-                    all_categories = []
-                    categories_result = supabase().from_("parts").select("category").execute()
+                if not all_categories:
+                    all_categories = ['필터', '펌프', '모터', '밸브', '센서', '기타']
+                
+                category_costs = []
+                for category in all_categories:
+                    # 해당 카테고리의 부품 ID 목록 조회
+                    parts_result = supabase().from_("parts").select("part_id").eq("category", category).execute()
                     
-                    if categories_result.data:
-                        for item in categories_result.data:
-                            category = item.get('category')
-                            if category and category not in all_categories:
-                                all_categories.append(category)
-                    
-                    if not all_categories:
-                        all_categories = ['필터', '펌프', '모터', '밸브', '센서', '기타']
-                    
-                    category_costs = []
-                    for category in all_categories:
-                        # 해당 카테고리의 부품 ID 목록 조회
-                        parts_result = supabase().from_("parts").select("part_id").eq("category", category).execute()
+                    total_cost = 0
+                    if parts_result.data:
+                        part_ids = [item.get('part_id') for item in parts_result.data]
                         
-                        total_cost = 0
-                        if parts_result.data:
-                            part_ids = [item.get('part_id') for item in parts_result.data]
+                        # 각 부품의 입고 금액 합계 조회
+                        for part_id in part_ids:
+                            inbound_sum = supabase().from_("inbound").select("total_price").eq("part_id", part_id).gte("inbound_date", start_date_str).lte("inbound_date", end_date_str).execute()
                             
-                            # 각 부품의 입고 금액 합계 조회
-                            for part_id in part_ids:
-                                inbound_sum = supabase().from_("inbound").select("total_price").eq("part_id", part_id).gte("inbound_date", start_date_str).lte("inbound_date", end_date_str).execute()
-                                
-                                if inbound_sum.data:
-                                    for item in inbound_sum.data:
-                                        total_cost += item.get('total_price', 0)
-                        
+                            if inbound_sum.data:
+                                for item in inbound_sum.data:
+                                    total_cost += item.get('total_price', 0)
+                    
+                    if total_cost > 0:  # 구매 금액이 있는 경우만 추가
                         category_costs.append({
                             'category': category,
                             'cost': total_cost
                         })
-                    
-                    category_cost_df = pd.DataFrame(category_costs)
+                
+                category_cost_df = pd.DataFrame(category_costs)
             except Exception as e:
                 st.error(f"카테고리별 비용 데이터를 불러오는 중 오류 발생: {e}")
                 # 최소한의 데모 데이터 사용
