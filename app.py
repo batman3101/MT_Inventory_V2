@@ -752,16 +752,25 @@ def display_dashboard():
         
         # 가치 컬럼 포맷 적용
         df['value_formatted'] = df['value'].apply(format_currency)
-        
+        # 천단위 콤마 적용 (수량, 부품수, 부족수)
+        df['part_count_formatted'] = df['part_count'].apply(lambda x: f"{x:,}")
+        df['quantity_formatted'] = df['quantity'].apply(lambda x: f"{x:,}")
+        df['low_stock_formatted'] = df['low_stock'].apply(lambda x: f"{x:,}")
         # 데이터프레임 표시
         st.dataframe(
-            df,
+            df[[
+                'category',
+                'part_count_formatted',
+                'quantity_formatted',
+                'value_formatted',
+                'low_stock_formatted'
+            ]],
             column_config={
                 'category': st.column_config.TextColumn(get_text('category')),
-                'part_count': st.column_config.NumberColumn(f"{get_text('part_code')} {get_text('quantity')}", format="%d{get_text('items')}"),
-                'quantity': st.column_config.NumberColumn(get_text('quantity'), format="%d{get_text('items')}"),
+                'part_count_formatted': st.column_config.TextColumn(f"{get_text('part_code')} {get_text('quantity')}") ,
+                'quantity_formatted': st.column_config.TextColumn(get_text('quantity')),
                 'value_formatted': st.column_config.TextColumn(get_text('total_value')),
-                'low_stock': st.column_config.NumberColumn(get_text('low_stock_items'), format="%d{get_text('items')}")
+                'low_stock_formatted': st.column_config.TextColumn(get_text('low_stock_items'))
             },
             hide_index=True,
             use_container_width=True
