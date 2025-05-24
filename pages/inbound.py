@@ -254,8 +254,8 @@ def show_inbound_add():
             if quantity < 1:
                 display_error(get_text('quantity_min'))
                 return
-            if unit_price <= 0:
-                display_error(get_text('price_min'))
+            if unit_price <= 0 and selected_supplier != "SEVT":
+                display_error("단가를 입력해 주세요.")
                 return
             try:
                 part_id = parts_dict[selected_part]['part_id']

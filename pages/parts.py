@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, date
 import time
 
 # 모듈 경로 추가
@@ -222,20 +222,22 @@ def show_parts_add():
         with col2:
             unit_options = get_units()
             unit = st.selectbox(f"{get_text('unit')}*", unit_options, index=0)
-            
-            # 카테고리 목록 가져오기
             categories = get_categories()
-            
             category = st.selectbox(f"{get_text('category')}", categories)
-            
-            # 상태 목록 가져오기
             statuses = get_statuses()
-            
             status = st.selectbox(f"{get_text('status')}*", statuses, index=0)
-            
             min_stock = st.number_input(f"{get_text('min_stock')}", min_value=0, value=5)
         
         description = st.text_area(f"{get_text('description')}", placeholder="부품에 대한 상세 설명")
+        
+        # --- 공급업체/단가 필드 추가 ---
+        st.markdown("---")
+        st.markdown("#### 단가 정보")
+        supplier_result = supabase().from_("suppliers").select("supplier_id, supplier_name").execute()
+        supplier_options = [f"{item['supplier_name']} ({item['supplier_id']})" for item in supplier_result.data] if supplier_result.data else []
+        supplier_map = {f"{item['supplier_name']} ({item['supplier_id']})": item['supplier_id'] for item in supplier_result.data} if supplier_result.data else {}
+        selected_supplier = st.selectbox("공급업체", supplier_options) if supplier_options else None
+        unit_price = st.number_input("단가(₫)", min_value=0.0, value=0.0, step=1000.0, format="%f")
         
         submitted = st.form_submit_button(f"✅ {get_text('save')}", use_container_width=True)
         
@@ -245,6 +247,8 @@ def show_parts_add():
                 display_error("부품 코드는 필수 입력 항목입니다.")
             elif not part_name:
                 display_error("부품명은 필수 입력 항목입니다.")
+            elif not selected_supplier or unit_price <= 0:
+                display_error("공급업체와 단가를 모두 입력해 주세요.")
             else:
                 try:
                     # 코드 중복 확인
@@ -252,12 +256,8 @@ def show_parts_add():
                     if duplicate_check.data:
                         display_error(f"부품 코드 '{part_code}'는 이미 사용 중입니다. 다른 코드를 입력해주세요.")
                         return
-                    
-                    # 현재 사용자 정보 가져오기
                     from utils.auth import get_current_user
                     current_user = get_current_user()
-                    
-                    # Supabase에 저장할 데이터 준비
                     part_data = {
                         "part_code": part_code,
                         "part_name": part_name,
@@ -271,21 +271,27 @@ def show_parts_add():
                         "description": description,
                         "created_by": current_user
                     }
-                    
-                    # Supabase에 저장
                     result = supabase().from_("parts").insert(part_data).execute()
-                    
                     if result.data:
-                        # 재고 테이블에도 초기 데이터 생성
                         part_id = result.data[0]["part_id"]
                         inventory_data = {
                             "part_id": part_id,
                             "current_quantity": 0
                         }
                         supabase().from_("inventory").insert(inventory_data).execute()
-                        
+                        # 단가 정보 저장
+                        supplier_id = supplier_map[selected_supplier]
+                        price_data = {
+                            "part_id": part_id,
+                            "supplier_id": supplier_id,
+                            "unit_price": unit_price,
+                            "currency": "₫",
+                            "effective_from": datetime.now().isoformat(timespec='microseconds'),
+                            "is_current": True,
+                            "created_by": current_user
+                        }
+                        supabase().from_("part_prices").insert(price_data).execute()
                         display_success(f"새 부품 '{part_name}'이(가) 등록되었습니다. (코드: {part_code})")
-                        # 폼 초기화
                         st.rerun()
                     else:
                         display_error("부품 등록 중 오류가 발생했습니다.")
@@ -378,16 +384,23 @@ def show_parts_details():
                     
                     description = st.text_area("설명", value=part_data.get("description", ""))
                     
-                    # 저장 버튼을 명확하게 보이도록 col 사용하지 않고 전체 너비 사용
+                    # 단가 변경 필드 추가
+                    st.markdown("---")
+                    st.markdown("#### 단가 변경")
+                    # 공급업체 목록 가져오기
+                    supplier_result = supabase().from_("suppliers").select("supplier_id, supplier_name").execute()
+                    supplier_options = [f"{item['supplier_name']} ({item['supplier_id']})" for item in supplier_result.data] if supplier_result.data else []
+                    supplier_map = {f"{item['supplier_name']} ({item['supplier_id']})": item['supplier_id'] for item in supplier_result.data} if supplier_result.data else {}
+                    selected_supplier = st.selectbox("공급업체", supplier_options) if supplier_options else None
+                    unit_price = st.number_input("단가(₫)", min_value=0.0, value=0.0, step=1000.0, format="%f")
+                    
+                    # 저장 버튼
                     save_button = st.form_submit_button("✅ 저장", use_container_width=True)
                     
                     if save_button:
                         try:
-                            # 현재 사용자 정보 가져오기
                             from utils.auth import get_current_user
                             current_user = get_current_user()
-                            
-                            # 업데이트할 기본 데이터만 준비 (최소한의 필수 필드만)
                             update_data = {
                                 "part_name": part_name,
                                 "unit": unit,
@@ -395,8 +408,6 @@ def show_parts_details():
                                 "updated_at": datetime.now().isoformat(),
                                 "updated_by": current_user
                             }
-                            
-                            # 나머지 필드들을 조건부로 추가
                             if vietnamese_name:
                                 update_data["vietnamese_name"] = vietnamese_name
                             if korean_name:
@@ -409,19 +420,29 @@ def show_parts_details():
                                 update_data["min_stock"] = min_stock
                             if description:
                                 update_data["description"] = description
-                            
-                            # 외부 모듈을 사용하여 업데이트 실행
                             update_result = update_part(selected_id, update_data)
-                            
-                            # 재고 정보 업데이트는 별도 처리
                             if current_quantity != current_stock:
-                                # 외부 모듈을 사용하여 재고 업데이트
                                 inventory_result = update_inventory(selected_id, current_quantity)
-                            
-                            # 결과 처리
+                            # 단가 변경 처리
+                            if selected_supplier and unit_price > 0:
+                                supplier_id = supplier_map[selected_supplier]
+                                # 기존 가격 is_current False 처리
+                                supabase().from_("part_prices").update({"is_current": False}).eq("part_id", selected_id).eq("supplier_id", supplier_id).eq("is_current", True).execute()
+                                # 새 가격 insert (effective_from을 DATE로 변환)
+                                today_str = date.today().isoformat()
+                                price_data = {
+                                    "part_id": selected_id,
+                                    "supplier_id": supplier_id,
+                                    "unit_price": unit_price,
+                                    "currency": "₫",
+                                    "effective_from": today_str,
+                                    "is_current": True,
+                                    "created_by": current_user
+                                }
+                                supabase().from_("part_prices").insert(price_data).execute()
                             if update_result["success"]:
                                 display_success(f"부품 '{part_name}' 정보가 업데이트되었습니다.")
-                                time.sleep(1)  # 잠시 대기 후 리로드
+                                time.sleep(1)
                                 st.rerun()
                             else:
                                 display_error(f"부품 정보 업데이트 실패: {update_result['message']}")
@@ -431,22 +452,9 @@ def show_parts_details():
                             import traceback
                             st.error(f"상세 오류 내역: {traceback.format_exc()}")
                 
-                # 삭제 기능
-                if st.button("🗑️ 부품 삭제"):
-                    delete_confirm = st.checkbox(f"정말로 '{part_data.get('part_name')}' 부품을 삭제하시겠습니까?")
-                    
-                    if delete_confirm:
-                        try:
-                            # Supabase에서 삭제
-                            result = supabase().from_("parts").delete().eq("part_id", selected_id).execute()
-                            
-                            if result.data:
-                                display_success(f"부품 '{part_data.get('part_name')}'이(가) 삭제되었습니다.")
-                                st.rerun()
-                            else:
-                                display_error("부품 삭제 중 오류가 발생했습니다.")
-                        except Exception as e:
-                            display_error(f"부품 삭제 중 오류가 발생했습니다: {e}")
+                # 삭제 기능 제거 (버튼 및 로직 전체 삭제)
+                # if st.button("🗑️ 부품 삭제"):
+                #     ... (삭제 관련 코드 전체 주석/삭제)
             else:
                 # 상세 정보 표시 (읽기 전용)
                 col1, col2 = st.columns(2)
