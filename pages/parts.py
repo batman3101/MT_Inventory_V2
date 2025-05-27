@@ -428,14 +428,14 @@ def show_parts_details():
                                 supplier_id = supplier_map[selected_supplier]
                                 # 기존 가격 is_current False 처리
                                 supabase().from_("part_prices").update({"is_current": False}).eq("part_id", selected_id).eq("supplier_id", supplier_id).eq("is_current", True).execute()
-                                # 새 가격 insert (effective_from을 DATE로 변환)
-                                today_str = date.today().isoformat()
+                                # 새 가격 insert (effective_from을 마이크로초까지 포함하여 고유성 보장)
+                                effective_from_str = datetime.now().isoformat(timespec='microseconds')
                                 price_data = {
                                     "part_id": selected_id,
                                     "supplier_id": supplier_id,
                                     "unit_price": unit_price,
                                     "currency": "₫",
-                                    "effective_from": today_str,
+                                    "effective_from": effective_from_str,
                                     "is_current": True,
                                     "created_by": current_user
                                 }
