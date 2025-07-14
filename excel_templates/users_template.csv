@@ -1,0 +1,3 @@
+username,full_name,email,password,role,department,is_active
+admin@example.com,관리자,admin@example.com,admin123,admin,IT부서,TRUE
+user1@example.com,일반사용자1,user1@example.com,user123,user,생산부,TRUE 

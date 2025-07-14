@@ -1,0 +1,3 @@
+inbound_date,part_code,supplier_code,quantity,unit_price,total_price,currency,invoice_number,lot_number,notes,created_by
+2023-05-10,MT001,SAMSOO,10,15000,150000,KRW,INV-20230510-001,LOT001,최초 입고,admin
+2023-05-15,MT002,RPS,5,25000,125000,KRW,INV-20230515-001,LOT002,정기 주문,admin 

@@ -1,0 +1,4 @@
+part_code,part_name,vietnamese_name,korean_name,spec,unit,category,status,min_stock,description,created_by
+MT001,COOLANT FILTER,?,?,?,EA,FILTER,NEW,10,,
+MT002,ELECTRIC FILTER,?,?,?,EA,FILTER,NEW,10,,
+,?,?,?,?,SET,MOTOR,OLD,10,,
