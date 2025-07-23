@@ -1,13 +1,19 @@
-import { typedSupabase, db } from '../utils/supabaseClient';
-import { formatCurrency, formatDate, handleSupabaseError as handleError } from '../utils/supabase';
-import type { Part, Supplier, PartPrice, Inbound, Outbound, InventoryMovement } from '../utils/supabase';
+import { supabase } from '../utils/supabaseClient';
+import { handleSupabaseError } from '../utils/supabase';
+
+// 에러 처리 헬퍼 함수
+const handleError = (error: any, defaultMessage: string = '오류가 발생했습니다.'): Error => {
+  console.error(error);
+  return new Error(handleSupabaseError(error) || defaultMessage);
+};
+import type { Part, Supplier, PartPrice, Inbound } from '../utils/supabase';
 
 // Parts API
 export const partsApi = {
   // 모든 부품 조회
   async getAll(page = 1, limit = 10, search = '') {
     try {
-      let query = db.parts.select('*');
+      let query = supabase.from('parts').select('*');
       
       if (search) {
         query = query.or(`part_number.ilike.%${search}%,vietnamese_name.ilike.%${search}%,korean_name.ilike.%${search}%`);
@@ -34,7 +40,7 @@ export const partsApi = {
   // 부품 상세 조회
   async getById(id: string) {
     try {
-      const { data, error } = await db.parts
+      const { data, error } = await supabase.from('parts')
         .select('*')
         .eq('id', id)
         .single();
@@ -49,7 +55,7 @@ export const partsApi = {
   // 부품 생성
   async create(part: Omit<Part, 'id' | 'created_at' | 'updated_at'>) {
     try {
-      const { data, error } = await db.parts
+      const { data, error } = await supabase.from('parts')
         .insert(part)
         .select()
         .single();
@@ -64,7 +70,7 @@ export const partsApi = {
   // 부품 업데이트
   async update(id: string, updates: Partial<Part>) {
     try {
-      const { data, error } = await db.parts
+      const { data, error } = await supabase.from('parts')
         .update(updates)
         .eq('id', id)
         .select()
@@ -80,7 +86,7 @@ export const partsApi = {
   // 부품 삭제
   async delete(id: string) {
     try {
-      const { error } = await db.parts.delete().eq('id', id);
+      const { error } = await supabase.from('parts').delete().eq('id', id);
       if (error) throw error;
       return true;
     } catch (error) {
@@ -94,7 +100,7 @@ export const suppliersApi = {
   // 모든 공급업체 조회
   async getAll(page = 1, limit = 10, search = '') {
     try {
-      let query = db.suppliers.select('*');
+      let query = supabase.from('suppliers').select('*');
       
       if (search) {
         query = query.or(`name.ilike.%${search}%,supplier_code.ilike.%${search}%,contact_person.ilike.%${search}%`);
@@ -121,7 +127,7 @@ export const suppliersApi = {
   // 공급업체 상세 조회
   async getById(id: string) {
     try {
-      const { data, error } = await db.suppliers
+      const { data, error } = await supabase.from('suppliers')
         .select('*')
         .eq('id', id)
         .single();
@@ -136,7 +142,7 @@ export const suppliersApi = {
   // 공급업체 생성
   async create(supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) {
     try {
-      const { data, error } = await db.suppliers
+      const { data, error } = await supabase.from('suppliers')
         .insert(supplier)
         .select()
         .single();
@@ -151,7 +157,7 @@ export const suppliersApi = {
   // 공급업체 업데이트
   async update(id: string, updates: Partial<Supplier>) {
     try {
-      const { data, error } = await db.suppliers
+      const { data, error } = await supabase.from('suppliers')
         .update(updates)
         .eq('id', id)
         .select()
@@ -167,7 +173,7 @@ export const suppliersApi = {
   // 공급업체 삭제
   async delete(id: string) {
     try {
-      const { error } = await db.suppliers.delete().eq('id', id);
+      const { error } = await supabase.from('suppliers').delete().eq('id', id);
       if (error) throw error;
       return true;
     } catch (error) {
@@ -181,7 +187,7 @@ export const inventoryApi = {
   // 재고 목록 조회
   async getAll(page = 1, limit = 10, search = '') {
     try {
-      let query = db.inventory
+      let query = supabase.from('inventory')
         .select(`
           *,
           parts!inner(part_number, vietnamese_name, korean_name, unit)
@@ -212,7 +218,7 @@ export const inventoryApi = {
   // 재고 상세 조회
   async getById(id: string) {
     try {
-      const { data, error } = await db.inventory
+      const { data, error } = await supabase.from('inventory')
         .select(`
           *,
           parts!inner(part_number, vietnamese_name, korean_name, unit, min_stock)
@@ -230,7 +236,7 @@ export const inventoryApi = {
   // 재고 업데이트
   async update(id: string, updates: { quantity?: number; location?: string }) {
     try {
-      const { data, error } = await db.inventory
+      const { data, error } = await supabase.from('inventory')
         .update({
           ...updates,
           updated_at: new Date().toISOString()
@@ -249,7 +255,7 @@ export const inventoryApi = {
   // 저재고 알림 조회
   async getLowStock() {
     try {
-      const { data, error } = await db.inventory
+      const { data, error } = await supabase.from('inventory')
         .select(`
           *,
           parts!inner(part_number, vietnamese_name, korean_name, unit, min_stock)
@@ -269,7 +275,7 @@ export const inboundApi = {
   // 입고 목록 조회
   async getAll(page = 1, limit = 10, search = '') {
     try {
-      let query = db.inbound
+      let query = supabase.from('inbound')
         .select(`
           *,
           parts!inner(part_number, vietnamese_name, korean_name, unit),
@@ -301,7 +307,7 @@ export const inboundApi = {
   // 입고 상세 조회
   async getById(id: string) {
     try {
-      const { data, error } = await db.inbound
+      const { data, error } = await supabase.from('inbound')
         .select(`
           *,
           parts!inner(part_number, vietnamese_name, korean_name, unit),
@@ -320,7 +326,7 @@ export const inboundApi = {
   // 입고 생성
   async create(inbound: Omit<Inbound, 'id' | 'created_at' | 'updated_at'>) {
     try {
-      const { data, error } = await db.inbound
+      const { data, error } = await supabase.from('inbound')
         .insert(inbound)
         .select()
         .single();
@@ -335,7 +341,7 @@ export const inboundApi = {
   // 입고 업데이트
   async update(id: string, updates: Partial<Inbound>) {
     try {
-      const { data, error } = await db.inbound
+      const { data, error } = await supabase.from('inbound')
         .update(updates)
         .eq('id', id)
         .select()
@@ -351,7 +357,7 @@ export const inboundApi = {
   // 입고 삭제
   async delete(id: string) {
     try {
-      const { error } = await db.inbound.delete().eq('id', id);
+      const { error } = await supabase.from('inbound').delete().eq('id', id);
       if (error) throw error;
       return true;
     } catch (error) {
@@ -365,7 +371,7 @@ export const partPricesApi = {
   // 부품 가격 목록 조회
   async getAll(page = 1, limit = 10, partId?: string) {
     try {
-      let query = db.partPrices
+      let query = supabase.from('partPrices')
         .select(`
           *,
           parts!inner(part_number, vietnamese_name, korean_name),
@@ -397,7 +403,7 @@ export const partPricesApi = {
   // 부품 가격 생성
   async create(partPrice: Omit<PartPrice, 'id' | 'created_at' | 'updated_at'>) {
     try {
-      const { data, error } = await db.partPrices
+      const { data, error } = await supabase.from('partPrices')
         .insert(partPrice)
         .select()
         .single();
@@ -412,7 +418,7 @@ export const partPricesApi = {
   // 부품 가격 업데이트
   async update(id: string, updates: Partial<PartPrice>) {
     try {
-      const { data, error } = await db.partPrices
+      const { data, error } = await supabase.from('partPrices')
         .update(updates)
         .eq('id', id)
         .select()
@@ -428,7 +434,7 @@ export const partPricesApi = {
   // 부품 가격 삭제
   async delete(id: string) {
     try {
-      const { error } = await db.partPrices.delete().eq('id', id);
+      const { error } = await supabase.from('partPrices').delete().eq('id', id);
       if (error) throw error;
       return true;
     } catch (error) {
@@ -441,7 +447,7 @@ export const partPricesApi = {
     try {
       const today = new Date().toISOString().split('T')[0];
       
-      const { data, error } = await db.partPrices
+      const { data, error } = await supabase.from('partPrices')
         .select('*')
         .eq('part_id', partId)
         .eq('supplier_id', supplierId)
@@ -465,10 +471,10 @@ export const dashboardApi = {
   async getStats() {
     try {
       const [partsCount, suppliersCount, lowStockCount, recentInbound] = await Promise.all([
-        db.parts.select('id', { count: 'exact', head: true }),
-        db.suppliers.select('id', { count: 'exact', head: true }),
+        supabase.from('parts').select('id', { count: 'exact', head: true }),
+        supabase.from('suppliers').select('id', { count: 'exact', head: true }),
         inventoryApi.getLowStock(),
-        db.inbound
+        supabase.from('inbound')
           .select('*')
           .gte('inbound_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
           .order('inbound_date', { ascending: false })
@@ -483,6 +489,345 @@ export const dashboardApi = {
       };
     } catch (error) {
       throw handleError(error, '대시보드 통계를 불러오는데 실패했습니다.');
+    }
+  }
+};
+
+// Reports API
+export const reportsApi = {
+  // 카테고리 목록 조회
+  async getCategories() {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('category_name');
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      throw handleError(error, '카테고리 목록을 불러오는데 실패했습니다.');
+    }
+  },
+
+  // 월별 입출고 데이터 조회
+  async getInOutData(startDate: string, endDate: string, categoryId?: string) {
+    try {
+      // 입고 데이터 쿼리
+      let inboundQuery = supabase.from('inbound')
+        .select('inbound_date, quantity, unit_price')
+        .gte('inbound_date', startDate)
+        .lte('inbound_date', endDate);
+      
+      // 출고 데이터 쿼리
+      let outboundQuery = supabase.from('outbound')
+        .select('outbound_date, quantity, unit_price')
+        .gte('outbound_date', startDate)
+        .lte('outbound_date', endDate);
+      
+      // 카테고리 필터링이 필요한 경우
+      if (categoryId && categoryId !== 'all') {
+        // 해당 카테고리의 부품 ID 목록 조회
+        const { data: partsInCategory, error: partsError } = await supabase.from('parts')
+          .select('id')
+          .eq('category_id', categoryId);
+        
+        if (partsError) throw partsError;
+        
+        const partIds = partsInCategory.map(part => part.id);
+        
+        if (partIds.length > 0) {
+          inboundQuery = inboundQuery.in('part_id', partIds);
+          outboundQuery = outboundQuery.in('part_id', partIds);
+        } else {
+          // 해당 카테고리에 부품이 없는 경우 빈 결과 반환
+          return [];
+        }
+      }
+      
+      // 쿼리 실행
+      const [inboundResult, outboundResult] = await Promise.all([
+        inboundQuery,
+        outboundQuery
+      ]);
+      
+      if (inboundResult.error) throw inboundResult.error;
+      if (outboundResult.error) throw outboundResult.error;
+      
+      // 월별 데이터 집계
+      const monthlyData: Record<string, { month: string; inbound: number; outbound: number }> = {};
+      
+      // 입고 데이터 처리
+      inboundResult.data.forEach((item: any) => {
+        const month = item.inbound_date.substring(0, 7); // YYYY-MM 형식
+        if (!monthlyData[month]) {
+          monthlyData[month] = { month, inbound: 0, outbound: 0 };
+        }
+        monthlyData[month]!.inbound += item.quantity;
+      });
+      
+      // 출고 데이터 처리
+      outboundResult.data.forEach((item: any) => {
+        const month = item.outbound_date.substring(0, 7); // YYYY-MM 형식
+        if (!monthlyData[month]) {
+          monthlyData[month] = { month, inbound: 0, outbound: 0 };
+        }
+        monthlyData[month]!.outbound += item.quantity;
+      });
+      
+      // 결과를 배열로 변환하고 월별로 정렬
+      return Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month));
+    } catch (error) {
+      throw handleError(error, '월별 입출고 데이터를 불러오는데 실패했습니다.');
+    }
+  },
+
+  // 입고 상세 내역 조회
+  async getInboundDetails(startDate: string, endDate: string, categoryId?: string) {
+    try {
+      let query = supabase.from('inbound')
+        .select(`
+          *,
+          parts(part_number, vietnamese_name, korean_name, category_id),
+          suppliers(name)
+        `)
+        .gte('inbound_date', startDate)
+        .lte('inbound_date', endDate);
+      
+      // 카테고리 필터링
+      if (categoryId && categoryId !== 'all') {
+        query = query.eq('parts.category_id', categoryId);
+      }
+      
+      const { data, error } = await query.order('inbound_date', { ascending: false });
+      
+      if (error) throw error;
+      
+      // 카테고리 이름 조회
+      const categoryIds = [...new Set(data.map(item => item.parts.category_id))];
+      let categories = [];
+      
+      if (categoryIds.length > 0) {
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('categories')
+          .select('*')
+          .in('category_id', categoryIds);
+        
+        if (categoriesError) throw categoriesError;
+        categories = categoriesData;
+      }
+      
+      // 결과 데이터 포맷팅
+      return data.map(item => {
+        const category = categories.find(cat => cat.category_id === item.parts.category_id);
+        return {
+          inbound_date: item.inbound_date,
+          part_code: item.parts.part_number,
+          part_name: item.parts.vietnamese_name,
+          supplier_name: item.suppliers.name,
+          category_name: category ? category.category_name : '미분류',
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_amount: item.quantity * item.unit_price
+        };
+      });
+    } catch (error) {
+      throw handleError(error, '입고 상세 내역을 불러오는데 실패했습니다.');
+    }
+  },
+
+  // 출고 상세 내역 조회
+  async getOutboundDetails(startDate: string, endDate: string, categoryId?: string) {
+    try {
+      let query = supabase.from('outbound')
+        .select(`
+          *,
+          parts(part_number, vietnamese_name, korean_name, category_id),
+          departments(name)
+        `)
+        .gte('outbound_date', startDate)
+        .lte('outbound_date', endDate);
+      
+      // 카테고리 필터링
+      if (categoryId && categoryId !== 'all') {
+        query = query.eq('parts.category_id', categoryId);
+      }
+      
+      const { data, error } = await query.order('outbound_date', { ascending: false });
+      
+      if (error) throw error;
+      
+      // 카테고리 이름 조회
+      const categoryIds = [...new Set(data.map(item => item.parts.category_id))];
+      let categories = [];
+      
+      if (categoryIds.length > 0) {
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('categories')
+          .select('*')
+          .in('category_id', categoryIds);
+        
+        if (categoriesError) throw categoriesError;
+        categories = categoriesData;
+      }
+      
+      // 결과 데이터 포맷팅
+      return data.map(item => {
+        const category = categories.find(cat => cat.category_id === item.parts.category_id);
+        return {
+          outbound_date: item.outbound_date,
+          part_code: item.parts.part_number,
+          part_name: item.parts.vietnamese_name,
+          department_name: item.departments.name,
+          category_name: category ? category.category_name : '미분류',
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_amount: item.quantity * item.unit_price
+        };
+      });
+    } catch (error) {
+      throw handleError(error, '출고 상세 내역을 불러오는데 실패했습니다.');
+    }
+  },
+
+  // 재고 분석 데이터 조회
+  async getInventoryAnalysis(categoryId?: string) {
+    try {
+      // 재고 데이터 조회
+      let query = supabase.from('inventory')
+        .select(`
+          *,
+          parts(part_number, vietnamese_name, korean_name, category_id)
+        `);
+      
+      // 카테고리 필터링
+      if (categoryId && categoryId !== 'all') {
+        query = query.eq('parts.category_id', categoryId);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      
+      // 카테고리 이름 조회
+      const categoryIds = [...new Set(data.map(item => item.parts.category_id))];
+      let categories = [];
+      
+      if (categoryIds.length > 0) {
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('categories')
+          .select('*')
+          .in('category_id', categoryIds);
+        
+        if (categoriesError) throw categoriesError;
+        categories = categoriesData;
+      }
+      
+      // 카테고리별 데이터 집계
+      const analysisByCategory: Record<string, {
+        category_name: string;
+        part_count: number;
+        total_quantity: number;
+        total_value: number;
+      }> = {};
+      
+      data.forEach((item: any) => {
+        const categoryId = item.parts.category_id;
+        const category = categories.find(cat => cat.category_id === categoryId);
+        const categoryName = category ? category.category_name : '미분류';
+        
+        if (!analysisByCategory[categoryName]) {
+          analysisByCategory[categoryName] = {
+            category_name: categoryName,
+            part_count: 0,
+            total_quantity: 0,
+            total_value: 0
+          };
+        }
+        
+        analysisByCategory[categoryName].part_count++;
+        analysisByCategory[categoryName].total_quantity += item.current_quantity;
+        analysisByCategory[categoryName].total_value += item.current_quantity * (item.unit_price || 0);
+      });
+      
+      // 결과를 배열로 변환
+      return Object.values(analysisByCategory);
+    } catch (error) {
+      throw handleError(error, '재고 분석 데이터를 불러오는데 실패했습니다.');
+    }
+  },
+
+  // 비용 분석 데이터 조회
+  async getCostAnalysis(startDate: string, endDate: string, categoryId?: string) {
+    try {
+      // 입고 비용 데이터 쿼리
+      let inboundQuery = supabase.from('inbound')
+        .select(`
+          inbound_date,
+          quantity,
+          unit_price,
+          parts(category_id)
+        `)
+        .gte('inbound_date', startDate)
+        .lte('inbound_date', endDate);
+      
+      // 출고 비용 데이터 쿼리
+      let outboundQuery = supabase.from('outbound')
+        .select(`
+          outbound_date,
+          quantity,
+          unit_price,
+          parts(category_id)
+        `)
+        .gte('outbound_date', startDate)
+        .lte('outbound_date', endDate);
+      
+      // 카테고리 필터링
+      if (categoryId && categoryId !== 'all') {
+        inboundQuery = inboundQuery.eq('parts.category_id', categoryId);
+        outboundQuery = outboundQuery.eq('parts.category_id', categoryId);
+      }
+      
+      // 쿼리 실행
+      const [inboundResult, outboundResult] = await Promise.all([
+        inboundQuery,
+        outboundQuery
+      ]);
+      
+      if (inboundResult.error) throw inboundResult.error;
+      if (outboundResult.error) throw outboundResult.error;
+      
+      // 월별 비용 데이터 집계
+      const monthlyCosts: Record<string, { month: string; inbound_cost: number; outbound_cost: number; net_cost: number }> = {};
+      
+      // 입고 비용 처리
+      inboundResult.data.forEach((item: any) => {
+        const month = item.inbound_date.substring(0, 7); // YYYY-MM 형식
+        if (!monthlyCosts[month]) {
+          monthlyCosts[month] = { month, inbound_cost: 0, outbound_cost: 0, net_cost: 0 };
+        }
+        monthlyCosts[month]!.inbound_cost += item.quantity * item.unit_price;
+      });
+      
+      // 출고 비용 처리
+      outboundResult.data.forEach((item: any) => {
+        const month = item.outbound_date.substring(0, 7); // YYYY-MM 형식
+        if (!monthlyCosts[month]) {
+          monthlyCosts[month] = { month, inbound_cost: 0, outbound_cost: 0, net_cost: 0 };
+        }
+        monthlyCosts[month]!.outbound_cost += item.quantity * item.unit_price;
+      });
+      
+      // 순 비용 계산
+      Object.values(monthlyCosts).forEach((item) => {
+        item.net_cost = item.inbound_cost - item.outbound_cost;
+      });
+      
+      // 결과를 배열로 변환하고 월별로 정렬
+      return Object.values(monthlyCosts).sort((a, b) => a.month.localeCompare(b.month));
+    } catch (error) {
+      console.error('비용 분석 데이터를 불러오는데 실패했습니다:', error);
+      throw error;
     }
   }
 };

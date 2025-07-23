@@ -30,11 +30,6 @@ import {
   Snackbar,
   IconButton,
   Tooltip,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -61,7 +56,7 @@ import {
   Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { suppliersApi, partPricesApi } from '../services/api';
-import { formatCurrency, formatDate } from '../utils/supabase';
+
 import { exportToExcel, formatSuppliersDataForExcel } from '../utils/excelUtils';
 
 interface TabPanelProps {
@@ -92,18 +87,15 @@ function TabPanel(props: TabPanelProps) {
 
 interface Supplier {
   id: string;
-  supplier_code: string;
   supplier_name: string;
   contact_person?: string;
   phone?: string;
   email?: string;
   address?: string;
-  country: string;
-  website?: string;
-  status: 'active' | 'inactive';
+  notes?: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
-  created_by?: string;
 }
 
 interface PartPrice {
@@ -133,22 +125,19 @@ const SuppliersPage: React.FC = () => {
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [newSupplier, setNewSupplier] = useState<Partial<Supplier>>({
-    supplier_code: '',
     supplier_name: '',
     contact_person: '',
     phone: '',
     email: '',
     address: '',
-    country: '대한민국',
-    website: '',
-    status: 'active'
+    notes: '',
+    is_active: true
   });
   const [partPrices, setPartPrices] = useState<PartPrice[]>([]);
   const [receivingHistory, setReceivingHistory] = useState<ReceivingHistory[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [countryFilter, setCountryFilter] = useState<string>('all');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
@@ -162,8 +151,8 @@ const SuppliersPage: React.FC = () => {
 
   useEffect(() => {
     if (selectedSupplier) {
-      loadPartPrices(selectedSupplier.id);
-      loadReceivingHistory(selectedSupplier.id);
+      loadPartPrices();
+      loadReceivingHistory();
     }
   }, [selectedSupplier]);
 
@@ -184,16 +173,16 @@ const SuppliersPage: React.FC = () => {
     }
   };
 
-  const loadPartPrices = async (supplierId: string) => {
+  const loadPartPrices = async () => {
     try {
-      const response = await partPricesApi.getAll(1, 100, undefined, supplierId);
+      const response = await partPricesApi.getAll(1, 100);
       setPartPrices(response.data || []);
     } catch (error) {
       console.error('부품 가격 정보 로드 실패:', error);
     }
   };
 
-  const loadReceivingHistory = async (supplierId: string) => {
+  const loadReceivingHistory = async () => {
     try {
       // 입고 이력은 아직 API에 구현되지 않았으므로 빈 배열로 설정
       setReceivingHistory([]);
@@ -203,10 +192,10 @@ const SuppliersPage: React.FC = () => {
   };
 
   const handleAddSupplier = async () => {
-    if (!newSupplier.supplier_code || !newSupplier.supplier_name) {
+    if (!newSupplier.supplier_name) {
       setSnackbar({
         open: true,
-        message: '공급업체 코드와 이름은 필수 입력 항목입니다.',
+        message: '공급업체명은 필수 입력 항목입니다.',
         severity: 'error'
       });
       return;
@@ -214,23 +203,15 @@ const SuppliersPage: React.FC = () => {
 
     try {
       setLoading(true);
-      
-      // 공급업체 코드 중복 확인
-      const existingSuppliers = await suppliersApi.getAll(1, 1000);
-      const existingSupplier = existingSuppliers.data.find(supplier => supplier.supplier_code === newSupplier.supplier_code);
-
-      if (existingSupplier) {
-        setSnackbar({
-          open: true,
-          message: '이미 존재하는 공급업체 코드입니다.',
-          severity: 'error'
-        });
-        return;
-      }
 
       await suppliersApi.create({
-        ...newSupplier,
-        created_by: 'current_user' // 실제로는 현재 로그인한 사용자 ID
+        supplier_name: newSupplier.supplier_name || '',
+        contact_person: newSupplier.contact_person || '',
+        phone: newSupplier.phone || '',
+        email: newSupplier.email || '',
+        address: newSupplier.address || '',
+        notes: newSupplier.notes || '',
+        is_active: newSupplier.is_active ?? true
       });
 
       setSnackbar({
@@ -241,15 +222,13 @@ const SuppliersPage: React.FC = () => {
       
       setAddDialogOpen(false);
       setNewSupplier({
-        supplier_code: '',
         supplier_name: '',
         contact_person: '',
         phone: '',
         email: '',
         address: '',
-        country: '대한민국',
-        website: '',
-        status: 'active'
+        notes: '',
+        is_active: true
       });
       
       await loadSuppliers();
@@ -277,9 +256,8 @@ const SuppliersPage: React.FC = () => {
         phone: editingSupplier.phone,
         email: editingSupplier.email,
         address: editingSupplier.address,
-        country: editingSupplier.country,
-        website: editingSupplier.website,
-        status: editingSupplier.status
+        notes: editingSupplier.notes,
+        is_active: editingSupplier.is_active
       });
 
       setSnackbar({
@@ -344,7 +322,11 @@ const SuppliersPage: React.FC = () => {
 
     try {
       const formattedData = formatSuppliersDataForExcel(filteredSuppliers);
-      exportToExcel(formattedData, '공급업체목록');
+      exportToExcel({
+        filename: '공급업체목록',
+        sheetName: '공급업체',
+        data: formattedData
+      });
       
       setSnackbar({
         open: true,
@@ -362,12 +344,12 @@ const SuppliersPage: React.FC = () => {
 
   const filteredSuppliers = suppliers.filter(supplier => {
     const matchesSearch = supplier.supplier_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         supplier.supplier_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          supplier.contact_person?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || supplier.status === statusFilter;
-    const matchesCountry = countryFilter === 'all' || supplier.country === countryFilter;
+    const matchesStatus = statusFilter === 'all' || 
+                         (statusFilter === 'active' && supplier.is_active) ||
+                         (statusFilter === 'inactive' && !supplier.is_active);
     
-    return matchesSearch && matchesStatus && matchesCountry;
+    return matchesSearch && matchesStatus;
   });
 
   const paginatedSuppliers = filteredSuppliers.slice(
@@ -375,7 +357,7 @@ const SuppliersPage: React.FC = () => {
     page * rowsPerPage + rowsPerPage
   );
 
-  const uniqueCountries = Array.from(new Set(suppliers.map(s => s.country)));
+
 
   return (
     <Box sx={{ p: 3 }}>
@@ -458,21 +440,7 @@ const SuppliersPage: React.FC = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={3}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>국가</InputLabel>
-                  <Select
-                    value={countryFilter}
-                    label="국가"
-                    onChange={(e) => setCountryFilter(e.target.value)}
-                  >
-                    <MenuItem value="all">전체</MenuItem>
-                    {uniqueCountries.map(country => (
-                      <MenuItem key={country} value={country}>{country}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+
             </Grid>
             
             {/* 공급업체 테이블 */}
@@ -480,11 +448,10 @@ const SuppliersPage: React.FC = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>공급업체 코드</TableCell>
                     <TableCell>공급업체명</TableCell>
                     <TableCell>담당자</TableCell>
                     <TableCell>연락처</TableCell>
-                    <TableCell>국가</TableCell>
+                    <TableCell>비고</TableCell>
                     <TableCell>상태</TableCell>
                     <TableCell>등록일</TableCell>
                     <TableCell>작업</TableCell>
@@ -492,12 +459,7 @@ const SuppliersPage: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {paginatedSuppliers.map((supplier) => (
-                    <TableRow key={supplier.supplier_id} hover>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="medium">
-                          {supplier.supplier_code}
-                        </Typography>
-                      </TableCell>
+                    <TableRow key={supplier.id} hover>
                       <TableCell>
                         <Typography variant="body2">
                           {supplier.supplier_name}
@@ -526,13 +488,13 @@ const SuppliersPage: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {supplier.country}
+                          {supplier.notes || '-'}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={supplier.status === 'active' ? '활성' : '비활성'}
-                          color={supplier.status === 'active' ? 'success' : 'default'}
+                          label={supplier.is_active ? '활성' : '비활성'}
+                          color={supplier.is_active ? 'success' : 'default'}
                           size="small"
                         />
                       </TableCell>
@@ -586,15 +548,7 @@ const SuppliersPage: React.FC = () => {
             </Typography>
             
             <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="공급업체 코드 *"
-                  value={newSupplier.supplier_code}
-                  onChange={(e) => setNewSupplier(prev => ({ ...prev, supplier_code: e.target.value }))}
-                  helperText="고유한 공급업체 코드를 입력하세요"
-                />
-              </Grid>
+
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -631,10 +585,9 @@ const SuppliersPage: React.FC = () => {
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
-                  label="웹사이트"
-                  value={newSupplier.website}
-                  onChange={(e) => setNewSupplier(prev => ({ ...prev, website: e.target.value }))}
-                  placeholder="https://"
+                  label="비고"
+                  value={newSupplier.notes}
+                  onChange={(e) => setNewSupplier(prev => ({ ...prev, notes: e.target.value }))}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -647,30 +600,14 @@ const SuppliersPage: React.FC = () => {
                   onChange={(e) => setNewSupplier(prev => ({ ...prev, address: e.target.value }))}
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>국가</InputLabel>
-                  <Select
-                    value={newSupplier.country}
-                    label="국가"
-                    onChange={(e) => setNewSupplier(prev => ({ ...prev, country: e.target.value }))}
-                  >
-                    <MenuItem value="대한민국">대한민국</MenuItem>
-                    <MenuItem value="중국">중국</MenuItem>
-                    <MenuItem value="일본">일본</MenuItem>
-                    <MenuItem value="미국">미국</MenuItem>
-                    <MenuItem value="독일">독일</MenuItem>
-                    <MenuItem value="기타">기타</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
+
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
                   <InputLabel>상태</InputLabel>
                   <Select
-                    value={newSupplier.status}
+                    value={newSupplier.is_active ? 'active' : 'inactive'}
                     label="상태"
-                    onChange={(e) => setNewSupplier(prev => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
+                    onChange={(e) => setNewSupplier(prev => ({ ...prev, is_active: e.target.value === 'active' }))}
                   >
                     <MenuItem value="active">활성</MenuItem>
                     <MenuItem value="inactive">비활성</MenuItem>
@@ -691,15 +628,13 @@ const SuppliersPage: React.FC = () => {
                     variant="outlined"
                     onClick={() => {
                       setNewSupplier({
-                        supplier_code: '',
                         supplier_name: '',
                         contact_person: '',
                         phone: '',
                         email: '',
                         address: '',
-                        country: '대한민국',
-                        website: '',
-                        status: 'active'
+                        notes: '',
+                        is_active: true
                       });
                     }}
                   >
@@ -754,8 +689,8 @@ const SuppliersPage: React.FC = () => {
                       <Grid item xs={12} md={6}>
                         <TextField
                           fullWidth
-                          label="공급업체 코드"
-                          value={editingSupplier.supplier_code}
+                          label="공급업체 ID"
+                          value={editingSupplier.id}
                           disabled
                           size="small"
                         />
@@ -811,11 +746,11 @@ const SuppliersPage: React.FC = () => {
                       <Grid item xs={12} md={6}>
                         <TextField
                           fullWidth
-                          label="웹사이트"
-                          value={editingSupplier.website || ''}
+                          label="비고"
+                          value={editingSupplier.notes || ''}
                           onChange={(e) => setEditingSupplier(prev => prev ? {
                             ...prev,
-                            website: e.target.value
+                            notes: e.target.value
                           } : null)}
                           size="small"
                         />
@@ -834,35 +769,16 @@ const SuppliersPage: React.FC = () => {
                           size="small"
                         />
                       </Grid>
-                      <Grid item xs={12} md={6}>
-                        <FormControl fullWidth size="small">
-                          <InputLabel>국가</InputLabel>
-                          <Select
-                            value={editingSupplier.country}
-                            label="국가"
-                            onChange={(e) => setEditingSupplier(prev => prev ? {
-                              ...prev,
-                              country: e.target.value
-                            } : null)}
-                          >
-                            <MenuItem value="대한민국">대한민국</MenuItem>
-                            <MenuItem value="중국">중국</MenuItem>
-                            <MenuItem value="일본">일본</MenuItem>
-                            <MenuItem value="미국">미국</MenuItem>
-                            <MenuItem value="독일">독일</MenuItem>
-                            <MenuItem value="기타">기타</MenuItem>
-                          </Select>
-                        </FormControl>
-                      </Grid>
+
                       <Grid item xs={12} md={6}>
                         <FormControl fullWidth size="small">
                           <InputLabel>상태</InputLabel>
                           <Select
-                            value={editingSupplier.status}
+                            value={editingSupplier.is_active ? 'active' : 'inactive'}
                             label="상태"
                             onChange={(e) => setEditingSupplier(prev => prev ? {
                               ...prev,
-                              status: e.target.value as 'active' | 'inactive'
+                              is_active: e.target.value === 'active'
                             } : null)}
                           >
                             <MenuItem value="active">활성</MenuItem>
@@ -895,10 +811,10 @@ const SuppliersPage: React.FC = () => {
                     <Grid container spacing={2}>
                       <Grid item xs={12} md={6}>
                         <Typography variant="body2" color="text.secondary">
-                          공급업체 코드
+                          공급업체 ID
                         </Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          {selectedSupplier.supplier_code}
+                          {selectedSupplier.id}
                         </Typography>
                       </Grid>
                       <Grid item xs={12} md={6}>
@@ -938,15 +854,11 @@ const SuppliersPage: React.FC = () => {
                       </Grid>
                       <Grid item xs={12} md={6}>
                         <Typography variant="body2" color="text.secondary">
-                          웹사이트
+                          비고
                         </Typography>
                         <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <WebsiteIcon fontSize="small" />
-                          {selectedSupplier.website ? (
-                            <a href={selectedSupplier.website} target="_blank" rel="noopener noreferrer">
-                              {selectedSupplier.website}
-                            </a>
-                          ) : '미등록'}
+                          {selectedSupplier.notes || '미등록'}
                         </Typography>
                       </Grid>
                       <Grid item xs={12}>
@@ -958,21 +870,14 @@ const SuppliersPage: React.FC = () => {
                           {selectedSupplier.address || '미등록'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          국가
-                        </Typography>
-                        <Typography variant="body1">
-                          {selectedSupplier.country}
-                        </Typography>
-                      </Grid>
+
                       <Grid item xs={12} md={6}>
                         <Typography variant="body2" color="text.secondary">
                           상태
                         </Typography>
                         <Chip
-                          label={selectedSupplier.status === 'active' ? '활성' : '비활성'}
-                          color={selectedSupplier.status === 'active' ? 'success' : 'default'}
+                          label={selectedSupplier.is_active ? '활성' : '비활성'}
+                          color={selectedSupplier.is_active ? 'success' : 'default'}
                           size="small"
                         />
                       </Grid>

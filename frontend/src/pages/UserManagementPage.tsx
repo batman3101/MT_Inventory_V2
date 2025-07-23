@@ -30,25 +30,17 @@ import {
   Switch,
   FormControlLabel,
   TablePagination,
-  Paper,
-  Divider,
-  Avatar,
-  Badge
+  Avatar
 } from '@mui/material';
 import {
-  Person as PersonIcon,
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
   Search as SearchIcon,
   Refresh as RefreshIcon,
   Business as BusinessIcon,
   Email as EmailIcon,
-  Phone as PhoneIcon,
   AdminPanelSettings as AdminIcon,
-  SupervisorAccount as SupervisorIcon,
   AccountCircle as UserIcon,
   CheckCircle as ActiveIcon,
   Block as InactiveIcon,
@@ -89,7 +81,7 @@ interface UserWithDepartment extends User {
 const UserManagementPage: React.FC = () => {
   const [users, setUsers] = useState<UserWithDepartment[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [selectedUser, setSelectedUser] = useState<UserWithDepartment | null>(null);
+  // const [selectedUser, setSelectedUser] = useState<UserWithDepartment | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');

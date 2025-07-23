@@ -24,20 +24,15 @@ import {
   MenuItem,
   Switch,
   FormControlLabel,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+
   CircularProgress,
   Snackbar,
-  Autocomplete,
+
   Divider,
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
-  IconButton,
-  Tooltip
+
 } from '@mui/material';
 import {
   Security as SecurityIcon,
@@ -138,7 +133,7 @@ const PermissionsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, user: null as User | null, action: '' });
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
 
   useEffect(() => {

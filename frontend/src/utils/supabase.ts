@@ -1,11 +1,36 @@
+/// <reference types="vite/client" />
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase 설정
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key';
 
+// 디버깅을 위한 로그
+console.log('Supabase URL:', supabaseUrl);
+console.log('Supabase Anon Key:', supabaseAnonKey ? 'Key loaded' : 'Key not found');
+
 // Supabase 클라이언트 생성
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// 연결 테스트 함수
+export const testSupabaseConnection = async () => {
+  try {
+    console.log('Testing Supabase connection...');
+    const { error } = await supabase.from('parts').select('count').limit(1);
+    if (error) {
+      console.error('Supabase connection test failed:', error);
+      return false;
+    }
+    console.log('Supabase connection test successful');
+    return true;
+  } catch (error) {
+    console.error('Supabase connection test error:', error);
+    return false;
+  }
+};
+
+// 페이지 로드 시 연결 테스트 실행
+testSupabaseConnection();
 
 // 데이터베이스 타입 정의
 export interface User {

@@ -22,18 +22,16 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
-  Divider,
+
   Chip,
-  IconButton,
-  Tooltip
+
 } from '@mui/material';
 import {
   Assessment as ReportsIcon,
   TrendingUp as TrendingUpIcon,
   Inventory as InventoryIcon,
   AttachMoney as MoneyIcon,
-  Download as DownloadIcon,
+
   Refresh as RefreshIcon,
   DateRange as DateRangeIcon,
   Category as CategoryIcon,
@@ -55,18 +53,51 @@ import {
   Bar
 } from 'recharts';
 import { exportToExcel } from '../utils/excelUtils';
-import {
-  generateInOutData,
-  generateInboundDetails,
-  generateOutboundDetails,
-  generateInventoryAnalysis,
-  generateCostAnalysis,
-  type InOutData,
-  type InboundDetail,
-  type OutboundDetail,
-  type InventoryAnalysis,
-  type CostAnalysis
-} from '../utils/mockData';
+import { reportsApi } from '../services/api';
+// Mock data imports removed - using real API calls
+
+// Type definitions
+interface InOutData {
+  month: string;
+  inbound: number;
+  outbound: number;
+}
+
+interface InboundDetail {
+  inbound_date: string;
+  part_code: string;
+  part_name: string;
+  supplier_name: string;
+  category_name: string;
+  quantity: number;
+  unit_price: number;
+  total_amount: number;
+}
+
+interface OutboundDetail {
+  outbound_date: string;
+  part_code: string;
+  part_name: string;
+  department_name: string;
+  category_name: string;
+  quantity: number;
+  unit_price: number;
+  total_amount: number;
+}
+
+interface InventoryAnalysis {
+  category_name: string;
+  part_count: number;
+  total_quantity: number;
+  total_value: number;
+}
+
+interface CostAnalysis {
+  month: string;
+  inbound_cost: number;
+  outbound_cost: number;
+  net_cost: number;
+}
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -135,31 +166,31 @@ const ReportsPage: React.FC = () => {
 
   const loadCategories = async () => {
     try {
-      // 모의 카테고리 데이터
-      const mockCategories = [
-        { category_id: '1', category_name: '전자부품' },
-        { category_id: '2', category_name: '기계부품' },
-        { category_id: '3', category_name: '소모품' },
-        { category_id: '4', category_name: '공구' },
-        { category_id: '5', category_name: '안전용품' }
-      ];
-      setCategories(mockCategories);
+      const categoriesData = await reportsApi.getCategories();
+      setCategories(categoriesData);
     } catch (error) {
       console.error('카테고리 로드 실패:', error);
+      setSnackbar({
+        open: true,
+        message: '카테고리를 불러오는데 실패했습니다.',
+        severity: 'error'
+      });
     }
   };
 
   const loadInOutReport = async () => {
     setLoading(true);
     try {
-      // 모의 데이터 생성
-      const inOutData = generateInOutData(startDate, endDate);
-      const inboundDetails = generateInboundDetails(startDate, endDate, selectedCategory);
-      const outboundDetails = generateOutboundDetails(startDate, endDate, selectedCategory);
+      // 실제 API 호출
+      const [inOutData, inboundData, outboundData] = await Promise.all([
+        reportsApi.getInOutData(startDate, endDate, selectedCategory),
+        reportsApi.getInboundDetails(startDate, endDate, selectedCategory),
+        reportsApi.getOutboundDetails(startDate, endDate, selectedCategory)
+      ]);
       
       setInOutData(inOutData);
-      setInboundDetails(inboundDetails);
-      setOutboundDetails(outboundDetails);
+      setInboundDetails(inboundData);
+      setOutboundDetails(outboundData);
       
     } catch (error) {
       console.error('입출고 보고서 로드 실패:', error);
@@ -176,9 +207,9 @@ const ReportsPage: React.FC = () => {
   const loadInventoryAnalysis = async () => {
     setLoading(true);
     try {
-      // 모의 데이터 생성
-      const inventoryData = generateInventoryAnalysis();
-      setInventoryAnalysis(inventoryData);
+      // 실제 API 호출
+      const analysisData = await reportsApi.getInventoryAnalysis(selectedCategory);
+      setInventoryAnalysis(analysisData);
       
     } catch (error) {
       console.error('재고 분석 로드 실패:', error);
@@ -195,8 +226,8 @@ const ReportsPage: React.FC = () => {
   const loadCostAnalysis = async () => {
     setLoading(true);
     try {
-      // 모의 데이터 생성
-      const costData = generateCostAnalysis(startDate, endDate);
+      // 실제 API 호출
+      const costData = await reportsApi.getCostAnalysis(startDate, endDate, selectedCategory);
       setCostAnalysis(costData);
       
     } catch (error) {
@@ -242,7 +273,7 @@ const ReportsPage: React.FC = () => {
     }
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
@@ -524,12 +555,12 @@ const ReportsPage: React.FC = () => {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ category_name, percent }) => `${category_name} ${(percent * 100).toFixed(0)}%`}
+                        label={({ category_name, percent }) => `${category_name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="total_quantity"
                       >
-                        {inventoryAnalysis.map((entry, index) => (
+                        {inventoryAnalysis.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -554,12 +585,12 @@ const ReportsPage: React.FC = () => {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ category_name, percent }) => `${category_name} ${(percent * 100).toFixed(0)}%`}
+                        label={({ category_name, percent }) => `${category_name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="total_value"
                       >
-                        {inventoryAnalysis.map((entry, index) => (
+                        {inventoryAnalysis.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>

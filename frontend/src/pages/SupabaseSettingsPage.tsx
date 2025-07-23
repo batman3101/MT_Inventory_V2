@@ -11,7 +11,7 @@ import {
   Tab,
   Grid,
   Paper,
-  Chip,
+
   Dialog,
   DialogTitle,
   DialogContent,
@@ -21,11 +21,10 @@ import {
   AccordionSummary,
   AccordionDetails,
   IconButton,
-  Tooltip,
+
   Snackbar
 } from '@mui/material';
 import {
-  Settings as SettingsIcon,
   Storage as StorageIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
@@ -35,7 +34,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
-  Code as CodeIcon
+  Code as CodeIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import { supabase } from '../utils/supabase';
 
@@ -122,7 +122,7 @@ const SupabaseSettingsPage: React.FC = () => {
   const testConnection = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('users')
         .select('user_id')
         .limit(1);

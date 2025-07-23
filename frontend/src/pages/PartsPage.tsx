@@ -44,12 +44,9 @@ import {
   LinearProgress
 } from '@mui/material';
 import {
-  Build as BuildIcon,
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
   Search as SearchIcon,
   Download as DownloadIcon,
   Refresh as RefreshIcon,
@@ -65,7 +62,9 @@ import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
   AttachMoney as MoneyIcon,
-  Business as BusinessIcon
+  Business as BusinessIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 import { partsApi, inventoryApi, partPricesApi } from '../services/api';
 import { formatCurrency, formatDate } from '../utils/supabase';
@@ -180,8 +179,8 @@ const PartsPage: React.FC = () => {
 
   useEffect(() => {
     if (selectedPart) {
-      loadPartPrices(selectedPart.part_id);
-      loadStockMovements(selectedPart.part_id);
+      loadPartPrices(selectedPart.id);
+      loadStockMovements(selectedPart.id);
     }
   }, [selectedPart]);
 
@@ -409,7 +408,11 @@ const PartsPage: React.FC = () => {
 
     try {
       const formattedData = formatPartsDataForExcel(filteredParts);
-      exportToExcel(formattedData, '부품목록');
+      exportToExcel({
+        filename: '부품목록',
+        sheetName: '부품',
+        data: formattedData
+      });
       
       setSnackbar({
         open: true,
@@ -452,8 +455,8 @@ const PartsPage: React.FC = () => {
   };
 
   const filteredParts = parts.filter(part => {
-    const matchesSearch = part.part_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         part.part_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = part.vietnamese_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         part.part_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          part.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || part.category === categoryFilter;
     const matchesStatus = statusFilter === 'all' || part.status === statusFilter;
@@ -479,7 +482,7 @@ const PartsPage: React.FC = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <BuildIcon />
+        <InfoIcon />
         부품 관리
       </Typography>
 
@@ -688,15 +691,15 @@ const PartsPage: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {paginatedParts.map((part) => (
-                    <TableRow key={part.part_id} hover>
+                    <TableRow key={part.id} hover>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">
-                          {part.part_code}
+                          {part.part_number}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {part.part_name}
+                          {part.vietnamese_name}
                         </Typography>
                         {part.description && (
                           <Typography variant="caption" color="text.secondary" display="block">
@@ -723,7 +726,7 @@ const PartsPage: React.FC = () => {
                         </Box>
                         <LinearProgress
                           variant="determinate"
-                          value={Math.min((part.current_stock / part.max_stock_level) * 100, 100)}
+                          value={Math.min((part.current_stock / part.min_stock) * 100, 100)}
                           color={getStockStatusColor(part.stock_status) as any}
                           sx={{ mt: 0.5, height: 4, borderRadius: 2 }}
                         />
@@ -745,7 +748,7 @@ const PartsPage: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          ₫{part.standard_cost.toLocaleString()}
+                          ₫{0}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -804,8 +807,8 @@ const PartsPage: React.FC = () => {
                 <TextField
                   fullWidth
                   label="부품 코드 *"
-                  value={newPart.part_code}
-                  onChange={(e) => setNewPart(prev => ({ ...prev, part_code: e.target.value }))}
+                  value={newPart.part_number}
+                  onChange={(e) => setNewPart(prev => ({ ...prev, part_number: e.target.value }))}
                   helperText="고유한 부품 코드를 입력하세요"
                 />
               </Grid>
@@ -813,8 +816,8 @@ const PartsPage: React.FC = () => {
                 <TextField
                   fullWidth
                   label="부품명 *"
-                  value={newPart.part_name}
-                  onChange={(e) => setNewPart(prev => ({ ...prev, part_name: e.target.value }))}
+                  value={newPart.vietnamese_name}
+                  onChange={(e) => setNewPart(prev => ({ ...prev, vietnamese_name: e.target.value }))}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -868,8 +871,8 @@ const PartsPage: React.FC = () => {
                   fullWidth
                   label="최소 재고 수준"
                   type="number"
-                  value={newPart.min_stock_level}
-                  onChange={(e) => setNewPart(prev => ({ ...prev, min_stock_level: Number(e.target.value) }))}
+                  value={newPart.min_stock}
+                  onChange={(e) => setNewPart(prev => ({ ...prev, min_stock: Number(e.target.value) }))}
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -877,8 +880,8 @@ const PartsPage: React.FC = () => {
                   fullWidth
                   label="최대 재고 수준"
                   type="number"
-                  value={newPart.max_stock_level}
-                  onChange={(e) => setNewPart(prev => ({ ...prev, max_stock_level: Number(e.target.value) }))}
+                  value={newPart.min_stock}
+                  onChange={(e) => setNewPart(prev => ({ ...prev, min_stock: Number(e.target.value) }))}
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -886,8 +889,8 @@ const PartsPage: React.FC = () => {
                   fullWidth
                   label="재주문점"
                   type="number"
-                  value={newPart.reorder_point}
-                  onChange={(e) => setNewPart(prev => ({ ...prev, reorder_point: Number(e.target.value) }))}
+                  value={newPart.min_stock}
+                  onChange={(e) => setNewPart(prev => ({ ...prev, min_stock: Number(e.target.value) }))}
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -895,8 +898,8 @@ const PartsPage: React.FC = () => {
                   fullWidth
                   label="표준 단가"
                   type="number"
-                  value={newPart.standard_cost}
-                  onChange={(e) => setNewPart(prev => ({ ...prev, standard_cost: Number(e.target.value) }))}
+                  value={0}
+                  onChange={() => {}}
                   InputProps={{
                     startAdornment: <Typography sx={{ mr: 1 }}>₫</Typography>
                   }}
@@ -930,15 +933,12 @@ const PartsPage: React.FC = () => {
                     variant="outlined"
                     onClick={() => {
                       setNewPart({
-                        part_code: '',
-                        part_name: '',
+                        part_number: '',
+                        vietnamese_name: '',
                         description: '',
                         category: '',
                         unit: 'EA',
-                        min_stock_level: 0,
-                        max_stock_level: 0,
-                        reorder_point: 0,
-                        standard_cost: 0,
+                        min_stock: 0,
                         status: 'active'
                       });
                     }}
@@ -962,7 +962,7 @@ const PartsPage: React.FC = () => {
                 <CardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <BuildIcon />
+                      <InfoIcon />
                       기본 정보
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1 }}>
@@ -995,7 +995,7 @@ const PartsPage: React.FC = () => {
                         <TextField
                           fullWidth
                           label="부품 코드"
-                          value={editingPart.part_code}
+                          value={editingPart.part_number}
                           disabled
                           size="small"
                         />
@@ -1004,10 +1004,10 @@ const PartsPage: React.FC = () => {
                         <TextField
                           fullWidth
                           label="부품명"
-                          value={editingPart.part_name}
+                          value={editingPart.vietnamese_name}
                           onChange={(e) => setEditingPart(prev => prev ? {
                             ...prev,
-                            part_name: e.target.value
+                            vietnamese_name: e.target.value
                           } : null)}
                           size="small"
                         />
@@ -1068,10 +1068,10 @@ const PartsPage: React.FC = () => {
                           fullWidth
                           label="최소 재고 수준"
                           type="number"
-                          value={editingPart.min_stock_level}
+                          value={editingPart.min_stock}
                           onChange={(e) => setEditingPart(prev => prev ? {
                             ...prev,
-                            min_stock_level: Number(e.target.value)
+                            min_stock: Number(e.target.value)
                           } : null)}
                           size="small"
                         />
@@ -1081,10 +1081,10 @@ const PartsPage: React.FC = () => {
                           fullWidth
                           label="최대 재고 수준"
                           type="number"
-                          value={editingPart.max_stock_level}
+                          value={editingPart.min_stock}
                           onChange={(e) => setEditingPart(prev => prev ? {
                             ...prev,
-                            max_stock_level: Number(e.target.value)
+                            min_stock: Number(e.target.value)
                           } : null)}
                           size="small"
                         />
@@ -1094,10 +1094,10 @@ const PartsPage: React.FC = () => {
                           fullWidth
                           label="재주문점"
                           type="number"
-                          value={editingPart.reorder_point}
+                          value={editingPart.min_stock}
                           onChange={(e) => setEditingPart(prev => prev ? {
                             ...prev,
-                            reorder_point: Number(e.target.value)
+                            min_stock: Number(e.target.value)
                           } : null)}
                           size="small"
                         />
@@ -1107,10 +1107,10 @@ const PartsPage: React.FC = () => {
                           fullWidth
                           label="표준 단가"
                           type="number"
-                          value={editingPart.standard_cost}
+                          value={0}
                           onChange={(e) => setEditingPart(prev => prev ? {
                             ...prev,
-                            standard_cost: Number(e.target.value)
+                            min_stock: Number(e.target.value)
                           } : null)}
                           size="small"
                           InputProps={{
@@ -1163,7 +1163,7 @@ const PartsPage: React.FC = () => {
                           부품 코드
                         </Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          {selectedPart.part_code}
+                          {selectedPart.part_number}
                         </Typography>
                       </Grid>
                       <Grid item xs={12} md={6}>
@@ -1171,7 +1171,7 @@ const PartsPage: React.FC = () => {
                           부품명
                         </Typography>
                         <Typography variant="body1">
-                          {selectedPart.part_name}
+                          {selectedPart.vietnamese_name}
                         </Typography>
                       </Grid>
                       <Grid item xs={12}>
@@ -1228,7 +1228,7 @@ const PartsPage: React.FC = () => {
                           표준단가
                         </Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          ₫{selectedPart.standard_cost.toLocaleString()}
+                          ₫{selectedPart.stock_value.toLocaleString()}
                         </Typography>
                       </Grid>
                       <Grid item xs={12} md={4}>
@@ -1236,7 +1236,7 @@ const PartsPage: React.FC = () => {
                           최소 재고
                         </Typography>
                         <Typography variant="body1">
-                          {selectedPart.min_stock_level.toLocaleString()}
+                          {selectedPart.min_stock.toLocaleString()}
                         </Typography>
                       </Grid>
                       <Grid item xs={12} md={4}>
@@ -1244,7 +1244,7 @@ const PartsPage: React.FC = () => {
                           최대 재고
                         </Typography>
                         <Typography variant="body1">
-                          {selectedPart.max_stock_level.toLocaleString()}
+                          {selectedPart.min_stock.toLocaleString()}
                         </Typography>
                       </Grid>
                       <Grid item xs={12} md={4}>
@@ -1252,7 +1252,7 @@ const PartsPage: React.FC = () => {
                           재주문점
                         </Typography>
                         <Typography variant="body1">
-                          {selectedPart.reorder_point.toLocaleString()}
+                          {selectedPart.min_stock.toLocaleString()}
                         </Typography>
                       </Grid>
                       <Grid item xs={12} md={6}>
@@ -1450,7 +1450,7 @@ const PartsPage: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           <Typography>
-            '{selectedPart?.part_name}' 부품을 삭제하시겠습니까?
+            '{selectedPart?.vietnamese_name}' 부품을 삭제하시겠습니까?
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             이 작업은 되돌릴 수 없습니다.
