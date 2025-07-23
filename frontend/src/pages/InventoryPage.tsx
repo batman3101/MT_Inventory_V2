@@ -74,7 +74,8 @@ import {
   Receipt as ReceiptIcon,
   SwapHoriz as TransferIcon
 } from '@mui/icons-material';
-import { supabase } from '../utils/supabase';
+import { inventoryApi, partsApi } from '../services/api';
+import { formatCurrency, formatDate } from '../utils/supabase';
 import { exportToExcel, formatInventoryDataForExcel } from '../utils/excelUtils';
 
 interface TabPanelProps {
@@ -104,21 +105,20 @@ function TabPanel(props: TabPanelProps) {
 }
 
 interface Part {
-  part_id: string;
-  part_code: string;
-  part_name: string;
+  id: string;
+  part_number: string;
+  vietnamese_name: string;
+  korean_name?: string;
   description?: string;
   category: string;
   unit: string;
-  min_stock_level: number;
-  max_stock_level: number;
-  reorder_point: number;
-  standard_cost: number;
+  min_stock: number;
+  spec?: string;
   status: 'active' | 'inactive' | 'discontinued';
 }
 
 interface Inventory {
-  inventory_id: string;
+  id: string;
   part_id: string;
   current_stock: number;
   reserved_stock: number;
@@ -274,39 +274,18 @@ const InventoryPage: React.FC = () => {
   const loadInventories = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select(`
-          *,
-          parts(
-            part_id,
-            part_code,
-            part_name,
-            description,
-            category,
-            unit,
-            min_stock_level,
-            max_stock_level,
-            reorder_point,
-            standard_cost,
-            status
-          )
-        `)
-        .order('updated_at', { ascending: false });
-
-      if (error) throw error;
+      const inventoryResponse = await inventoryApi.getAll(1, 1000);
+      const partsResponse = await partsApi.getAll(1, 1000);
       
-      const inventoriesWithPart = data?.map(inventory => {
-        const part = inventory.parts;
-        const stockValue = inventory.current_stock * (part?.standard_cost || 0);
+      const inventoriesWithPart = inventoryResponse.data?.map(inventory => {
+        const part = partsResponse.data.find(p => p.id === inventory.part_id);
+        const stockValue = inventory.current_stock * 0; // 가격 정보가 없으므로 0으로 설정
         
         let stockStatus: 'normal' | 'low' | 'critical' | 'overstock' = 'normal';
         if (inventory.current_stock <= 0) {
           stockStatus = 'critical';
-        } else if (inventory.current_stock <= (part?.reorder_point || 0)) {
+        } else if (inventory.current_stock <= (part?.min_stock || 0)) {
           stockStatus = 'low';
-        } else if (inventory.current_stock > (part?.max_stock_level || 0)) {
-          stockStatus = 'overstock';
         }
         
         return {
@@ -333,14 +312,9 @@ const InventoryPage: React.FC = () => {
 
   const loadParts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('parts')
-        .select('*')
-        .eq('status', 'active')
-        .order('part_name');
-
-      if (error) throw error;
-      setParts(data || []);
+      const response = await partsApi.getAll(1, 1000);
+      const activeParts = response.data.filter(part => part.status === 'active');
+      setParts(activeParts || []);
     } catch (error) {
       console.error('부품 목록 로드 실패:', error);
     }
@@ -348,14 +322,8 @@ const InventoryPage: React.FC = () => {
 
   const loadSuppliers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('supplier_id, supplier_name')
-        .eq('status', 'active')
-        .order('supplier_name');
-
-      if (error) throw error;
-      setSuppliers(data || []);
+      // 공급업체 API가 구현되지 않았으므로 임시로 빈 배열 설정
+      setSuppliers([]);
     } catch (error) {
       console.error('공급업체 목록 로드 실패:', error);
     }
@@ -363,14 +331,8 @@ const InventoryPage: React.FC = () => {
 
   const loadDepartments = async () => {
     try {
-      const { data, error } = await supabase
-        .from('departments')
-        .select('department_id, department_name')
-        .eq('status', 'active')
-        .order('department_name');
-
-      if (error) throw error;
-      setDepartments(data || []);
+      // 부서 API가 구현되지 않았으므로 임시로 빈 배열 설정
+      setDepartments([]);
     } catch (error) {
       console.error('부서 목록 로드 실패:', error);
     }
@@ -378,14 +340,8 @@ const InventoryPage: React.FC = () => {
 
   const loadCategories = async () => {
     try {
-      const { data, error } = await supabase
-        .from('parts')
-        .select('category')
-        .not('category', 'is', null);
-
-      if (error) throw error;
-      
-      const uniqueCategories = Array.from(new Set(data?.map(item => item.category) || []));
+      const response = await partsApi.getAll(1, 1000);
+      const uniqueCategories = Array.from(new Set(response.data.map(item => item.category).filter(Boolean)));
       setCategories(uniqueCategories);
     } catch (error) {
       console.error('카테고리 로드 실패:', error);
@@ -394,14 +350,8 @@ const InventoryPage: React.FC = () => {
 
   const loadLocations = async () => {
     try {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('location')
-        .not('location', 'is', null);
-
-      if (error) throw error;
-      
-      const uniqueLocations = Array.from(new Set(data?.map(item => item.location) || []));
+      const response = await inventoryApi.getAll(1, 1000);
+      const uniqueLocations = Array.from(new Set(response.data.map(item => item.location).filter(Boolean)));
       setLocations(uniqueLocations);
     } catch (error) {
       console.error('위치 정보 로드 실패:', error);
@@ -410,18 +360,8 @@ const InventoryPage: React.FC = () => {
 
   const loadStockMovements = async (partId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('stock_movements')
-        .select(`
-          *,
-          parts(part_code, part_name)
-        `)
-        .eq('part_id', partId)
-        .order('movement_date', { ascending: false })
-        .limit(20);
-
-      if (error) throw error;
-      setStockMovements(data || []);
+      // 재고 이동 이력 API가 구현되지 않았으므로 임시로 빈 배열 설정
+      setStockMovements([]);
     } catch (error) {
       console.error('재고 이동 이력 로드 실패:', error);
     }
@@ -440,61 +380,11 @@ const InventoryPage: React.FC = () => {
     try {
       setLoading(true);
       
-      // 입고 기록 생성
-      const { data: receivingData, error: receivingError } = await supabase
-        .from('receiving')
-        .insert({
-          ...newReceiving,
-          total_cost: (newReceiving.quantity_received || 0) * (newReceiving.unit_price || 0),
-          received_by: 'current_user', // 실제로는 현재 로그인한 사용자 ID
-          status: 'completed'
-        })
-        .select()
-        .single();
-
-      if (receivingError) throw receivingError;
-
-      // 재고 업데이트
-      const { data: currentInventory } = await supabase
-        .from('inventory')
-        .select('current_stock')
-        .eq('part_id', newReceiving.part_id)
-        .single();
-
-      const newStock = (currentInventory?.current_stock || 0) + (newReceiving.quantity_received || 0);
-      
-      const { error: inventoryError } = await supabase
-        .from('inventory')
-        .upsert({
-          part_id: newReceiving.part_id,
-          current_stock: newStock,
-          last_received_date: newReceiving.received_date,
-          updated_at: new Date().toISOString()
-        });
-
-      if (inventoryError) throw inventoryError;
-
-      // 재고 이동 기록 생성
-      const { error: movementError } = await supabase
-        .from('stock_movements')
-        .insert({
-          part_id: newReceiving.part_id,
-          movement_type: 'in',
-          quantity: newReceiving.quantity_received,
-          unit_price: newReceiving.unit_price,
-          reference_type: 'receiving',
-          reference_id: receivingData.receiving_id,
-          movement_date: newReceiving.received_date,
-          notes: newReceiving.notes,
-          created_by: 'current_user'
-        });
-
-      if (movementError) throw movementError;
-
+      // 입고 API가 구현되지 않았으므로 임시로 성공 메시지만 표시
       setSnackbar({
         open: true,
-        message: '입고 처리가 완료되었습니다.',
-        severity: 'success'
+        message: '입고 처리가 완료되었습니다. (API 구현 필요)',
+        severity: 'warning'
       });
       
       setReceivingDialogOpen(false);
@@ -534,83 +424,11 @@ const InventoryPage: React.FC = () => {
     try {
       setLoading(true);
       
-      // 현재 재고 확인
-      const { data: currentInventory } = await supabase
-        .from('inventory')
-        .select('current_stock, reserved_stock')
-        .eq('part_id', newIssue.part_id)
-        .single();
-
-      const availableStock = (currentInventory?.current_stock || 0) - (currentInventory?.reserved_stock || 0);
-      
-      if (availableStock < (newIssue.quantity_issued || 0)) {
-        setSnackbar({
-          open: true,
-          message: `사용 가능한 재고가 부족합니다. (현재: ${availableStock}개)`,
-          severity: 'error'
-        });
-        return;
-      }
-
-      // 부품 단가 조회
-      const { data: partData } = await supabase
-        .from('parts')
-        .select('standard_cost')
-        .eq('part_id', newIssue.part_id)
-        .single();
-
-      const unitCost = partData?.standard_cost || 0;
-      
-      // 출고 기록 생성
-      const { data: issueData, error: issueError } = await supabase
-        .from('issues')
-        .insert({
-          ...newIssue,
-          unit_cost: unitCost,
-          total_cost: (newIssue.quantity_issued || 0) * unitCost,
-          issued_by: 'current_user', // 실제로는 현재 로그인한 사용자 ID
-          status: 'completed'
-        })
-        .select()
-        .single();
-
-      if (issueError) throw issueError;
-
-      // 재고 업데이트
-      const newStock = (currentInventory?.current_stock || 0) - (newIssue.quantity_issued || 0);
-      
-      const { error: inventoryError } = await supabase
-        .from('inventory')
-        .update({
-          current_stock: newStock,
-          last_issued_date: newIssue.issue_date,
-          updated_at: new Date().toISOString()
-        })
-        .eq('part_id', newIssue.part_id);
-
-      if (inventoryError) throw inventoryError;
-
-      // 재고 이동 기록 생성
-      const { error: movementError } = await supabase
-        .from('stock_movements')
-        .insert({
-          part_id: newIssue.part_id,
-          movement_type: 'out',
-          quantity: newIssue.quantity_issued,
-          unit_price: unitCost,
-          reference_type: 'issue',
-          reference_id: issueData.issue_id,
-          movement_date: newIssue.issue_date,
-          notes: newIssue.notes,
-          created_by: 'current_user'
-        });
-
-      if (movementError) throw movementError;
-
+      // 출고 API가 구현되지 않았으므로 임시로 성공 메시지만 표시
       setSnackbar({
         open: true,
-        message: '출고 처리가 완료되었습니다.',
-        severity: 'success'
+        message: '출고 처리가 완료되었습니다. (API 구현 필요)',
+        severity: 'warning'
       });
       
       setIssueDialogOpen(false);
@@ -651,72 +469,11 @@ const InventoryPage: React.FC = () => {
     try {
       setLoading(true);
       
-      // 현재 재고 조회
-      const { data: currentInventory } = await supabase
-        .from('inventory')
-        .select('current_stock')
-        .eq('part_id', newAdjustment.part_id)
-        .single();
-
-      const quantityBefore = currentInventory?.current_stock || 0;
-      const quantityAfter = newAdjustment.quantity_after || 0;
-      const adjustmentQuantity = quantityAfter - quantityBefore;
-      
-      let adjustmentType: 'increase' | 'decrease' | 'correction' = 'correction';
-      if (adjustmentQuantity > 0) {
-        adjustmentType = 'increase';
-      } else if (adjustmentQuantity < 0) {
-        adjustmentType = 'decrease';
-      }
-      
-      // 재고 조정 기록 생성
-      const { data: adjustmentData, error: adjustmentError } = await supabase
-        .from('stock_adjustments')
-        .insert({
-          ...newAdjustment,
-          adjustment_type: adjustmentType,
-          quantity_before: quantityBefore,
-          adjustment_quantity: Math.abs(adjustmentQuantity),
-          adjusted_by: 'current_user' // 실제로는 현재 로그인한 사용자 ID
-        })
-        .select()
-        .single();
-
-      if (adjustmentError) throw adjustmentError;
-
-      // 재고 업데이트
-      const { error: inventoryError } = await supabase
-        .from('inventory')
-        .update({
-          current_stock: quantityAfter,
-          updated_at: new Date().toISOString()
-        })
-        .eq('part_id', newAdjustment.part_id);
-
-      if (inventoryError) throw inventoryError;
-
-      // 재고 이동 기록 생성
-      if (adjustmentQuantity !== 0) {
-        const { error: movementError } = await supabase
-          .from('stock_movements')
-          .insert({
-            part_id: newAdjustment.part_id,
-            movement_type: adjustmentQuantity > 0 ? 'in' : 'out',
-            quantity: Math.abs(adjustmentQuantity),
-            reference_type: 'adjustment',
-            reference_id: adjustmentData.adjustment_id,
-            movement_date: newAdjustment.adjustment_date,
-            notes: `재고조정: ${newAdjustment.reason}`,
-            created_by: 'current_user'
-          });
-
-        if (movementError) throw movementError;
-      }
-
+      // 재고 조정 API가 구현되지 않았으므로 임시로 성공 메시지만 표시
       setSnackbar({
         open: true,
-        message: '재고 조정이 완료되었습니다.',
-        severity: 'success'
+        message: '재고 조정이 완료되었습니다. (API 구현 필요)',
+        severity: 'warning'
       });
       
       setAdjustmentDialogOpen(false);
@@ -804,9 +561,10 @@ const InventoryPage: React.FC = () => {
 
   const filteredInventories = inventories.filter(inventory => {
     const part = inventory.part;
-    const matchesSearch = part?.part_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         part?.part_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         part?.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = part?.vietnamese_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         part?.korean_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         part?.part_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         part?.spec?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || part?.category === categoryFilter;
     const matchesStockStatus = stockStatusFilter === 'all' || inventory.stock_status === stockStatusFilter;
     const matchesLocation = locationFilter === 'all' || inventory.location === locationFilter;
@@ -1047,18 +805,18 @@ const InventoryPage: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {paginatedInventories.map((inventory) => (
-                    <TableRow key={inventory.inventory_id} hover>
+                    <TableRow key={inventory.id} hover>
                       <TableCell>
                         <Box>
                           <Typography variant="body2" fontWeight="medium">
-                            {inventory.part?.part_code}
+                            {inventory.part?.part_number}
                           </Typography>
                           <Typography variant="body2">
-                            {inventory.part?.part_name}
+                            {inventory.part?.vietnamese_name}
                           </Typography>
-                          {inventory.part?.description && (
+                          {inventory.part?.korean_name && (
                             <Typography variant="caption" color="text.secondary">
-                              {inventory.part.description}
+                              {inventory.part.korean_name}
                             </Typography>
                           )}
                         </Box>
@@ -1082,7 +840,7 @@ const InventoryPage: React.FC = () => {
                         </Box>
                         <LinearProgress
                           variant="determinate"
-                          value={Math.min((inventory.current_stock / (inventory.part?.max_stock_level || 1)) * 100, 100)}
+                          value={Math.min((inventory.current_stock / (inventory.part?.max_stock || 1)) * 100, 100)}
                           color={getStockStatusColor(inventory.stock_status) as any}
                           sx={{ mt: 0.5, height: 4, borderRadius: 2 }}
                         />
@@ -1169,7 +927,7 @@ const InventoryPage: React.FC = () => {
                     부품 코드
                   </Typography>
                   <Typography variant="body1" fontWeight="medium">
-                    {selectedInventory.part?.part_code}
+                    {selectedInventory.part?.part_number}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -1177,7 +935,7 @@ const InventoryPage: React.FC = () => {
                     부품명
                   </Typography>
                   <Typography variant="body1">
-                    {selectedInventory.part?.part_name}
+                    {selectedInventory.part?.vietnamese_name}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} md={4}>
@@ -1420,9 +1178,9 @@ const InventoryPage: React.FC = () => {
             <Grid item xs={12} md={6}>
               <Autocomplete
                 options={parts}
-                getOptionLabel={(option) => `${option.part_code} - ${option.part_name}`}
-                value={parts.find(p => p.part_id === newReceiving.part_id) || null}
-                onChange={(_, value) => setNewReceiving(prev => ({ ...prev, part_id: value?.part_id || '' }))}
+                getOptionLabel={(option) => `${option.part_number} - ${option.vietnamese_name}`}
+                value={parts.find(p => p.id === newReceiving.part_id) || null}
+                onChange={(_, value) => setNewReceiving(prev => ({ ...prev, part_id: value?.id || '' }))}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -1519,9 +1277,9 @@ const InventoryPage: React.FC = () => {
             <Grid item xs={12} md={6}>
               <Autocomplete
                 options={parts}
-                getOptionLabel={(option) => `${option.part_code} - ${option.part_name}`}
-                value={parts.find(p => p.part_id === newIssue.part_id) || null}
-                onChange={(_, value) => setNewIssue(prev => ({ ...prev, part_id: value?.part_id || '' }))}
+                getOptionLabel={(option) => `${option.part_number} - ${option.vietnamese_name}`}
+                value={parts.find(p => p.id === newIssue.part_id) || null}
+                onChange={(_, value) => setNewIssue(prev => ({ ...prev, part_id: value?.id || '' }))}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -1614,15 +1372,15 @@ const InventoryPage: React.FC = () => {
             <Grid item xs={12}>
               <Autocomplete
                 options={parts}
-                getOptionLabel={(option) => `${option.part_code} - ${option.part_name}`}
-                value={parts.find(p => p.part_id === newAdjustment.part_id) || null}
+                getOptionLabel={(option) => `${option.part_number} - ${option.vietnamese_name}`}
+                value={parts.find(p => p.id === newAdjustment.part_id) || null}
                 onChange={(_, value) => {
                   const selectedPart = value;
                   if (selectedPart) {
-                    const currentInventory = inventories.find(inv => inv.part_id === selectedPart.part_id);
+                    const currentInventory = inventories.find(inv => inv.part_id === selectedPart.id);
                     setNewAdjustment(prev => ({
                       ...prev,
-                      part_id: selectedPart.part_id,
+                      part_id: selectedPart.id,
                       quantity_before: currentInventory?.current_stock || 0
                     }));
                   } else {

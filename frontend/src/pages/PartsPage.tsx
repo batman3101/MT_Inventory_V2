@@ -67,7 +67,8 @@ import {
   AttachMoney as MoneyIcon,
   Business as BusinessIcon
 } from '@mui/icons-material';
-import { supabase } from '../utils/supabase';
+import { partsApi, inventoryApi, partPricesApi } from '../services/api';
+import { formatCurrency, formatDate } from '../utils/supabase';
 import { exportToExcel, formatPartsDataForExcel } from '../utils/excelUtils';
 
 interface TabPanelProps {
@@ -97,16 +98,15 @@ function TabPanel(props: TabPanelProps) {
 }
 
 interface Part {
-  part_id: string;
-  part_code: string;
-  part_name: string;
+  id: string;
+  part_number: string;
+  vietnamese_name: string;
+  korean_name?: string;
   description?: string;
   category: string;
   unit: string;
-  min_stock_level: number;
-  max_stock_level: number;
-  reorder_point: number;
-  standard_cost: number;
+  min_stock: number;
+  spec?: string;
   status: 'active' | 'inactive' | 'discontinued';
   created_at: string;
   updated_at: string;
@@ -148,15 +148,14 @@ const PartsPage: React.FC = () => {
   const [selectedPart, setSelectedPart] = useState<PartWithInventory | null>(null);
   const [editingPart, setEditingPart] = useState<Part | null>(null);
   const [newPart, setNewPart] = useState<Partial<Part>>({
-    part_code: '',
-    part_name: '',
+    part_number: '',
+    vietnamese_name: '',
+    korean_name: '',
     description: '',
     category: '',
     unit: 'EA',
-    min_stock_level: 0,
-    max_stock_level: 0,
-    reorder_point: 0,
-    standard_cost: 0,
+    min_stock: 0,
+    spec: '',
     status: 'active'
   });
   const [partPrices, setPartPrices] = useState<PartPrice[]>([]);
@@ -189,42 +188,41 @@ const PartsPage: React.FC = () => {
   const loadParts = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('parts')
-        .select(`
-          *,
-          inventory(
-            current_stock,
-            last_received_date,
-            last_issued_date
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const response = await partsApi.getAll(page + 1, rowsPerPage, searchTerm);
       
-      const partsWithInventory = data?.map(part => {
-        const inventory = part.inventory?.[0] || { current_stock: 0 };
-        const stockValue = inventory.current_stock * part.standard_cost;
-        
-        let stockStatus: 'normal' | 'low' | 'critical' | 'overstock' = 'normal';
-        if (inventory.current_stock <= 0) {
-          stockStatus = 'critical';
-        } else if (inventory.current_stock <= part.reorder_point) {
-          stockStatus = 'low';
-        } else if (inventory.current_stock > part.max_stock_level) {
-          stockStatus = 'overstock';
-        }
-        
-        return {
-          ...part,
-          current_stock: inventory.current_stock,
-          stock_value: stockValue,
-          last_received_date: inventory.last_received_date,
-          last_issued_date: inventory.last_issued_date,
-          stock_status: stockStatus
-        };
-      }) || [];
+      // 각 부품에 대한 재고 정보를 가져와서 결합
+      const partsWithInventory = await Promise.all(
+        response.data.map(async (part: Part) => {
+          try {
+            const inventoryResponse = await inventoryApi.getAll(1, 1, part.part_number);
+            const inventory = inventoryResponse.data[0] || { quantity: 0 };
+            
+            let stockStatus: 'normal' | 'low' | 'critical' | 'overstock' = 'normal';
+            if (inventory.quantity <= 0) {
+              stockStatus = 'critical';
+            } else if (inventory.quantity <= part.min_stock) {
+              stockStatus = 'low';
+            }
+            
+            return {
+              ...part,
+              current_stock: inventory.quantity,
+              stock_value: inventory.quantity * 0, // TODO: 가격 정보 추가
+              last_received_date: inventory.last_received_date,
+              last_issued_date: inventory.last_issued_date,
+              stock_status: stockStatus
+            };
+          } catch (error) {
+            console.error(`부품 ${part.part_number}의 재고 정보 로드 실패:`, error);
+            return {
+              ...part,
+              current_stock: 0,
+              stock_value: 0,
+              stock_status: 'critical' as const
+            };
+          }
+        })
+      );
       
       setParts(partsWithInventory);
     } catch (error) {
@@ -241,14 +239,8 @@ const PartsPage: React.FC = () => {
 
   const loadCategories = async () => {
     try {
-      const { data, error } = await supabase
-        .from('parts')
-        .select('category')
-        .not('category', 'is', null);
-
-      if (error) throw error;
-      
-      const uniqueCategories = Array.from(new Set(data?.map(item => item.category) || []));
+      const response = await partsApi.getAll(1, 1000); // 모든 부품의 카테고리 가져오기
+      const uniqueCategories = Array.from(new Set(response.data.map(item => item.category).filter(Boolean)));
       setCategories(uniqueCategories);
     } catch (error) {
       console.error('카테고리 로드 실패:', error);
@@ -257,24 +249,8 @@ const PartsPage: React.FC = () => {
 
   const loadPartPrices = async (partId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('part_prices')
-        .select(`
-          *,
-          suppliers(supplier_name)
-        `)
-        .eq('part_id', partId)
-        .eq('is_current', true)
-        .order('effective_date', { ascending: false });
-
-      if (error) throw error;
-      
-      const pricesWithSuppliers = data?.map(price => ({
-        ...price,
-        supplier_name: price.suppliers?.supplier_name || ''
-      })) || [];
-      
-      setPartPrices(pricesWithSuppliers);
+      const response = await partPricesApi.getAll(1, 100, partId);
+      setPartPrices(response.data || []);
     } catch (error) {
       console.error('부품 가격 정보 로드 실패:', error);
     }
@@ -282,25 +258,18 @@ const PartsPage: React.FC = () => {
 
   const loadStockMovements = async (partId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('stock_movements')
-        .select('*')
-        .eq('part_id', partId)
-        .order('movement_date', { ascending: false })
-        .limit(20);
-
-      if (error) throw error;
-      setStockMovements(data || []);
+      // 재고 이동 이력은 아직 API에 구현되지 않았으므로 빈 배열로 설정
+      setStockMovements([]);
     } catch (error) {
       console.error('재고 이동 이력 로드 실패:', error);
     }
   };
 
   const handleAddPart = async () => {
-    if (!newPart.part_code || !newPart.part_name || !newPart.category) {
+    if (!newPart.part_number || !newPart.vietnamese_name || !newPart.category) {
       setSnackbar({
         open: true,
-        message: '부품 코드, 부품명, 카테고리는 필수 입력 항목입니다.',
+        message: '부품 번호, 베트남어명, 카테고리는 필수 입력 항목입니다.',
         severity: 'error'
       });
       return;
@@ -309,30 +278,23 @@ const PartsPage: React.FC = () => {
     try {
       setLoading(true);
       
-      // 부품 코드 중복 확인
-      const { data: existingPart } = await supabase
-        .from('parts')
-        .select('part_id')
-        .eq('part_code', newPart.part_code)
-        .single();
+      // 부품 번호 중복 확인
+      const existingParts = await partsApi.getAll(1, 1000);
+      const existingPart = existingParts.data.find(part => part.part_number === newPart.part_number);
 
       if (existingPart) {
         setSnackbar({
           open: true,
-          message: '이미 존재하는 부품 코드입니다.',
+          message: '이미 존재하는 부품 번호입니다.',
           severity: 'error'
         });
         return;
       }
 
-      const { error } = await supabase
-        .from('parts')
-        .insert({
-          ...newPart,
-          created_by: 'current_user' // 실제로는 현재 로그인한 사용자 ID
-        });
-
-      if (error) throw error;
+      await partsApi.create({
+        ...newPart,
+        created_by: 'current_user' // 실제로는 현재 로그인한 사용자 ID
+      });
 
       setSnackbar({
         open: true,
@@ -342,15 +304,14 @@ const PartsPage: React.FC = () => {
       
       setAddDialogOpen(false);
       setNewPart({
-        part_code: '',
-        part_name: '',
+        part_number: '',
+        vietnamese_name: '',
+        korean_name: '',
         description: '',
         category: '',
         unit: 'EA',
-        min_stock_level: 0,
-        max_stock_level: 0,
-        reorder_point: 0,
-        standard_cost: 0,
+        min_stock: 0,
+        spec: '',
         status: 'active'
       });
       
@@ -374,23 +335,16 @@ const PartsPage: React.FC = () => {
     try {
       setLoading(true);
       
-      const { error } = await supabase
-        .from('parts')
-        .update({
-          part_name: editingPart.part_name,
-          description: editingPart.description,
-          category: editingPart.category,
-          unit: editingPart.unit,
-          min_stock_level: editingPart.min_stock_level,
-          max_stock_level: editingPart.max_stock_level,
-          reorder_point: editingPart.reorder_point,
-          standard_cost: editingPart.standard_cost,
-          status: editingPart.status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('part_id', editingPart.part_id);
-
-      if (error) throw error;
+      await partsApi.update(editingPart.id, {
+        vietnamese_name: editingPart.vietnamese_name,
+        korean_name: editingPart.korean_name,
+        description: editingPart.description,
+        category: editingPart.category,
+        unit: editingPart.unit,
+        min_stock: editingPart.min_stock,
+        spec: editingPart.spec,
+        status: editingPart.status
+      });
 
       setSnackbar({
         open: true,
@@ -419,12 +373,7 @@ const PartsPage: React.FC = () => {
     try {
       setLoading(true);
       
-      const { error } = await supabase
-        .from('parts')
-        .delete()
-        .eq('part_id', selectedPart.part_id);
-
-      if (error) throw error;
+      await partsApi.delete(selectedPart.id);
 
       setSnackbar({
         open: true,

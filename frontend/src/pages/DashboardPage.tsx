@@ -19,11 +19,8 @@ import {
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
-import {
-  generateDashboardStats,
-  generateRecentActivities,
-  generateLowStockItems
-} from '../utils/mockData';
+import { dashboardApi, inventoryApi, inboundApi } from '../services/api';
+import { formatCurrency, formatDate } from '../utils/supabase';
 
 interface DashboardStats {
   totalParts: number;
@@ -72,14 +69,43 @@ const DashboardPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // 모의 데이터 생성
-      const stats = generateDashboardStats();
-      const activities = generateRecentActivities();
-      const lowStock = generateLowStockItems();
+      // 실제 Supabase 데이터 로드
+      const [dashboardStats, lowStockData, recentInboundData] = await Promise.all([
+        dashboardApi.getStats(),
+        inventoryApi.getLowStock(),
+        inboundApi.getAll(1, 5) // 최근 5개 입고 데이터
+      ]);
       
-      setStats(stats);
+      // 대시보드 통계 설정
+      setStats({
+        totalParts: dashboardStats.totalParts,
+        lowStockParts: dashboardStats.lowStockItems,
+        totalValue: 0, // TODO: 재고 가치 계산 로직 추가
+        recentInbound: dashboardStats.recentInbound.length,
+        recentOutbound: 0 // TODO: 출고 데이터 추가
+      });
+
+      // 최근 활동 데이터 변환
+      const activities: RecentActivity[] = recentInboundData.data.map((inbound: any) => ({
+        id: inbound.id,
+        type: 'inbound' as const,
+        partName: inbound.parts?.vietnamese_name || inbound.parts?.korean_name || 'Unknown Part',
+        quantity: inbound.quantity,
+        date: inbound.inbound_date,
+        user: inbound.received_by || 'Unknown User'
+      }));
       setRecentActivities(activities);
+
+      // 저재고 항목 데이터 변환
+      const lowStock: LowStockItem[] = lowStockData.map((item: any) => ({
+        id: item.id,
+        partName: item.parts?.vietnamese_name || item.parts?.korean_name || 'Unknown Part',
+        currentStock: item.quantity,
+        minStock: item.parts?.min_stock || 0,
+        category: item.parts?.category || 'Unknown'
+      }));
       setLowStockItems(lowStock);
+      
     } catch (err) {
       console.error('대시보드 데이터 로드 오류:', err);
       setError('대시보드 데이터를 불러오는 중 오류가 발생했습니다.');
@@ -88,23 +114,7 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // 개별 데이터 로딩 함수들은 모의 데이터로 대체됨
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(value);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ko-KR', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  // formatCurrency와 formatDate는 utils/supabase에서 import
 
   if (loading) {
     return (

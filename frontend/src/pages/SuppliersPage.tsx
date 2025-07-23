@@ -60,7 +60,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   Visibility as VisibilityIcon
 } from '@mui/icons-material';
-import { supabase } from '../utils/supabase';
+import { suppliersApi, partPricesApi } from '../services/api';
+import { formatCurrency, formatDate } from '../utils/supabase';
 import { exportToExcel, formatSuppliersDataForExcel } from '../utils/excelUtils';
 
 interface TabPanelProps {
@@ -90,7 +91,7 @@ function TabPanel(props: TabPanelProps) {
 }
 
 interface Supplier {
-  supplier_id: string;
+  id: string;
   supplier_code: string;
   supplier_name: string;
   contact_person?: string;
@@ -161,21 +162,16 @@ const SuppliersPage: React.FC = () => {
 
   useEffect(() => {
     if (selectedSupplier) {
-      loadPartPrices(selectedSupplier.supplier_id);
-      loadReceivingHistory(selectedSupplier.supplier_id);
+      loadPartPrices(selectedSupplier.id);
+      loadReceivingHistory(selectedSupplier.id);
     }
   }, [selectedSupplier]);
 
   const loadSuppliers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setSuppliers(data || []);
+      const response = await suppliersApi.getAll(1, 1000);
+      setSuppliers(response.data || []);
     } catch (error) {
       console.error('공급업체 목록 로드 실패:', error);
       setSnackbar({
@@ -190,25 +186,8 @@ const SuppliersPage: React.FC = () => {
 
   const loadPartPrices = async (supplierId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('part_prices')
-        .select(`
-          *,
-          parts(part_code, part_name)
-        `)
-        .eq('supplier_id', supplierId)
-        .eq('is_current', true)
-        .order('effective_date', { ascending: false });
-
-      if (error) throw error;
-      
-      const pricesWithParts = data?.map(price => ({
-        ...price,
-        part_code: price.parts?.part_code || '',
-        part_name: price.parts?.part_name || ''
-      })) || [];
-      
-      setPartPrices(pricesWithParts);
+      const response = await partPricesApi.getAll(1, 100, undefined, supplierId);
+      setPartPrices(response.data || []);
     } catch (error) {
       console.error('부품 가격 정보 로드 실패:', error);
     }
@@ -216,31 +195,8 @@ const SuppliersPage: React.FC = () => {
 
   const loadReceivingHistory = async (supplierId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('receiving_details')
-        .select(`
-          *,
-          parts(part_code, part_name),
-          receiving(received_date, received_by)
-        `)
-        .eq('supplier_id', supplierId)
-        .order('received_date', { ascending: false })
-        .limit(20);
-
-      if (error) throw error;
-      
-      const historyWithDetails = data?.map(detail => ({
-        receiving_id: detail.receiving_id,
-        part_code: detail.parts?.part_code || '',
-        part_name: detail.parts?.part_name || '',
-        quantity: detail.quantity,
-        unit_price: detail.unit_price,
-        total_amount: detail.quantity * detail.unit_price,
-        received_date: detail.receiving?.received_date || '',
-        received_by: detail.receiving?.received_by || ''
-      })) || [];
-      
-      setReceivingHistory(historyWithDetails);
+      // 입고 이력은 아직 API에 구현되지 않았으므로 빈 배열로 설정
+      setReceivingHistory([]);
     } catch (error) {
       console.error('입고 이력 로드 실패:', error);
     }
@@ -260,11 +216,8 @@ const SuppliersPage: React.FC = () => {
       setLoading(true);
       
       // 공급업체 코드 중복 확인
-      const { data: existingSupplier } = await supabase
-        .from('suppliers')
-        .select('supplier_id')
-        .eq('supplier_code', newSupplier.supplier_code)
-        .single();
+      const existingSuppliers = await suppliersApi.getAll(1, 1000);
+      const existingSupplier = existingSuppliers.data.find(supplier => supplier.supplier_code === newSupplier.supplier_code);
 
       if (existingSupplier) {
         setSnackbar({
@@ -275,14 +228,10 @@ const SuppliersPage: React.FC = () => {
         return;
       }
 
-      const { error } = await supabase
-        .from('suppliers')
-        .insert({
-          ...newSupplier,
-          created_by: 'current_user' // 실제로는 현재 로그인한 사용자 ID
-        });
-
-      if (error) throw error;
+      await suppliersApi.create({
+        ...newSupplier,
+        created_by: 'current_user' // 실제로는 현재 로그인한 사용자 ID
+      });
 
       setSnackbar({
         open: true,
@@ -322,22 +271,16 @@ const SuppliersPage: React.FC = () => {
     try {
       setLoading(true);
       
-      const { error } = await supabase
-        .from('suppliers')
-        .update({
-          supplier_name: editingSupplier.supplier_name,
-          contact_person: editingSupplier.contact_person,
-          phone: editingSupplier.phone,
-          email: editingSupplier.email,
-          address: editingSupplier.address,
-          country: editingSupplier.country,
-          website: editingSupplier.website,
-          status: editingSupplier.status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('supplier_id', editingSupplier.supplier_id);
-
-      if (error) throw error;
+      await suppliersApi.update(editingSupplier.id, {
+        supplier_name: editingSupplier.supplier_name,
+        contact_person: editingSupplier.contact_person,
+        phone: editingSupplier.phone,
+        email: editingSupplier.email,
+        address: editingSupplier.address,
+        country: editingSupplier.country,
+        website: editingSupplier.website,
+        status: editingSupplier.status
+      });
 
       setSnackbar({
         open: true,
@@ -366,12 +309,7 @@ const SuppliersPage: React.FC = () => {
     try {
       setLoading(true);
       
-      const { error } = await supabase
-        .from('suppliers')
-        .delete()
-        .eq('supplier_id', selectedSupplier.supplier_id);
-
-      if (error) throw error;
+      await suppliersApi.delete(selectedSupplier.id);
 
       setSnackbar({
         open: true,
