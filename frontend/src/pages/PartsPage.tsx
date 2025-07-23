@@ -68,6 +68,7 @@ import {
   Business as BusinessIcon
 } from '@mui/icons-material';
 import { supabase } from '../utils/supabase';
+import { exportToExcel, formatPartsDataForExcel } from '../utils/excelUtils';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -448,34 +449,22 @@ const PartsPage: React.FC = () => {
   };
 
   const handleExportToExcel = async () => {
-    try {
-      const csvContent = [
-        ['부품 코드', '부품명', '카테고리', '단위', '현재고', '재고가치', '최소재고', '최대재고', '재주문점', '표준단가', '상태', '등록일'],
-        ...filteredParts.map(part => [
-          part.part_code,
-          part.part_name,
-          part.category,
-          part.unit,
-          part.current_stock.toString(),
-          part.stock_value.toString(),
-          part.min_stock_level.toString(),
-          part.max_stock_level.toString(),
-          part.reorder_point.toString(),
-          part.standard_cost.toString(),
-          part.status === 'active' ? '활성' : part.status === 'inactive' ? '비활성' : '단종',
-          new Date(part.created_at).toLocaleDateString()
-        ])
-      ].map(row => row.join(',')).join('\n');
+    if (filteredParts.length === 0) {
+      setSnackbar({
+        open: true,
+        message: '내보낼 데이터가 없습니다.',
+        severity: 'warning'
+      });
+      return;
+    }
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `parts_${new Date().toISOString().split('T')[0]}.csv`;
-      link.click();
+    try {
+      const formattedData = formatPartsDataForExcel(filteredParts);
+      exportToExcel(formattedData, '부품목록');
       
       setSnackbar({
         open: true,
-        message: '부품 목록이 CSV 파일로 내보내졌습니다.',
+        message: '부품 목록이 Excel 파일로 내보내졌습니다.',
         severity: 'success'
       });
     } catch (error) {
@@ -599,7 +588,7 @@ const PartsPage: React.FC = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h6" color="primary">
-                ₩{stockSummary.totalValue.toLocaleString()}
+                ₫{stockSummary.totalValue.toLocaleString()}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 총 재고가치
@@ -802,12 +791,12 @@ const PartsPage: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">
-                          ₩{part.stock_value.toLocaleString()}
+                          ₫{part.stock_value.toLocaleString()}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          ₩{part.standard_cost.toLocaleString()}
+                          ₫{part.standard_cost.toLocaleString()}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -960,7 +949,7 @@ const PartsPage: React.FC = () => {
                   value={newPart.standard_cost}
                   onChange={(e) => setNewPart(prev => ({ ...prev, standard_cost: Number(e.target.value) }))}
                   InputProps={{
-                    startAdornment: <Typography sx={{ mr: 1 }}>₩</Typography>
+                    startAdornment: <Typography sx={{ mr: 1 }}>₫</Typography>
                   }}
                 />
               </Grid>
@@ -1176,7 +1165,7 @@ const PartsPage: React.FC = () => {
                           } : null)}
                           size="small"
                           InputProps={{
-                            startAdornment: <Typography sx={{ mr: 1 }}>₩</Typography>
+                            startAdornment: <Typography sx={{ mr: 1 }}>₫</Typography>
                           }}
                         />
                       </Grid>
@@ -1282,7 +1271,7 @@ const PartsPage: React.FC = () => {
                           재고가치
                         </Typography>
                         <Typography variant="h6" fontWeight="medium" color="primary">
-                          ₩{selectedPart.stock_value.toLocaleString()}
+                          ₫{selectedPart.stock_value.toLocaleString()}
                         </Typography>
                       </Grid>
                       <Grid item xs={12} md={4}>
@@ -1290,7 +1279,7 @@ const PartsPage: React.FC = () => {
                           표준단가
                         </Typography>
                         <Typography variant="body1" fontWeight="medium">
-                          ₩{selectedPart.standard_cost.toLocaleString()}
+                          ₫{selectedPart.standard_cost.toLocaleString()}
                         </Typography>
                       </Grid>
                       <Grid item xs={12} md={4}>
@@ -1451,7 +1440,7 @@ const PartsPage: React.FC = () => {
                                 </Typography>
                               </TableCell>
                               <TableCell>
-                                {movement.unit_price ? `₩${movement.unit_price.toLocaleString()}` : '-'}
+                                {movement.unit_price ? `₫${movement.unit_price.toLocaleString()}` : '-'}
                               </TableCell>
                               <TableCell>
                                 <Chip

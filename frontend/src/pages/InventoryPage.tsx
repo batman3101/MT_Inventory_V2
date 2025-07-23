@@ -75,6 +75,7 @@ import {
   SwapHoriz as TransferIcon
 } from '@mui/icons-material';
 import { supabase } from '../utils/supabase';
+import { exportToExcel, formatInventoryDataForExcel } from '../utils/excelUtils';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -743,41 +744,33 @@ const InventoryPage: React.FC = () => {
   };
 
   const handleExportToExcel = async () => {
-    try {
-      const csvContent = [
-        ['부품 코드', '부품명', '카테고리', '현재고', '예약재고', '사용가능재고', '재고가치', '위치', '재고상태', '최종입고일', '최종출고일'],
-        ...filteredInventories.map(inventory => [
-          inventory.part?.part_code || '',
-          inventory.part?.part_name || '',
-          inventory.part?.category || '',
-          inventory.current_stock.toString(),
-          (inventory.reserved_stock || 0).toString(),
-          inventory.available_stock.toString(),
-          inventory.stock_value.toString(),
-          inventory.location || '',
-          inventory.stock_status === 'critical' ? '재고부족' :
-          inventory.stock_status === 'low' ? '재주문필요' :
-          inventory.stock_status === 'overstock' ? '과재고' : '정상',
-          inventory.last_received_date ? new Date(inventory.last_received_date).toLocaleDateString() : '',
-          inventory.last_issued_date ? new Date(inventory.last_issued_date).toLocaleDateString() : ''
-        ])
-      ].map(row => row.join(',')).join('\n');
+    if (filteredInventories.length === 0) {
+      setSnackbar({
+        open: true,
+        message: '내보낼 데이터가 없습니다.',
+        severity: 'warning'
+      });
+      return;
+    }
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `inventory_${new Date().toISOString().split('T')[0]}.csv`;
-      link.click();
+    try {
+      const formattedData = formatInventoryDataForExcel(filteredInventories);
+      exportToExcel({
+        filename: '재고현황',
+        sheetName: '재고 목록',
+        data: formattedData
+      });
       
       setSnackbar({
         open: true,
-        message: '재고 목록이 CSV 파일로 내보내졌습니다.',
+        message: 'Excel 파일이 다운로드되었습니다.',
         severity: 'success'
       });
     } catch (error) {
+      console.error('Excel 내보내기 오류:', error);
       setSnackbar({
         open: true,
-        message: 'Excel 내보내기에 실패했습니다.',
+        message: 'Excel 파일 내보내기 중 오류가 발생했습니다.',
         severity: 'error'
       });
     }
@@ -910,7 +903,7 @@ const InventoryPage: React.FC = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h6" color="primary">
-                ₩{stockSummary.totalValue.toLocaleString()}
+                ₫{stockSummary.totalValue.toLocaleString()}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 총 재고가치
@@ -1116,7 +1109,7 @@ const InventoryPage: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">
-                          ₩{inventory.stock_value.toLocaleString()}
+                          ₫{inventory.stock_value.toLocaleString()}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -1222,7 +1215,7 @@ const InventoryPage: React.FC = () => {
                     재고가치
                   </Typography>
                   <Typography variant="h6" fontWeight="medium" color="primary">
-                    ₩{selectedInventory.stock_value.toLocaleString()}
+                    ₫{selectedInventory.stock_value.toLocaleString()}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -1305,7 +1298,7 @@ const InventoryPage: React.FC = () => {
                             </Typography>
                           </TableCell>
                           <TableCell>
-                            {movement.unit_price ? `₩${movement.unit_price.toLocaleString()}` : '-'}
+                            {movement.unit_price ? `₫${movement.unit_price.toLocaleString()}` : '-'}
                           </TableCell>
                           <TableCell>
                             <Chip
@@ -1472,7 +1465,7 @@ const InventoryPage: React.FC = () => {
                 value={newReceiving.unit_price}
                 onChange={(e) => setNewReceiving(prev => ({ ...prev, unit_price: Number(e.target.value) }))}
                 InputProps={{
-                  startAdornment: <Typography sx={{ mr: 1 }}>₩</Typography>
+                  startAdornment: <Typography sx={{ mr: 1 }}>₫</Typography>
                 }}
               />
             </Grid>
@@ -1490,7 +1483,7 @@ const InventoryPage: React.FC = () => {
               <TextField
                 fullWidth
                 label="총 비용"
-                value={`₩${((newReceiving.quantity_received || 0) * (newReceiving.unit_price || 0)).toLocaleString()}`}
+                value={`₫${((newReceiving.quantity_received || 0) * (newReceiving.unit_price || 0)).toLocaleString()}`}
                 disabled
               />
             </Grid>

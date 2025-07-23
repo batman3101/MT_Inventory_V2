@@ -54,8 +54,19 @@ import {
   BarChart,
   Bar
 } from 'recharts';
-import { supabase } from '../utils/supabase';
-import * as XLSX from 'xlsx';
+import { exportToExcel } from '../utils/excelUtils';
+import {
+  generateInOutData,
+  generateInboundDetails,
+  generateOutboundDetails,
+  generateInventoryAnalysis,
+  generateCostAnalysis,
+  type InOutData,
+  type InboundDetail,
+  type OutboundDetail,
+  type InventoryAnalysis,
+  type CostAnalysis
+} from '../utils/mockData';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -83,49 +94,7 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-interface InOutData {
-  month: string;
-  inbound: number;
-  outbound: number;
-}
-
-interface InboundDetail {
-  inbound_id: string;
-  inbound_date: string;
-  part_code: string;
-  part_name: string;
-  supplier_name: string;
-  quantity: number;
-  unit_price: number;
-  total_amount: number;
-  category_name: string;
-}
-
-interface OutboundDetail {
-  outbound_id: string;
-  outbound_date: string;
-  part_code: string;
-  part_name: string;
-  department_name: string;
-  quantity: number;
-  unit_price: number;
-  total_amount: number;
-  category_name: string;
-}
-
-interface InventoryAnalysis {
-  category_name: string;
-  total_quantity: number;
-  total_value: number;
-  part_count: number;
-}
-
-interface CostAnalysis {
-  month: string;
-  inbound_cost: number;
-  outbound_cost: number;
-  net_cost: number;
-}
+// 인터페이스는 mockData.ts에서 import
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C'];
 
@@ -166,14 +135,15 @@ const ReportsPage: React.FC = () => {
 
   const loadCategories = async () => {
     try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('status', 'active')
-        .order('category_name');
-
-      if (error) throw error;
-      setCategories(data || []);
+      // 모의 카테고리 데이터
+      const mockCategories = [
+        { category_id: '1', category_name: '전자부품' },
+        { category_id: '2', category_name: '기계부품' },
+        { category_id: '3', category_name: '소모품' },
+        { category_id: '4', category_name: '공구' },
+        { category_id: '5', category_name: '안전용품' }
+      ];
+      setCategories(mockCategories);
     } catch (error) {
       console.error('카테고리 로드 실패:', error);
     }
@@ -182,122 +152,12 @@ const ReportsPage: React.FC = () => {
   const loadInOutReport = async () => {
     setLoading(true);
     try {
-      // 월별 입출고 추이 데이터
-      const monthlyData: { [key: string]: { inbound: number; outbound: number } } = {};
+      // 모의 데이터 생성
+      const inOutData = generateInOutData(startDate, endDate);
+      const inboundDetails = generateInboundDetails(startDate, endDate, selectedCategory);
+      const outboundDetails = generateOutboundDetails(startDate, endDate, selectedCategory);
       
-      // 입고 데이터 조회
-      let inboundQuery = supabase
-        .from('inbound_details')
-        .select(`
-          inbound_date,
-          quantity,
-          unit_price,
-          parts(
-            part_code,
-            part_name,
-            categories(
-              category_name
-            )
-          ),
-          inbound(
-            suppliers(
-              supplier_name
-            )
-          )
-        `)
-        .gte('inbound_date', startDate)
-        .lte('inbound_date', endDate);
-        
-      if (selectedCategory !== 'all') {
-        inboundQuery = inboundQuery.eq('parts.category_id', selectedCategory);
-      }
-      
-      const { data: inboundData, error: inboundError } = await inboundQuery;
-      if (inboundError) throw inboundError;
-      
-      // 출고 데이터 조회
-      let outboundQuery = supabase
-        .from('outbound_details')
-        .select(`
-          outbound_date,
-          quantity,
-          unit_price,
-          parts(
-            part_code,
-            part_name,
-            categories(
-              category_name
-            )
-          ),
-          outbound(
-            departments(
-              department_name
-            )
-          )
-        `)
-        .gte('outbound_date', startDate)
-        .lte('outbound_date', endDate);
-        
-      if (selectedCategory !== 'all') {
-        outboundQuery = outboundQuery.eq('parts.category_id', selectedCategory);
-      }
-      
-      const { data: outboundData, error: outboundError } = await outboundQuery;
-      if (outboundError) throw outboundError;
-      
-      // 월별 데이터 집계
-      inboundData?.forEach(item => {
-        const month = new Date(item.inbound_date).toISOString().slice(0, 7);
-        if (!monthlyData[month]) {
-          monthlyData[month] = { inbound: 0, outbound: 0 };
-        }
-        monthlyData[month].inbound += item.quantity;
-      });
-      
-      outboundData?.forEach(item => {
-        const month = new Date(item.outbound_date).toISOString().slice(0, 7);
-        if (!monthlyData[month]) {
-          monthlyData[month] = { inbound: 0, outbound: 0 };
-        }
-        monthlyData[month].outbound += item.quantity;
-      });
-      
-      // 차트 데이터 변환
-      const chartData = Object.entries(monthlyData)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([month, data]) => ({
-          month: new Date(month + '-01').toLocaleDateString('ko-KR', { year: 'numeric', month: 'short' }),
-          inbound: data.inbound,
-          outbound: data.outbound
-        }));
-      
-      setInOutData(chartData);
-      
-      // 상세 데이터 변환
-      const inboundDetails = inboundData?.map(item => ({
-        inbound_id: item.inbound_id,
-        inbound_date: item.inbound_date,
-        part_code: item.parts?.part_code || '',
-        part_name: item.parts?.part_name || '',
-        supplier_name: item.inbound?.suppliers?.supplier_name || '',
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        total_amount: item.quantity * item.unit_price,
-        category_name: item.parts?.categories?.category_name || ''
-      })) || [];
-      
-      const outboundDetails = outboundData?.map(item => ({
-        outbound_id: item.outbound_id,
-        outbound_date: item.outbound_date,
-        part_code: item.parts?.part_code || '',
-        part_name: item.parts?.part_name || '',
-        department_name: item.outbound?.departments?.department_name || '',
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        total_amount: item.quantity * item.unit_price,
-        category_name: item.parts?.categories?.category_name || ''
-      })) || [];
-      
+      setInOutData(inOutData);
       setInboundDetails(inboundDetails);
       setOutboundDetails(outboundDetails);
       
@@ -316,48 +176,9 @@ const ReportsPage: React.FC = () => {
   const loadInventoryAnalysis = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('parts')
-        .select(`
-          *,
-          categories(
-            category_name
-          ),
-          inventory(
-            current_stock
-          ),
-          part_prices(
-            unit_price
-          )
-        `)
-        .eq('status', 'active');
-
-      if (error) throw error;
-      
-      // 카테고리별 집계
-      const categoryData: { [key: string]: InventoryAnalysis } = {};
-      
-      data?.forEach(part => {
-        const categoryName = part.categories?.category_name || '미분류';
-        const currentStock = part.inventory?.current_stock || 0;
-        const unitPrice = part.part_prices?.[0]?.unit_price || 0;
-        const totalValue = currentStock * unitPrice;
-        
-        if (!categoryData[categoryName]) {
-          categoryData[categoryName] = {
-            category_name: categoryName,
-            total_quantity: 0,
-            total_value: 0,
-            part_count: 0
-          };
-        }
-        
-        categoryData[categoryName].total_quantity += currentStock;
-        categoryData[categoryName].total_value += totalValue;
-        categoryData[categoryName].part_count += 1;
-      });
-      
-      setInventoryAnalysis(Object.values(categoryData));
+      // 모의 데이터 생성
+      const inventoryData = generateInventoryAnalysis();
+      setInventoryAnalysis(inventoryData);
       
     } catch (error) {
       console.error('재고 분석 로드 실패:', error);
@@ -374,54 +195,9 @@ const ReportsPage: React.FC = () => {
   const loadCostAnalysis = async () => {
     setLoading(true);
     try {
-      const monthlyData: { [key: string]: { inbound_cost: number; outbound_cost: number } } = {};
-      
-      // 입고 비용 데이터
-      const { data: inboundData, error: inboundError } = await supabase
-        .from('inbound_details')
-        .select('inbound_date, quantity, unit_price')
-        .gte('inbound_date', startDate)
-        .lte('inbound_date', endDate);
-        
-      if (inboundError) throw inboundError;
-      
-      // 출고 비용 데이터
-      const { data: outboundData, error: outboundError } = await supabase
-        .from('outbound_details')
-        .select('outbound_date, quantity, unit_price')
-        .gte('outbound_date', startDate)
-        .lte('outbound_date', endDate);
-        
-      if (outboundError) throw outboundError;
-      
-      // 월별 비용 집계
-      inboundData?.forEach(item => {
-        const month = new Date(item.inbound_date).toISOString().slice(0, 7);
-        if (!monthlyData[month]) {
-          monthlyData[month] = { inbound_cost: 0, outbound_cost: 0 };
-        }
-        monthlyData[month].inbound_cost += item.quantity * item.unit_price;
-      });
-      
-      outboundData?.forEach(item => {
-        const month = new Date(item.outbound_date).toISOString().slice(0, 7);
-        if (!monthlyData[month]) {
-          monthlyData[month] = { inbound_cost: 0, outbound_cost: 0 };
-        }
-        monthlyData[month].outbound_cost += item.quantity * item.unit_price;
-      });
-      
-      // 차트 데이터 변환
-      const chartData = Object.entries(monthlyData)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([month, data]) => ({
-          month: new Date(month + '-01').toLocaleDateString('ko-KR', { year: 'numeric', month: 'short' }),
-          inbound_cost: data.inbound_cost,
-          outbound_cost: data.outbound_cost,
-          net_cost: data.inbound_cost - data.outbound_cost
-        }));
-      
-      setCostAnalysis(chartData);
+      // 모의 데이터 생성
+      const costData = generateCostAnalysis(startDate, endDate);
+      setCostAnalysis(costData);
       
     } catch (error) {
       console.error('비용 분석 로드 실패:', error);
@@ -435,11 +211,35 @@ const ReportsPage: React.FC = () => {
     }
   };
 
-  const exportToExcel = (data: any[], filename: string, sheetName: string) => {
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  const handleExportToExcel = (data: any[], filename: string) => {
+    if (!data || data.length === 0) {
+      setSnackbar({
+        open: true,
+        message: '내보낼 데이터가 없습니다.',
+        severity: 'warning'
+      });
+      return;
+    }
+
+    try {
+      exportToExcel({
+        filename,
+        sheetName: filename,
+        data
+      });
+      
+      setSnackbar({
+        open: true,
+        message: `${filename} 데이터가 Excel 파일로 내보내졌습니다.`,
+        severity: 'success'
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: 'Excel 내보내기에 실패했습니다.',
+        severity: 'error'
+      });
+    }
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -447,9 +247,9 @@ const ReportsPage: React.FC = () => {
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('ko-KR', {
+    return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
-      currency: 'KRW'
+      currency: 'VND'
     }).format(value);
   };
 
@@ -556,7 +356,7 @@ const ReportsPage: React.FC = () => {
                 <Button
                   size="small"
                   startIcon={<FileDownloadIcon />}
-                  onClick={() => exportToExcel(inOutData, '월별_입출고_추이', '입출고추이')}
+                  onClick={() => handleExportToExcel(inOutData, '월별_입출고_추이')}
                 >
                   Excel 내보내기
                 </Button>
@@ -597,7 +397,7 @@ const ReportsPage: React.FC = () => {
                 <Button
                   size="small"
                   startIcon={<FileDownloadIcon />}
-                  onClick={() => exportToExcel(inboundDetails, '입고_상세_내역', '입고내역')}
+                  onClick={() => handleExportToExcel(inboundDetails, '입고_상세_내역')}
                 >
                   Excel 내보내기
                 </Button>
@@ -652,7 +452,7 @@ const ReportsPage: React.FC = () => {
                 <Button
                   size="small"
                   startIcon={<FileDownloadIcon />}
-                  onClick={() => exportToExcel(outboundDetails, '출고_상세_내역', '출고내역')}
+                  onClick={() => handleExportToExcel(outboundDetails, '출고_상세_내역')}
                 >
                   Excel 내보내기
                 </Button>
@@ -712,7 +512,7 @@ const ReportsPage: React.FC = () => {
                     <Button
                       size="small"
                       startIcon={<FileDownloadIcon />}
-                      onClick={() => exportToExcel(inventoryAnalysis, '재고_분석', '재고분석')}
+                      onClick={() => handleExportToExcel(inventoryAnalysis, '재고_분석')}
                     >
                       Excel 내보내기
                     </Button>
@@ -867,7 +667,7 @@ const ReportsPage: React.FC = () => {
                 <Button
                   size="small"
                   startIcon={<FileDownloadIcon />}
-                  onClick={() => exportToExcel(costAnalysis, '월별_비용_분석', '비용분석')}
+                  onClick={() => handleExportToExcel(costAnalysis, '월별_비용_분석')}
                 >
                   Excel 내보내기
                 </Button>

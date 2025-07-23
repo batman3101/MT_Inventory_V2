@@ -138,7 +138,7 @@ CREATE TABLE part_prices (
     price_id SERIAL PRIMARY KEY,
     part_id INT REFERENCES parts(part_id) NOT NULL,
     supplier_id INT REFERENCES suppliers(supplier_id) NOT NULL,
-    unit_price DECIMAL(15, 2) NOT NULL, -- 각 공급업체별 단가 정보    currency VARCHAR(10) DEFAULT '₩', -- 원화 기본 설정    effective_date DATE NOT NULL,
+    unit_price DECIMAL(15, 2) NOT NULL, -- 각 공급업체별 단가 정보    currency VARCHAR(10) DEFAULT '₫', -- 베트남 동 기본 설정    effective_date DATE NOT NULL,
     end_date DATE,
     is_current BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -339,7 +339,7 @@ for index, row in parts_df.iterrows():
             # 가격 정보 삽입            price_data = {
                 "part_id": part_id,
                 "supplier_id": supplier_id,
-                "unit_price": float(str(row[price_col]).replace('₩', '').replace(',', '')),
+                "unit_price": float(str(row[price_col]).replace('₫', '').replace(',', '')),
                 "effective_date": pd.Timestamp.now().date().isoformat(),
                 "is_current": True            }
             supabase.table('part_prices').insert(price_data).execute()
@@ -352,7 +352,7 @@ for index, row in parts_df.iterrows():
     # 재고 수량이 있는 경우에만 처리    if 'Total Stock' in parts_df.columns and pd.notna(row['Total Stock']):
         quantity = int(row['Total Stock'])
         # 총 금액 계산        total_value = 0        if 'Amount' in parts_df.columns and pd.notna(row['Amount']):
-            total_value = float(str(row['Amount']).replace('₩', '').replace(',', ''))
+            total_value = float(str(row['Amount']).replace('₫', '').replace(',', ''))
         # 재고 정보 삽입        inventory_data = {
             "part_id": part_id,
             "current_quantity": quantity,

@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS part_prices (
     part_id UUID NOT NULL REFERENCES parts(part_id),
     supplier_id UUID REFERENCES suppliers(supplier_id),
     unit_price NUMERIC(12, 2) NOT NULL,
-    currency VARCHAR(10) DEFAULT 'KRW',
+    currency VARCHAR(10) DEFAULT 'VND',
     effective_from DATE NOT NULL,
     effective_to DATE,
     is_current BOOLEAN DEFAULT true,
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS inbound (
     quantity INTEGER NOT NULL,
     unit_price NUMERIC(12, 2),
     total_price NUMERIC(12, 2),
-    currency VARCHAR(10) DEFAULT 'KRW',
+    currency VARCHAR(10) DEFAULT 'VND',
     invoice_number VARCHAR(50),
     lot_number VARCHAR(50),
     notes TEXT,
@@ -236,4 +236,4 @@ ON CONFLICT (role, permission_id) DO NOTHING;
 INSERT INTO role_permissions (role, permission_id)
 SELECT 'user', permission_id FROM permissions
 WHERE permission_name IN ('view_reports')
-ON CONFLICT (role, permission_id) DO NOTHING; 
+ON CONFLICT (role, permission_id) DO NOTHING;

@@ -51,6 +51,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { supabase } from '../utils/supabase';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { exportToExcel, formatInboundDataForExcel } from '../utils/excelUtils';
 
 interface Part {
   part_id: string;
@@ -406,39 +407,18 @@ const InboundPage: React.FC = () => {
       return;
     }
 
-    // CSV 형태로 데이터 변환
-    const csvData = inboundRecords.map(record => ({
-      '입고ID': record.inbound_id,
-      '부품코드': record.part_code,
-      '부품명': record.part_name,
-      '수량': record.quantity,
-      '단위': record.part_unit,
-      '입고일': record.inbound_date,
-      '공급업체': record.supplier_name,
-      '단가': record.unit_price,
-      '총액': record.total_price,
-      '통화': record.currency,
-      '참조번호': record.reference_number,
-      '등록자': record.created_by
-    }));
-
-    // CSV 문자열 생성
-    const headers = Object.keys(csvData[0]).join(',');
-    const rows = csvData.map(row => Object.values(row).join(','));
-    const csvContent = [headers, ...rows].join('\n');
-
-    // 파일 다운로드
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `입고기록_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    showSnackbar('Excel 파일이 다운로드되었습니다.', 'success');
+    try {
+      const formattedData = formatInboundDataForExcel(inboundRecords);
+      exportToExcel({
+        filename: '입고기록',
+        sheetName: '입고 이력',
+        data: formattedData
+      });
+      showSnackbar('Excel 파일이 다운로드되었습니다.', 'success');
+    } catch (error) {
+      console.error('Excel 내보내기 오류:', error);
+      showSnackbar('Excel 파일 내보내기 중 오류가 발생했습니다.', 'error');
+    }
   };
 
   const generateReport = () => {
@@ -694,157 +674,103 @@ ${inboundRecords.map(record =>
                 </Grid>
               </Paper>
               
-              {inboundRecords.length === 0 && searchFilters.dateRange && (
-                 <Paper sx={{ p: 6, textAlign: 'center', bgcolor: '#fafafa', border: '1px dashed #ddd' }}>
-                   <SearchIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-                   <Typography variant="h6" sx={{ mb: 1, color: 'text.secondary' }}>
-                     검색 결과가 없습니다
-                   </Typography>
-                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                     다른 검색 조건을 시도해보세요
-                   </Typography>
-                 </Paper>
-               )}
-               
-               {!searchFilters.dateRange && (
-                 <Paper sx={{ p: 6, textAlign: 'center', bgcolor: '#f8f9fa', border: '1px solid #e9ecef' }}>
-                   <SearchIcon sx={{ fontSize: 48, color: '#1976d2', mb: 2 }} />
-                   <Typography variant="h6" sx={{ mb: 1, color: '#1976d2' }}>
-                     입고 이력 검색
-                   </Typography>
-                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                     검색 조건을 설정하고 검색 버튼을 클릭하세요
-                   </Typography>
-                 </Paper>
-               )}
+              {/* 기본 테이블 구조 - 항상 표시 */}
+              <TableContainer component={Paper} sx={{ mb: 3 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                      <TableCell><strong>입고 ID</strong></TableCell>
+                      <TableCell><strong>부품 코드</strong></TableCell>
+                      <TableCell><strong>부품명</strong></TableCell>
+                      <TableCell><strong>수량</strong></TableCell>
+                      <TableCell><strong>단위</strong></TableCell>
+                      <TableCell><strong>입고일</strong></TableCell>
+                      <TableCell><strong>공급업체</strong></TableCell>
+                      <TableCell><strong>단가</strong></TableCell>
+                      <TableCell><strong>총액</strong></TableCell>
+                      <TableCell><strong>참조번호</strong></TableCell>
+                      <TableCell><strong>등록자</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {inboundRecords.length > 0 ? (
+                      inboundRecords.map((record) => (
+                        <TableRow key={record.inbound_id} hover>
+                          <TableCell>
+                            <Chip 
+                              label={record.inbound_id} 
+                              size="small" 
+                              color="primary" 
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="bold">
+                              {record.part_code}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>{record.part_name}</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="body2" fontWeight="bold">
+                                {record.quantity.toLocaleString()}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="caption" color="text.secondary">
+                              {record.part_unit}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>{record.inbound_date}</TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={record.supplier_name} 
+                              size="small" 
+                              color="secondary"
+                            />
+                          </TableCell>
+                          <TableCell>{formatCurrency(record.unit_price)}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="bold" color="primary">
+                              {formatCurrency(record.total_price)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={record.reference_number} 
+                              size="small" 
+                              color="info" 
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>{record.created_by}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            검색 결과가 없습니다.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
               
               {inboundRecords.length > 0 && (
-                <>
-                  <Alert severity="info" sx={{ mb: 3 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                        📊 검색 결과: {inboundRecords.length}건 | 총액: {formatCurrency(inboundRecords.reduce((sum, record) => sum + record.total_price, 0))}
-                      </Typography>
-                    </Box>
-                  </Alert>
-                  
-                  <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                    <Button
-                      variant="contained"
-                      startIcon={<DownloadIcon />}
-                      onClick={exportToExcel}
-                      sx={{ 
-                        bgcolor: '#4caf50',
-                        '&:hover': { bgcolor: '#45a049' }
-                      }}
-                    >
-                      📥 Excel 저장
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      startIcon={<ReportIcon />}
-                      onClick={generateReport}
-                      sx={{ 
-                        borderColor: '#ff9800',
-                        color: '#ff9800',
-                        '&:hover': { 
-                          borderColor: '#f57c00',
-                          color: '#f57c00',
-                          bgcolor: '#fff3e0'
-                        }
-                      }}
-                    >
-                      📊 보고서 생성
-                    </Button>
-                  </Box>
-                  
-                  <TableContainer component={Paper} sx={{ mb: 3 }}>
-                    <Table>
-                      <TableHead>
-                        <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                          <TableCell><strong>입고 ID</strong></TableCell>
-                          <TableCell><strong>부품 코드</strong></TableCell>
-                          <TableCell><strong>부품명</strong></TableCell>
-                          <TableCell><strong>수량</strong></TableCell>
-                          <TableCell><strong>단위</strong></TableCell>
-                          <TableCell><strong>입고일</strong></TableCell>
-                          <TableCell><strong>공급업체</strong></TableCell>
-                          <TableCell><strong>단가</strong></TableCell>
-                          <TableCell><strong>총액</strong></TableCell>
-                          <TableCell><strong>참조번호</strong></TableCell>
-                          <TableCell><strong>등록자</strong></TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {inboundRecords.map((record) => (
-                          <TableRow key={record.inbound_id} hover>
-                            <TableCell>
-                              <Chip 
-                                label={record.inbound_id} 
-                                size="small" 
-                                color="primary" 
-                                variant="outlined"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" fontWeight="bold">
-                                {record.part_code}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>{record.part_name}</TableCell>
-                            <TableCell>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography variant="body2" fontWeight="bold">
-                                  {record.quantity.toLocaleString()}
-                                </Typography>
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="caption" color="text.secondary">
-                                {record.part_unit}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>{record.inbound_date}</TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={record.supplier_name} 
-                                size="small" 
-                                color="secondary"
-                              />
-                            </TableCell>
-                            <TableCell>{formatCurrency(record.unit_price)}</TableCell>
-                            <TableCell>
-                              <Typography variant="body2" fontWeight="bold" color="primary">
-                                {formatCurrency(record.total_price)}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={record.reference_number} 
-                                size="small" 
-                                color="info" 
-                                variant="outlined"
-                              />
-                            </TableCell>
-                            <TableCell>{record.created_by}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      총 {inboundRecords.length}건의 입고 기록
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      📊 검색 결과: {inboundRecords.length}건 | 총액: {formatCurrency(inboundRecords.reduce((sum, record) => sum + record.total_price, 0))}
                     </Typography>
-                    <Pagination 
-                      count={Math.ceil(inboundRecords.length / 10)} 
-                      page={1} 
-                      color="primary" 
-                    />
                   </Box>
-                </>
+                </Alert>
               )}
+              
+
             </TabPanel>
             
             <TabPanel value={tabValue} index={1}>

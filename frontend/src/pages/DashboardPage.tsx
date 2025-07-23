@@ -19,7 +19,11 @@ import {
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
-import { supabase } from '../utils/supabase';
+import {
+  generateDashboardStats,
+  generateRecentActivities,
+  generateLowStockItems
+} from '../utils/mockData';
 
 interface DashboardStats {
   totalParts: number;
@@ -68,12 +72,14 @@ const DashboardPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // 통계 데이터 로드
-      await Promise.all([
-        loadStats(),
-        loadRecentActivities(),
-        loadLowStockItems(),
-      ]);
+      // 모의 데이터 생성
+      const stats = generateDashboardStats();
+      const activities = generateRecentActivities();
+      const lowStock = generateLowStockItems();
+      
+      setStats(stats);
+      setRecentActivities(activities);
+      setLowStockItems(lowStock);
     } catch (err) {
       console.error('대시보드 데이터 로드 오류:', err);
       setError('대시보드 데이터를 불러오는 중 오류가 발생했습니다.');
@@ -82,150 +88,12 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  const loadStats = async () => {
-    // 부품 총 개수
-    const { data: partsData, error: partsError } = await supabase
-      .from('parts')
-      .select('id, current_stock, min_stock');
-
-    if (partsError) throw partsError;
-
-    const totalParts = partsData?.length || 0;
-    const lowStockParts = partsData?.filter(
-      (part) => part.current_stock <= part.min_stock
-    ).length || 0;
-
-    // 최근 7일 입고/출고 건수
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const { data: inboundData } = await supabase
-      .from('inbound')
-      .select('id')
-      .gte('inbound_date', sevenDaysAgo.toISOString());
-
-    const { data: outboundData } = await supabase
-      .from('outbound')
-      .select('id')
-      .gte('outbound_date', sevenDaysAgo.toISOString());
-
-    // 총 재고 가치 계산 (부품 가격 * 현재 재고)
-    const { data: inventoryValue } = await supabase
-      .from('parts')
-      .select(`
-        current_stock,
-        part_prices!inner(
-          price
-        )
-      `);
-
-    const totalValue = inventoryValue?.reduce((sum, item) => {
-      const price = item.part_prices?.[0]?.price || 0;
-      return sum + (item.current_stock * price);
-    }, 0) || 0;
-
-    setStats({
-      totalParts,
-      lowStockParts,
-      totalValue,
-      recentInbound: inboundData?.length || 0,
-      recentOutbound: outboundData?.length || 0,
-    });
-  };
-
-  const loadRecentActivities = async () => {
-    // 최근 입고 활동
-    const { data: inboundData } = await supabase
-      .from('inbound')
-      .select(`
-        id,
-        quantity,
-        inbound_date,
-        created_by,
-        parts!inner(
-          part_name
-        )
-      `)
-      .order('inbound_date', { ascending: false })
-      .limit(5);
-
-    // 최근 출고 활동
-    const { data: outboundData } = await supabase
-      .from('outbound')
-      .select(`
-        id,
-        quantity,
-        outbound_date,
-        created_by,
-        parts!inner(
-          part_name
-        )
-      `)
-      .order('outbound_date', { ascending: false })
-      .limit(5);
-
-    const activities: RecentActivity[] = [];
-
-    // 입고 데이터 변환
-    inboundData?.forEach((item) => {
-      activities.push({
-        id: item.id,
-        type: 'inbound',
-        partName: item.parts?.part_name || '알 수 없음',
-        quantity: item.quantity,
-        date: item.inbound_date,
-        user: item.created_by || '시스템',
-      });
-    });
-
-    // 출고 데이터 변환
-    outboundData?.forEach((item) => {
-      activities.push({
-        id: item.id,
-        type: 'outbound',
-        partName: item.parts?.part_name || '알 수 없음',
-        quantity: item.quantity,
-        date: item.outbound_date,
-        user: item.created_by || '시스템',
-      });
-    });
-
-    // 날짜순 정렬
-    activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    setRecentActivities(activities.slice(0, 10));
-  };
-
-  const loadLowStockItems = async () => {
-    const { data, error } = await supabase
-      .from('parts')
-      .select(`
-        id,
-        part_name,
-        current_stock,
-        min_stock,
-        category
-      `)
-      .lte('current_stock', supabase.raw('min_stock'))
-      .order('current_stock', { ascending: true })
-      .limit(10);
-
-    if (error) throw error;
-
-    setLowStockItems(
-      data?.map((item) => ({
-        id: item.id,
-        partName: item.part_name,
-        currentStock: item.current_stock,
-        minStock: item.min_stock,
-        category: item.category || '미분류',
-      })) || []
-    );
-  };
+  // 개별 데이터 로딩 함수들은 모의 데이터로 대체됨
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('ko-KR', {
+    return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
-      currency: 'KRW',
+      currency: 'VND',
     }).format(value);
   };
 

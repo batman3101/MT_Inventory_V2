@@ -61,6 +61,7 @@ import {
   Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import { supabase } from '../utils/supabase';
+import { exportToExcel, formatSuppliersDataForExcel } from '../utils/excelUtils';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -394,33 +395,22 @@ const SuppliersPage: React.FC = () => {
   };
 
   const handleExportToExcel = async () => {
-    try {
-      // 실제 구현에서는 Excel 라이브러리 사용
-      const csvContent = [
-        ['공급업체 코드', '공급업체명', '담당자', '전화번호', '이메일', '주소', '국가', '웹사이트', '상태', '등록일'],
-        ...filteredSuppliers.map(supplier => [
-          supplier.supplier_code,
-          supplier.supplier_name,
-          supplier.contact_person || '',
-          supplier.phone || '',
-          supplier.email || '',
-          supplier.address || '',
-          supplier.country,
-          supplier.website || '',
-          supplier.status === 'active' ? '활성' : '비활성',
-          new Date(supplier.created_at).toLocaleDateString()
-        ])
-      ].map(row => row.join(',')).join('\n');
+    if (filteredSuppliers.length === 0) {
+      setSnackbar({
+        open: true,
+        message: '내보낼 데이터가 없습니다.',
+        severity: 'warning'
+      });
+      return;
+    }
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `suppliers_${new Date().toISOString().split('T')[0]}.csv`;
-      link.click();
+    try {
+      const formattedData = formatSuppliersDataForExcel(filteredSuppliers);
+      exportToExcel(formattedData, '공급업체목록');
       
       setSnackbar({
         open: true,
-        message: '공급업체 목록이 CSV 파일로 내보내졌습니다.',
+        message: '공급업체 목록이 Excel 파일로 내보내졌습니다.',
         severity: 'success'
       });
     } catch (error) {

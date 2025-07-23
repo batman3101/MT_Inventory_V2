@@ -51,6 +51,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ko } from 'date-fns/locale';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { supabase } from '@/utils/supabaseClient';
+import { exportToExcel, formatOutboundDataForExcel } from '../utils/excelUtils';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -473,8 +474,23 @@ const OutboundPage: React.FC = () => {
   };
 
   const exportToExcel = () => {
-    // Excel 내보내기 로직 (실제 구현 시 라이브러리 사용)
-    showSnackbar('Excel 파일로 내보내기 기능이 구현될 예정입니다.', 'info');
+    if (outboundRecords.length === 0) {
+      showSnackbar('내보낼 데이터가 없습니다.', 'warning');
+      return;
+    }
+
+    try {
+      const formattedData = formatOutboundDataForExcel(outboundRecords);
+      exportToExcel({
+        filename: '출고기록',
+        sheetName: '출고 이력',
+        data: formattedData
+      });
+      showSnackbar('Excel 파일이 다운로드되었습니다.', 'success');
+    } catch (error) {
+      console.error('Excel 내보내기 오류:', error);
+      showSnackbar('Excel 파일 내보내기 중 오류가 발생했습니다.', 'error');
+    }
   };
 
   const generateReport = () => {
