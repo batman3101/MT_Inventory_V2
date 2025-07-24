@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(npm run dev:*)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(pip install:*)",
+      "Bash(..venvScriptsactivate.bat)",
+      "Bash(taskkill:*)",
+      "Bash(pkill:*)",
+      "mcp__ide__getDiagnostics"
+    ],
+    "deny": []
+  }
+}

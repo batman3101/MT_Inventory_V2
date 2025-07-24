@@ -42,7 +42,8 @@ import {
   Avatar,
   Badge,
   LinearProgress,
-  Autocomplete
+  Autocomplete,
+  TableSortLabel
 } from '@mui/material';
 import {
   Inventory as InventoryIcon,
@@ -75,7 +76,7 @@ import {
   SwapHoriz as TransferIcon
 } from '@mui/icons-material';
 import { inventoryApi, partsApi } from '../services/api';
-import { formatCurrency, formatDate } from '../utils/supabase';
+import { formatCurrency, formatDate, supabase } from '../utils/supabase';
 import { exportToExcel, formatInventoryDataForExcel } from '../utils/excelUtils';
 
 interface TabPanelProps {
@@ -207,6 +208,8 @@ const InventoryPage: React.FC = () => {
   const [stockAdjustments, setStockAdjustments] = useState<StockAdjustment[]>([]);
   const [parts, setParts] = useState<Part[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [sortBy, setSortBy] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -277,14 +280,22 @@ const InventoryPage: React.FC = () => {
       const inventoryResponse = await inventoryApi.getAll(1, 1000);
       const partsResponse = await partsApi.getAll(1, 1000);
       
+      // 가격 정보 가져오기 (최신 입고 단가 사용)
+      const { data: pricesData } = await supabase
+        .from('inbound')
+        .select('part_id, unit_price, inbound_date')
+        .order('inbound_date', { ascending: false });
+      
       const inventoriesWithPart = inventoryResponse.data?.map(inventory => {
-        const part = partsResponse.data.find(p => p.id === inventory.part_id);
-        const stockValue = inventory.current_stock * 0; // 가격 정보가 없으므로 0으로 설정
+        const part = partsResponse.data.find(p => p.part_id === inventory.part_id);
+        const priceInfo = pricesData.find((p: any) => p.part_id === inventory.part_id);
+        const unitPrice = priceInfo?.unit_price || 0;
+        const stockValue = inventory.current_quantity * unitPrice;
         
         let stockStatus: 'normal' | 'low' | 'critical' | 'overstock' = 'normal';
-        if (inventory.current_stock <= 0) {
+        if (inventory.current_quantity <= 0) {
           stockStatus = 'critical';
-        } else if (inventory.current_stock <= (part?.min_stock || 0)) {
+        } else if (inventory.current_quantity <= (part?.min_stock || 0)) {
           stockStatus = 'low';
         }
         
@@ -293,7 +304,8 @@ const InventoryPage: React.FC = () => {
           part,
           stock_value: stockValue,
           stock_status: stockStatus,
-          available_stock: inventory.current_stock - (inventory.reserved_stock || 0)
+          current_stock: inventory.current_quantity, // 호환성을 위해 추가
+          available_stock: inventory.current_quantity - 0 // reserved_stock 필드가 없으므로 0
         };
       }) || [];
       
@@ -356,6 +368,57 @@ const InventoryPage: React.FC = () => {
     } catch (error) {
       console.error('위치 정보 로드 실패:', error);
     }
+  };
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortedInventories = () => {
+    if (!sortBy) return inventories;
+    
+    return [...inventories].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+      
+      switch (sortBy) {
+        case 'part_code':
+          aValue = a.part?.part_code || '';
+          bValue = b.part?.part_code || '';
+          break;
+        case 'part_name':
+          aValue = a.part?.vietnamese_name || '';
+          bValue = b.part?.vietnamese_name || '';
+          break;
+        case 'category':
+          aValue = a.part?.category || '';
+          bValue = b.part?.category || '';
+          break;
+        case 'current_stock':
+          aValue = a.current_stock || 0;
+          bValue = b.current_stock || 0;
+          break;
+        case 'stock_value':
+          aValue = a.stock_value || 0;
+          bValue = b.stock_value || 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aValue === 'string') {
+        const result = aValue.localeCompare(bValue);
+        return sortDirection === 'asc' ? result : -result;
+      } else {
+        const result = aValue - bValue;
+        return sortDirection === 'asc' ? result : -result;
+      }
+    });
   };
 
   const loadStockMovements = async (partId: string) => {
@@ -559,11 +622,11 @@ const InventoryPage: React.FC = () => {
     }
   };
 
-  const filteredInventories = inventories.filter(inventory => {
+  const filteredInventories = getSortedInventories().filter(inventory => {
     const part = inventory.part;
     const matchesSearch = part?.vietnamese_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          part?.korean_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         part?.part_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         part?.part_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          part?.spec?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || part?.category === categoryFilter;
     const matchesStockStatus = stockStatusFilter === 'all' || inventory.stock_status === stockStatusFilter;
@@ -792,26 +855,66 @@ const InventoryPage: React.FC = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>부품 정보</TableCell>
-                    <TableCell>카테고리</TableCell>
-                    <TableCell>현재고</TableCell>
-                    <TableCell>예약재고</TableCell>
-                    <TableCell>사용가능</TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={sortBy === 'part_code'}
+                        direction={sortBy === 'part_code' ? sortDirection : 'asc'}
+                        onClick={() => handleSort('part_code')}
+                      >
+                        부품 코드
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={sortBy === 'part_name'}
+                        direction={sortBy === 'part_name' ? sortDirection : 'asc'}
+                        onClick={() => handleSort('part_name')}
+                      >
+                        부품 정보
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={sortBy === 'category'}
+                        direction={sortBy === 'category' ? sortDirection : 'asc'}
+                        onClick={() => handleSort('category')}
+                      >
+                        카테고리
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={sortBy === 'current_stock'}
+                        direction={sortBy === 'current_stock' ? sortDirection : 'asc'}
+                        onClick={() => handleSort('current_stock')}
+                      >
+                        현재고
+                      </TableSortLabel>
+                    </TableCell>
                     <TableCell>재고 상태</TableCell>
-                    <TableCell>재고가치</TableCell>
-                    <TableCell>위치</TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={sortBy === 'stock_value'}
+                        direction={sortBy === 'stock_value' ? sortDirection : 'asc'}
+                        onClick={() => handleSort('stock_value')}
+                      >
+                        재고가치
+                      </TableSortLabel>
+                    </TableCell>
                     <TableCell>작업</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {paginatedInventories.map((inventory) => (
-                    <TableRow key={inventory.id} hover>
+                    <TableRow key={inventory.inventory_id} hover>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {inventory.part?.part_code}
+                        </Typography>
+                      </TableCell>
                       <TableCell>
                         <Box>
                           <Typography variant="body2" fontWeight="medium">
-                            {inventory.part?.part_number}
-                          </Typography>
-                          <Typography variant="body2">
                             {inventory.part?.vietnamese_name}
                           </Typography>
                           {inventory.part?.korean_name && (
@@ -846,16 +949,6 @@ const InventoryPage: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" color="warning.main" fontWeight="medium">
-                          {(inventory.reserved_stock || 0).toLocaleString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="success.main" fontWeight="medium">
-                          {inventory.available_stock.toLocaleString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           {getStockStatusIcon(inventory.stock_status)}
                           <Typography variant="body2">
@@ -869,16 +962,6 @@ const InventoryPage: React.FC = () => {
                         <Typography variant="body2" fontWeight="medium">
                           ₫{inventory.stock_value.toLocaleString()}
                         </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {inventory.location || '-'}
-                        </Typography>
-                        {inventory.bin_location && (
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            {inventory.bin_location}
-                          </Typography>
-                        )}
                       </TableCell>
                       <TableCell>
                         <Tooltip title="상세 보기">
@@ -913,21 +996,27 @@ const InventoryPage: React.FC = () => {
         </Card>
         
         {/* 선택된 재고 상세 정보 */}
-        {selectedInventory && (
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <BuildIcon />
-                재고 상세 정보
-              </Typography>
-              
-              <Grid container spacing={3}>
+        {/* 재고 상세보기 다이얼로그 */}
+        <Dialog
+          open={!!selectedInventory}
+          onClose={() => setSelectedInventory(null)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <BuildIcon />
+            재고 상세 정보
+          </DialogTitle>
+          <DialogContent>
+            {selectedInventory && (
+              <>
+                <Grid container spacing={3}>
                 <Grid item xs={12} md={6}>
                   <Typography variant="body2" color="text.secondary">
                     부품 코드
                   </Typography>
                   <Typography variant="body1" fontWeight="medium">
-                    {selectedInventory.part?.part_number}
+                    {selectedInventory.part?.part_code}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -1009,12 +1098,13 @@ const InventoryPage: React.FC = () => {
                 </Grid>
               </Grid>
               
-              {/* 재고 이동 이력 */}
-              <Divider sx={{ my: 3 }} />
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <HistoryIcon />
-                재고 이동 이력 (최근 20건)
-              </Typography>
+              <>
+                <Divider sx={{ my: 3 }} />
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <HistoryIcon />
+                  재고 이동 이력 (최근 20건)
+                </Typography>
+              </>
               
               {stockMovements.length > 0 ? (
                 <TableContainer>
@@ -1082,9 +1172,15 @@ const InventoryPage: React.FC = () => {
                   재고 이동 이력이 없습니다.
                 </Alert>
               )}
-            </CardContent>
-          </Card>
-        )}
+              </>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSelectedInventory(null)}>
+              닫기
+            </Button>
+          </DialogActions>
+        </Dialog>
       </TabPanel>
 
       {/* 입고 관리 탭 */}

@@ -189,8 +189,14 @@ export const inventoryApi = {
     try {
       let query = supabase.from('inventory')
         .select(`
-          *,
-          parts!inner(part_code, vietnamese_name, korean_name, unit)
+          inventory_id,
+          part_id,
+          current_quantity,
+          last_count_date,
+          location,
+          updated_at,
+          updated_by,
+          parts!inner(part_code, vietnamese_name, korean_name, unit, min_stock)
         `);
       
       if (search) {
@@ -220,10 +226,16 @@ export const inventoryApi = {
     try {
       const { data, error } = await supabase.from('inventory')
         .select(`
-          *,
+          inventory_id,
+          part_id,
+          current_quantity,
+          last_count_date,
+          location,
+          updated_at,
+          updated_by,
           parts!inner(part_code, vietnamese_name, korean_name, unit, min_stock)
         `)
-        .eq('id', id)
+        .eq('inventory_id', id)
         .single();
       
       if (error) throw error;
@@ -236,12 +248,20 @@ export const inventoryApi = {
   // 재고 업데이트
   async update(id: string, updates: { quantity?: number; location?: string }) {
     try {
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+      
+      if (updates.quantity !== undefined) {
+        updateData.current_quantity = updates.quantity;
+      }
+      if (updates.location !== undefined) {
+        updateData.location = updates.location;
+      }
+      
       const { data, error } = await supabase.from('inventory')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
+        .update(updateData)
+        .eq('inventory_id', id)
         .select()
         .single();
       
@@ -257,10 +277,13 @@ export const inventoryApi = {
     try {
       const { data, error } = await supabase.from('inventory')
         .select(`
-          *,
-          parts!inner(part_number, vietnamese_name, korean_name, unit, min_stock)
+          inventory_id,
+          part_id,
+          current_quantity,
+          location,
+          parts!inner(part_code, vietnamese_name, korean_name, unit, min_stock)
         `)
-        .filter('quantity', 'lt', 'parts.min_stock');
+        .filter('current_quantity', 'lt', 'parts.min_stock');
       
       if (error) throw error;
       return data || [];

@@ -10,7 +10,7 @@ import os
 load_dotenv()
 
 # Import routers
-from api.routers import auth, users, departments, categories, parts, suppliers, inventory, inbound, outbound, reports
+from api.routers import auth, users, departments, categories, parts, suppliers, inventory, inbound, outbound
 from api.database import engine, Base
 from api.middleware.auth import get_current_user
 
@@ -50,7 +50,6 @@ app.include_router(suppliers.router, prefix="/api/suppliers", tags=["Suppliers"]
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(inbound.router, prefix="/api/inbound", tags=["Inbound"])
 app.include_router(outbound.router, prefix="/api/outbound", tags=["Outbound"])
-app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 
 @app.get("/")
 async def root():
