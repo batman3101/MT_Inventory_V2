@@ -930,7 +930,7 @@ const SuppliersPage: React.FC = () => {
                         </TableHead>
                         <TableBody>
                           {partPrices.map((price, index) => (
-                            <TableRow key={index}>
+                            <TableRow key={`${price.part_code}-${price.effective_date}-${index}`}>
                               <TableCell>{price.part_code}</TableCell>
                               <TableCell>{price.part_name}</TableCell>
                               <TableCell>{price.unit_price.toLocaleString()}</TableCell>
@@ -979,7 +979,7 @@ const SuppliersPage: React.FC = () => {
                         </TableHead>
                         <TableBody>
                           {receivingHistory.map((history, index) => (
-                            <TableRow key={index}>
+                            <TableRow key={`${history.part_code}-${history.received_date}-${index}`}>
                               <TableCell>{history.part_code}</TableCell>
                               <TableCell>{history.part_name}</TableCell>
                               <TableCell>{history.quantity.toLocaleString()}</TableCell>

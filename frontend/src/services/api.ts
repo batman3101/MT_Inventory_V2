@@ -1,4 +1,4 @@
-import { supabase } from '../utils/supabaseClient';
+import { supabase } from '../utils/supabase';
 import { handleSupabaseError } from '../utils/supabase';
 
 // 에러 처리 헬퍼 함수
@@ -16,7 +16,7 @@ export const partsApi = {
       let query = supabase.from('parts').select('*');
       
       if (search) {
-        query = query.or(`part_number.ilike.%${search}%,vietnamese_name.ilike.%${search}%,korean_name.ilike.%${search}%`);
+        query = query.or(`part_code.ilike.%${search}%,vietnamese_name.ilike.%${search}%,korean_name.ilike.%${search}%`);
       }
       
       const { data, error, count } = await query
@@ -103,7 +103,7 @@ export const suppliersApi = {
       let query = supabase.from('suppliers').select('*');
       
       if (search) {
-        query = query.or(`name.ilike.%${search}%,supplier_code.ilike.%${search}%,contact_person.ilike.%${search}%`);
+        query = query.or(`supplier_name.ilike.%${search}%,supplier_code.ilike.%${search}%,contact_person.ilike.%${search}%`);
       }
       
       const { data, error, count } = await query
@@ -190,11 +190,11 @@ export const inventoryApi = {
       let query = supabase.from('inventory')
         .select(`
           *,
-          parts!inner(part_number, vietnamese_name, korean_name, unit)
+          parts!inner(part_code, vietnamese_name, korean_name, unit)
         `);
       
       if (search) {
-        query = query.or(`parts.part_number.ilike.%${search}%,parts.vietnamese_name.ilike.%${search}%,parts.korean_name.ilike.%${search}%`);
+        query = query.or(`parts.part_code.ilike.%${search}%,parts.vietnamese_name.ilike.%${search}%,parts.korean_name.ilike.%${search}%`);
       }
       
       const { data, error, count } = await query
@@ -221,7 +221,7 @@ export const inventoryApi = {
       const { data, error } = await supabase.from('inventory')
         .select(`
           *,
-          parts!inner(part_number, vietnamese_name, korean_name, unit, min_stock)
+          parts!inner(part_code, vietnamese_name, korean_name, unit, min_stock)
         `)
         .eq('id', id)
         .single();
@@ -278,12 +278,12 @@ export const inboundApi = {
       let query = supabase.from('inbound')
         .select(`
           *,
-          parts!inner(part_number, vietnamese_name, korean_name, unit),
-          suppliers!inner(name, supplier_code)
+          parts!inner(part_code, vietnamese_name, korean_name, unit),
+          suppliers!inner(supplier_name, supplier_code)
         `);
       
       if (search) {
-        query = query.or(`reference_number.ilike.%${search}%,parts.part_number.ilike.%${search}%,suppliers.name.ilike.%${search}%`);
+        query = query.or(`reference_number.ilike.%${search}%,parts.part_code.ilike.%${search}%,suppliers.supplier_name.ilike.%${search}%`);
       }
       
       const { data, error, count } = await query
@@ -310,8 +310,8 @@ export const inboundApi = {
       const { data, error } = await supabase.from('inbound')
         .select(`
           *,
-          parts!inner(part_number, vietnamese_name, korean_name, unit),
-          suppliers!inner(name, supplier_code, contact_person, email)
+          parts!inner(part_code, vietnamese_name, korean_name, unit),
+          suppliers!inner(supplier_name, supplier_code, contact_person, email)
         `)
         .eq('id', id)
         .single();
@@ -374,8 +374,8 @@ export const partPricesApi = {
       let query = supabase.from('partPrices')
         .select(`
           *,
-          parts!inner(part_number, vietnamese_name, korean_name),
-          suppliers!inner(name, supplier_code)
+          parts!inner(part_code, vietnamese_name, korean_name),
+          suppliers!inner(supplier_name, supplier_code)
         `);
       
       if (partId) {
@@ -588,8 +588,8 @@ export const reportsApi = {
       let query = supabase.from('inbound')
         .select(`
           *,
-          parts(part_number, vietnamese_name, korean_name, category_id),
-          suppliers(name)
+          parts(part_code, vietnamese_name, korean_name, category_id),
+          suppliers(supplier_name)
         `)
         .gte('inbound_date', startDate)
         .lte('inbound_date', endDate);
@@ -622,9 +622,9 @@ export const reportsApi = {
         const category = categories.find(cat => cat.category_id === item.parts.category_id);
         return {
           inbound_date: item.inbound_date,
-          part_code: item.parts.part_number,
+          part_code: item.parts.part_code,
           part_name: item.parts.vietnamese_name,
-          supplier_name: item.suppliers.name,
+          supplier_name: item.suppliers.supplier_name,
           category_name: category ? category.category_name : '미분류',
           quantity: item.quantity,
           unit_price: item.unit_price,
@@ -642,8 +642,8 @@ export const reportsApi = {
       let query = supabase.from('outbound')
         .select(`
           *,
-          parts(part_number, vietnamese_name, korean_name, category_id),
-          departments(name)
+          parts(part_code, vietnamese_name, korean_name, category_id),
+          departments(department_name)
         `)
         .gte('outbound_date', startDate)
         .lte('outbound_date', endDate);
@@ -676,9 +676,9 @@ export const reportsApi = {
         const category = categories.find(cat => cat.category_id === item.parts.category_id);
         return {
           outbound_date: item.outbound_date,
-          part_code: item.parts.part_number,
+          part_code: item.parts.part_code,
           part_name: item.parts.vietnamese_name,
-          department_name: item.departments.name,
+          department_name: item.departments.department_name,
           category_name: category ? category.category_name : '미분류',
           quantity: item.quantity,
           unit_price: item.unit_price,
@@ -697,7 +697,7 @@ export const reportsApi = {
       let query = supabase.from('inventory')
         .select(`
           *,
-          parts(part_number, vietnamese_name, korean_name, category_id)
+          parts(part_code, vietnamese_name, korean_name, category_id)
         `);
       
       // 카테고리 필터링

@@ -50,7 +50,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ko } from 'date-fns/locale';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
-import { supabase } from '@/utils/supabaseClient';
+import { supabase } from '@/utils/supabase';
 import { exportToExcel, formatOutboundDataForExcel } from '../utils/excelUtils';
 
 interface TabPanelProps {

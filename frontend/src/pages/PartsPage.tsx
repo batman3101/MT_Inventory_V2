@@ -147,7 +147,7 @@ const PartsPage: React.FC = () => {
   const [selectedPart, setSelectedPart] = useState<PartWithInventory | null>(null);
   const [editingPart, setEditingPart] = useState<Part | null>(null);
   const [newPart, setNewPart] = useState<Partial<Part>>({
-    part_number: '',
+    part_code: '',
     vietnamese_name: '',
     korean_name: '',
     description: '',
@@ -193,7 +193,7 @@ const PartsPage: React.FC = () => {
       const partsWithInventory = await Promise.all(
         response.data.map(async (part: Part) => {
           try {
-            const inventoryResponse = await inventoryApi.getAll(1, 1, part.part_number);
+            const inventoryResponse = await inventoryApi.getAll(1, 1, part.part_code);
             const inventory = inventoryResponse.data[0] || { quantity: 0 };
             
             let stockStatus: 'normal' | 'low' | 'critical' | 'overstock' = 'normal';
@@ -212,7 +212,7 @@ const PartsPage: React.FC = () => {
               stock_status: stockStatus
             };
           } catch (error) {
-            console.error(`부품 ${part.part_number}의 재고 정보 로드 실패:`, error);
+            console.error(`부품 ${part.part_code}의 재고 정보 로드 실패:`, error);
             return {
               ...part,
               current_stock: 0,
@@ -265,10 +265,10 @@ const PartsPage: React.FC = () => {
   };
 
   const handleAddPart = async () => {
-    if (!newPart.part_number || !newPart.vietnamese_name || !newPart.category) {
+    if (!newPart.part_code || !newPart.vietnamese_name || !newPart.category) {
       setSnackbar({
         open: true,
-        message: '부품 번호, 베트남어명, 카테고리는 필수 입력 항목입니다.',
+        message: '부품 코드, 베트남어명, 카테고리는 필수 입력 항목입니다.',
         severity: 'error'
       });
       return;
@@ -277,14 +277,14 @@ const PartsPage: React.FC = () => {
     try {
       setLoading(true);
       
-      // 부품 번호 중복 확인
+      // 부품 코드 중복 확인
       const existingParts = await partsApi.getAll(1, 1000);
-      const existingPart = existingParts.data.find(part => part.part_number === newPart.part_number);
+      const existingPart = existingParts.data.find(part => part.part_code === newPart.part_code);
 
       if (existingPart) {
         setSnackbar({
           open: true,
-          message: '이미 존재하는 부품 번호입니다.',
+          message: '이미 존재하는 부품 코드입니다.',
           severity: 'error'
         });
         return;
@@ -303,7 +303,7 @@ const PartsPage: React.FC = () => {
       
       setAddDialogOpen(false);
       setNewPart({
-        part_number: '',
+        part_code: '',
         vietnamese_name: '',
         korean_name: '',
         description: '',
@@ -456,7 +456,7 @@ const PartsPage: React.FC = () => {
 
   const filteredParts = parts.filter(part => {
     const matchesSearch = part.vietnamese_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         part.part_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         part.part_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          part.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || part.category === categoryFilter;
     const matchesStatus = statusFilter === 'all' || part.status === statusFilter;
@@ -694,7 +694,7 @@ const PartsPage: React.FC = () => {
                     <TableRow key={part.id} hover>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">
-                          {part.part_number}
+                          {part.part_code}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -718,7 +718,7 @@ const PartsPage: React.FC = () => {
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography variant="body2" fontWeight="medium">
-                            {part.current_stock.toLocaleString()}
+                            {(part.current_stock || 0).toLocaleString()}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             {part.unit}
@@ -726,7 +726,7 @@ const PartsPage: React.FC = () => {
                         </Box>
                         <LinearProgress
                           variant="determinate"
-                          value={Math.min((part.current_stock / part.min_stock) * 100, 100)}
+                          value={Math.min(((part.current_stock || 0) / (part.min_stock || 1)) * 100, 100)}
                           color={getStockStatusColor(part.stock_status) as any}
                           sx={{ mt: 0.5, height: 4, borderRadius: 2 }}
                         />
@@ -743,7 +743,7 @@ const PartsPage: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">
-                          ₫{part.stock_value.toLocaleString()}
+                          ₫{(part.stock_value || 0).toLocaleString()}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -807,8 +807,8 @@ const PartsPage: React.FC = () => {
                 <TextField
                   fullWidth
                   label="부품 코드 *"
-                  value={newPart.part_number}
-                  onChange={(e) => setNewPart(prev => ({ ...prev, part_number: e.target.value }))}
+                  value={newPart.part_code}
+                  onChange={(e) => setNewPart(prev => ({ ...prev, part_code: e.target.value }))}
                   helperText="고유한 부품 코드를 입력하세요"
                 />
               </Grid>

@@ -621,7 +621,7 @@ const ReportsPage: React.FC = () => {
                       </TableHead>
                       <TableBody>
                         {inventoryAnalysis.map((item, index) => (
-                          <TableRow key={index}>
+                          <TableRow key={`${item.category_name}-${index}`}>
                             <TableCell>
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <Box

@@ -30,7 +30,8 @@ def check_table_schema():
         'part_prices',
         'inbound',
         'outbound',
-        'suppliers'
+        'suppliers',
+        'departments'
     ]
     
     for table_name in tables:
@@ -161,4 +162,4 @@ def create_sample_data(table_name):
     return None
 
 if __name__ == "__main__":
-    check_table_schema() 
+    check_table_schema()
