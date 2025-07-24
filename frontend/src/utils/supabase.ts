@@ -93,14 +93,16 @@ export interface PartPrice {
 }
 
 export interface Inbound {
-  id: string;
+  inbound_id: string;
   part_id: string;
   supplier_id?: string;
   quantity: number;
   unit_price?: number;
   total_price?: number;
   inbound_date: string;
-  reference_number?: string;
+  currency?: string;
+  invoice_number?: string;
+  lot_number?: string;
   notes?: string;
   created_at: string;
   created_by?: string;

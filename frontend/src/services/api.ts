@@ -300,13 +300,26 @@ export const inboundApi = {
     try {
       let query = supabase.from('inbound')
         .select(`
-          *,
-          parts!inner(part_code, vietnamese_name, korean_name, unit),
-          suppliers!inner(supplier_name, supplier_code)
+          inbound_id,
+          inbound_date,
+          part_id,
+          supplier_id,
+          quantity,
+          unit_price,
+          total_price,
+          currency,
+          reference_number,
+          notes,
+          created_at,
+          created_by,
+          part_code,
+          part_name,
+          supplier_name,
+          part_unit
         `);
       
       if (search) {
-        query = query.or(`reference_number.ilike.%${search}%,parts.part_code.ilike.%${search}%,suppliers.supplier_name.ilike.%${search}%`);
+        query = query.or(`reference_number.ilike.%${search}%,part_code.ilike.%${search}%,part_name.ilike.%${search}%,supplier_name.ilike.%${search}%`);
       }
       
       const { data, error, count } = await query
@@ -332,11 +345,24 @@ export const inboundApi = {
     try {
       const { data, error } = await supabase.from('inbound')
         .select(`
-          *,
-          parts!inner(part_code, vietnamese_name, korean_name, unit),
-          suppliers!inner(supplier_name, supplier_code, contact_person, email)
+          inbound_id,
+          inbound_date,
+          part_id,
+          supplier_id,
+          quantity,
+          unit_price,
+          total_price,
+          currency,
+          reference_number,
+          notes,
+          created_at,
+          created_by,
+          part_code,
+          part_name,
+          supplier_name,
+          part_unit
         `)
-        .eq('id', id)
+        .eq('inbound_id', id)
         .single();
       
       if (error) throw error;
@@ -347,7 +373,7 @@ export const inboundApi = {
   },
 
   // 입고 생성
-  async create(inbound: Omit<Inbound, 'id' | 'created_at' | 'updated_at'>) {
+  async create(inbound: Omit<Inbound, 'inbound_id' | 'created_at'>) {
     try {
       const { data, error } = await supabase.from('inbound')
         .insert(inbound)
@@ -366,7 +392,7 @@ export const inboundApi = {
     try {
       const { data, error } = await supabase.from('inbound')
         .update(updates)
-        .eq('id', id)
+        .eq('inbound_id', id)
         .select()
         .single();
       
@@ -380,7 +406,7 @@ export const inboundApi = {
   // 입고 삭제
   async delete(id: string) {
     try {
-      const { error } = await supabase.from('inbound').delete().eq('id', id);
+      const { error } = await supabase.from('inbound').delete().eq('inbound_id', id);
       if (error) throw error;
       return true;
     } catch (error) {

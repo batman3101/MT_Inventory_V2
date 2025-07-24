@@ -75,7 +75,7 @@ import {
   Receipt as ReceiptIcon,
   SwapHoriz as TransferIcon
 } from '@mui/icons-material';
-import { inventoryApi, partsApi } from '../services/api';
+import { inventoryApi, partsApi, inboundApi } from '../services/api';
 import { formatCurrency, formatDate, supabase } from '../utils/supabase';
 import { exportToExcel, formatInventoryDataForExcel } from '../utils/excelUtils';
 
@@ -266,6 +266,7 @@ const InventoryPage: React.FC = () => {
     loadDepartments();
     loadCategories();
     loadLocations();
+    loadReceivingRecords();
   }, []);
 
   useEffect(() => {
@@ -367,6 +368,41 @@ const InventoryPage: React.FC = () => {
       setLocations(uniqueLocations);
     } catch (error) {
       console.error('위치 정보 로드 실패:', error);
+    }
+  };
+
+  const loadReceivingRecords = async () => {
+    try {
+      const response = await inboundApi.getAll(1, 1000);
+      const records = response.data?.map(inbound => ({
+        id: inbound.inbound_id,
+        part_id: inbound.part_id,
+        supplier_id: inbound.supplier_id,
+        quantity_received: inbound.quantity,
+        unit_price: inbound.unit_price || 0,
+        total_amount: inbound.total_price || 0,
+        received_date: inbound.inbound_date,
+        invoice_number: inbound.reference_number || '',
+        lot_number: '', // 테이블에 없는 필드
+        notes: inbound.notes || '',
+        part: {
+          part_code: inbound.part_code,
+          vietnamese_name: inbound.part_name,
+          unit: inbound.part_unit
+        },
+        supplier: {
+          supplier_name: inbound.supplier_name
+        }
+      })) || [];
+      
+      setReceivingRecords(records);
+    } catch (error) {
+      console.error('입고 이력 로드 실패:', error);
+      setSnackbar({
+        open: true,
+        message: '입고 이력을 불러오는데 실패했습니다.',
+        severity: 'error'
+      });
     }
   };
 
@@ -1205,7 +1241,78 @@ const InventoryPage: React.FC = () => {
               입고 처리 시 재고가 자동으로 업데이트됩니다.
             </Alert>
             
-            {/* 입고 이력 테이블은 여기에 추가 */}
+            {/* 입고 이력 테이블 */}
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>입고일</TableCell>
+                    <TableCell>부품 정보</TableCell>
+                    <TableCell>공급업체</TableCell>
+                    <TableCell>수량</TableCell>
+                    <TableCell>단가</TableCell>
+                    <TableCell>총액</TableCell>
+                    <TableCell>송장번호</TableCell>
+                    <TableCell>LOT번호</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {receivingRecords.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell>
+                        {new Date(record.received_date).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Box>
+                          <Typography variant="body2" fontWeight="medium">
+                            {record.part?.part_code}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {record.part?.vietnamese_name}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {record.supplier?.supplier_name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {record.quantity_received.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          ₫{record.unit_price.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          ₫{record.total_amount.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {record.invoice_number || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {record.lot_number || '-'}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            
+            {receivingRecords.length === 0 && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                입고 이력이 없습니다.
+              </Alert>
+            )}
           </CardContent>
         </Card>
       </TabPanel>

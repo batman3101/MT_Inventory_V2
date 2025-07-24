@@ -31,7 +31,8 @@ import {
   CardContent,
   Autocomplete,
   TablePagination,
-  CircularProgress
+  CircularProgress,
+  TableSortLabel
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -128,6 +129,8 @@ const OutboundPage: React.FC = () => {
   const [outboundRecords, setOutboundRecords] = useState<OutboundRecord[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [sortField, setSortField] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
   // 등록 관련 상태
   const [parts, setParts] = useState<Part[]>([]);
@@ -469,6 +472,70 @@ const OutboundPage: React.FC = () => {
     });
   };
 
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortedRecords = () => {
+    if (!sortField) return outboundRecords;
+    
+    return [...outboundRecords].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+      
+      switch (sortField) {
+        case 'part_code':
+          aValue = a.part_code || '';
+          bValue = b.part_code || '';
+          break;
+        case 'part_name':
+          aValue = a.part_name || '';
+          bValue = b.part_name || '';
+          break;
+        case 'quantity':
+          aValue = a.quantity || 0;
+          bValue = b.quantity || 0;
+          break;
+        case 'outbound_date':
+          aValue = new Date(a.outbound_date);
+          bValue = new Date(b.outbound_date);
+          break;
+        case 'requester':
+          aValue = a.requester || '';
+          bValue = b.requester || '';
+          break;
+        case 'department':
+          aValue = a.department || '';
+          bValue = b.department || '';
+          break;
+        case 'purpose':
+          aValue = a.purpose || '';
+          bValue = b.purpose || '';
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aValue === 'string') {
+        const result = aValue.localeCompare(bValue);
+        return sortDirection === 'asc' ? result : -result;
+      } else {
+        const result = aValue - bValue;
+        return sortDirection === 'asc' ? result : -result;
+      }
+    });
+  };
+
+  const getPaginatedRecords = () => {
+    const sortedRecords = getSortedRecords();
+    return sortedRecords.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  };
+
   const showSnackbar = (message: string, severity: 'success' | 'error' | 'warning' | 'info') => {
     setSnackbar({ open: true, message, severity });
   };
@@ -501,217 +568,338 @@ const OutboundPage: React.FC = () => {
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
       <Box sx={{ width: '100%' }}>
-        <Paper sx={{ mb: 2 }}>
-          <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
-            <Typography variant="h4" component="h1" gutterBottom>
-              📦 출고 관리
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+          <Box sx={{ 
+            width: 48, 
+            height: 48, 
+            borderRadius: 2, 
+            bgcolor: '#1976d2', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            mr: 2
+          }}>
+            <InventoryIcon sx={{ color: 'white', fontSize: 24 }} />
+          </Box>
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2', mb: 0.5 }}>
+              출고 관리
             </Typography>
-            <Typography variant="body1" color="text.secondary">
+            <Typography variant="body1" sx={{ color: 'text.secondary' }}>
               부품 출고 이력 조회 및 신규 출고 등록
             </Typography>
           </Box>
+        </Box>
+        
+        <Card>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs 
+              value={tabValue} 
+              onChange={(_, newValue) => setTabValue(newValue)}
+              sx={{ 
+                '& .MuiTab-root': {
+                  minHeight: 64,
+                  fontSize: '1rem',
+                  fontWeight: 500
+                },
+                '& .Mui-selected': {
+                  color: '#1976d2 !important',
+                  fontWeight: 'bold'
+                },
+                '& .MuiTabs-indicator': {
+                  backgroundColor: '#1976d2',
+                  height: 3
+                }
+              }}
+            >
+              <Tab 
+                icon={<SearchIcon />} 
+                label="출고 이력 검색" 
+                iconPosition="start"
+              />
+              <Tab 
+                icon={<AddIcon />} 
+                label="신규 출고 등록" 
+                iconPosition="start"
+              />
+            </Tabs>
+          </Box>
           
-          <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
-            <Tab 
-              icon={<SearchIcon />} 
-              label="출고 이력 검색" 
-              id="outbound-tab-0"
-              aria-controls="outbound-tabpanel-0"
-            />
-            <Tab 
-              icon={<AddIcon />} 
-              label="신규 출고 등록" 
-              id="outbound-tab-1"
-              aria-controls="outbound-tabpanel-1"
-            />
-          </Tabs>
-        </Paper>
+          <CardContent sx={{ p: 3 }}>
 
-        {/* 출고 이력 검색 탭 */}
-        <TabPanel value={tabValue} index={0}>
-          <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              🔍 검색 조건
-            </Typography>
+            <TabPanel value={tabValue} index={0}>
+              <Typography variant="h6" gutterBottom>
+                출고 이력 검색
+              </Typography>
+              
+              <Paper sx={{ p: 3, mb: 3, bgcolor: '#f8f9fa' }}>
+                <Typography variant="h6" gutterBottom sx={{ mb: 2, fontWeight: 'bold' }}>
+                  🔍 검색 조건
+                </Typography>
             
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>기간 선택</InputLabel>
-                  <Select
-                    value={searchFilters.dateRange}
-                    label="기간 선택"
-                    onChange={(e) => setSearchFilters(prev => ({ ...prev, dateRange: e.target.value }))}
-                  >
-                    {dateRangeOptions.map(option => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={3}>
+                    <FormControl fullWidth>
+                      <InputLabel>기간 선택</InputLabel>
+                      <Select
+                        value={searchFilters.dateRange}
+                        label="기간 선택"
+                        onChange={(e) => setSearchFilters(prev => ({ ...prev, dateRange: e.target.value }))}
+                      >
+                        <MenuItem value="all">전체</MenuItem>
+                        <MenuItem value="today">오늘</MenuItem>
+                        <MenuItem value="week">최근 7일</MenuItem>
+                        <MenuItem value="month">이번 달</MenuItem>
+                        <MenuItem value="custom">직접 선택</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  
+                  {searchFilters.dateRange === 'custom' && (
+                    <>
+                      <Grid item xs={12} md={3}>
+                        <DatePicker
+                          label="시작일"
+                          value={searchFilters.startDate}
+                          onChange={(date) => setSearchFilters(prev => ({ ...prev, startDate: date }))}
+                          slotProps={{
+                            textField: { fullWidth: true }
+                          }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={3}>
+                        <DatePicker
+                          label="종료일"
+                          value={searchFilters.endDate}
+                          onChange={(date) => setSearchFilters(prev => ({ ...prev, endDate: date }))}
+                          slotProps={{
+                            textField: { fullWidth: true }
+                          }}
+                        />
+                      </Grid>
+                    </>
+                  )}
+                  
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      fullWidth
+                      label="부품 코드 검색"
+                      placeholder="MT001"
+                      value={searchFilters.partCode}
+                      onChange={(e) => setSearchFilters(prev => ({ ...prev, partCode: e.target.value }))}
+                      helperText="부품 코드로 검색"
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      fullWidth
+                      label="요청자 검색"
+                      placeholder="홍길동"
+                      value={searchFilters.requester}
+                      onChange={(e) => setSearchFilters(prev => ({ ...prev, requester: e.target.value }))}
+                      helperText="요청자명으로 검색"
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <Button
+                        variant="contained"
+                        startIcon={<SearchIcon />}
+                        onClick={searchOutboundRecords}
+                        disabled={loading}
+                      >
+                        검색
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        startIcon={<DownloadIcon />}
+                        onClick={exportToExcel}
+                        disabled={outboundRecords.length === 0}
+                      >
+                        Excel 내보내기
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        startIcon={<ReportIcon />}
+                        onClick={generateReport}
+                        disabled={outboundRecords.length === 0}
+                      >
+                        보고서 생성
+                      </Button>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
               
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="부품 코드 검색"
-                  placeholder="MT001"
-                  value={searchFilters.partCode}
-                  onChange={(e) => setSearchFilters(prev => ({ ...prev, partCode: e.target.value }))}
-                  InputProps={{
-                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+              <TableContainer component={Paper} sx={{ mb: 3 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'part_code'}
+                          direction={sortField === 'part_code' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('part_code')}
+                        >
+                          <strong>부품 코드</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'part_name'}
+                          direction={sortField === 'part_name' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('part_name')}
+                        >
+                          <strong>부품명</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'quantity'}
+                          direction={sortField === 'quantity' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('quantity')}
+                        >
+                          <strong>수량</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell><strong>단위</strong></TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'outbound_date'}
+                          direction={sortField === 'outbound_date' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('outbound_date')}
+                        >
+                          <strong>출고일</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'requester'}
+                          direction={sortField === 'requester' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('requester')}
+                        >
+                          <strong>요청자</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'department'}
+                          direction={sortField === 'department' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('department')}
+                        >
+                          <strong>부서</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell><strong>설비 ID</strong></TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'purpose'}
+                          direction={sortField === 'purpose' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('purpose')}
+                        >
+                          <strong>용도</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell><strong>참조번호</strong></TableCell>
+                      <TableCell><strong>등록자</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {getPaginatedRecords().length > 0 ? (
+                      getPaginatedRecords().map((record) => (
+                      <TableRow key={record.outbound_id} hover>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight="bold">
+                            {record.part_code}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{record.part_name}</TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="body2" fontWeight="bold">
+                              {record.quantity.toLocaleString()}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption" color="text.secondary">
+                            {record.unit}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{format(new Date(record.outbound_date), 'yyyy-MM-dd')}</TableCell>
+                        <TableCell>{record.requester}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={record.department} 
+                            size="small" 
+                            color="secondary"
+                          />
+                        </TableCell>
+                        <TableCell>{record.equipment_id || '-'}</TableCell>
+                        <TableCell>{record.purpose}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={record.reference_number} 
+                            size="small" 
+                            color="info" 
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell>{record.created_by}</TableCell>
+                      </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            검색 결과가 없습니다.
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              
+              {outboundRecords.length > 0 && (
+                <TablePagination
+                  component="div"
+                  count={outboundRecords.length}
+                  page={page}
+                  onPageChange={(_, newPage) => setPage(newPage)}
+                  rowsPerPage={rowsPerPage}
+                  onRowsPerPageChange={(e) => {
+                    setRowsPerPage(parseInt(e.target.value));
+                    setPage(0);
                   }}
+                  rowsPerPageOptions={[5, 10, 25, 50]}
+                  labelRowsPerPage="페이지당 행 수:"
+                  labelDisplayedRows={({ from, to, count }) =>
+                    `${count}개 중 ${from}-${to}`
+                  }
+                  sx={{ borderTop: 1, borderColor: 'divider' }}
                 />
-              </Grid>
-              
-              {searchFilters.dateRange === 'custom' && (
-                <>
-                  <Grid item xs={12} md={6}>
-                    <DatePicker
-                      label="시작일"
-                      value={searchFilters.startDate}
-                      onChange={(date) => setSearchFilters(prev => ({ ...prev, startDate: date }))}
-                      slotProps={{
-                        textField: { fullWidth: true }
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <DatePicker
-                      label="종료일"
-                      value={searchFilters.endDate}
-                      onChange={(date) => setSearchFilters(prev => ({ ...prev, endDate: date }))}
-                      slotProps={{
-                        textField: { fullWidth: true }
-                      }}
-                    />
-                  </Grid>
-                </>
               )}
               
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="요청자 검색"
-                  placeholder="홍길동"
-                  value={searchFilters.requester}
-                  onChange={(e) => setSearchFilters(prev => ({ ...prev, requester: e.target.value }))}
-                  InputProps={{
-                    startAdornment: <PersonIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                  }}
-                />
-              </Grid>
-              
-              <Grid item xs={12}>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <Button
-                    variant="contained"
-                    startIcon={loading ? <CircularProgress size={20} /> : <SearchIcon />}
-                    onClick={searchOutboundRecords}
-                    disabled={loading}
-                  >
-                    검색
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    startIcon={<DownloadIcon />}
-                    onClick={exportToExcel}
-                    disabled={outboundRecords.length === 0}
-                  >
-                    Excel 내보내기
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    startIcon={<ReportIcon />}
-                    onClick={generateReport}
-                    disabled={outboundRecords.length === 0}
-                  >
-                    보고서 생성
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
+              {outboundRecords.length > 0 && (
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      📊 검색 결과: {outboundRecords.length}건
+                    </Typography>
+                  </Box>
+                </Alert>
+              )}
+            </TabPanel>
 
-          {/* 검색 결과 */}
-          <Paper>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>출고 ID</TableCell>
-                    <TableCell>부품 코드</TableCell>
-                    <TableCell>부품명</TableCell>
-                    <TableCell>수량</TableCell>
-                    <TableCell>단위</TableCell>
-                    <TableCell>출고일</TableCell>
-                    <TableCell>요청자</TableCell>
-                    <TableCell>부서</TableCell>
-                    <TableCell>설비 ID</TableCell>
-                    <TableCell>용도</TableCell>
-                    <TableCell>참조번호</TableCell>
-                    <TableCell>등록자</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {outboundRecords
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((record) => (
-                    <TableRow key={record.outbound_id}>
-                      <TableCell>{record.outbound_id}</TableCell>
-                      <TableCell>
-                        <Chip label={record.part_code} size="small" variant="outlined" />
-                      </TableCell>
-                      <TableCell>{record.part_name}</TableCell>
-                      <TableCell>{record.quantity.toLocaleString()}</TableCell>
-                      <TableCell>{record.unit}</TableCell>
-                      <TableCell>{format(new Date(record.outbound_date), 'yyyy-MM-dd')}</TableCell>
-                      <TableCell>{record.requester}</TableCell>
-                      <TableCell>{record.department}</TableCell>
-                      <TableCell>{record.equipment_id || '-'}</TableCell>
-                      <TableCell>{record.purpose}</TableCell>
-                      <TableCell>
-                        <Chip label={record.reference_number} size="small" />
-                      </TableCell>
-                      <TableCell>{record.created_by}</TableCell>
-                    </TableRow>
-                  ))}
-                  {outboundRecords.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          검색 결과가 없습니다.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            
-            <TablePagination
-              component="div"
-              count={outboundRecords.length}
-              page={page}
-              onPageChange={(_, newPage) => setPage(newPage)}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
-                setPage(0);
-              }}
-              labelRowsPerPage="페이지당 행 수:"
-              labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
-            />
-          </Paper>
-        </TabPanel>
-
-        {/* 신규 출고 등록 탭 */}
-        <TabPanel value={tabValue} index={1}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              ➕ 신규 출고 등록
-            </Typography>
+            <TabPanel value={tabValue} index={1}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <AddIcon color="primary" />
+                  신규 출고 등록
+                </Typography>
             
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
@@ -895,9 +1083,11 @@ const OutboundPage: React.FC = () => {
                   </Button>
                 </Box>
               </Grid>
-            </Grid>
-          </Paper>
-        </TabPanel>
+                </Grid>
+              </Paper>
+            </TabPanel>
+          </CardContent>
+        </Card>
 
         {/* 확인 다이얼로그 */}
         <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog({ open: false, message: '' })}>

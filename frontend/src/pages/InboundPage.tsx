@@ -28,6 +28,7 @@ import {
   DialogActions,
   Chip,
   IconButton,
+  TableSortLabel,
   Autocomplete,
   CircularProgress,
   Pagination,
@@ -114,6 +115,10 @@ const InboundPage: React.FC = () => {
   const [parts, setParts] = useState<Part[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [inboundRecords, setInboundRecords] = useState<InboundRecord[]>([]);
+  const [sortField, setSortField] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
 
@@ -260,11 +265,11 @@ const InboundPage: React.FC = () => {
     setLoading(true);
     try {
       let query = supabase
-        .from('inbound_view')
+        .from('inbound')
         .select(`
           inbound_id, inbound_date, quantity, unit_price, total_price, 
-          currency, reference_number, created_by, part_id, supplier_id,
-          part_code, part_name, supplier_name, part_unit
+          currency, notes, created_at, created_by, part_id, supplier_id,
+          reference_number, part_code, part_name, supplier_name, part_unit
         `);
 
       // 날짜 필터 적용
@@ -286,11 +291,12 @@ const InboundPage: React.FC = () => {
       
       if (error) throw error;
       
-      // 부품 코드 필터 적용 (클라이언트 사이드)
+      // 부품 코드 필터 적용
       let filteredData = data || [];
+      
       if (searchFilters.partCode) {
         filteredData = filteredData.filter(record => 
-          record.part_code.toLowerCase().includes(searchFilters.partCode.toLowerCase())
+          record.part_code?.toLowerCase().includes(searchFilters.partCode.toLowerCase())
         );
       }
       
@@ -468,6 +474,73 @@ ${inboundRecords.map(record =>
     setSnackbar({ open: true, message, severity });
   };
 
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortedRecords = () => {
+    if (!sortField) return inboundRecords;
+    
+    return [...inboundRecords].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+      
+      switch (sortField) {
+        case 'part_code':
+          aValue = a.part_code || '';
+          bValue = b.part_code || '';
+          break;
+        case 'part_name':
+          aValue = a.part_name || '';
+          bValue = b.part_name || '';
+          break;
+        case 'quantity':
+          aValue = a.quantity || 0;
+          bValue = b.quantity || 0;
+          break;
+        case 'inbound_date':
+          aValue = new Date(a.inbound_date);
+          bValue = new Date(b.inbound_date);
+          break;
+        case 'supplier_name':
+          aValue = a.supplier_name || '';
+          bValue = b.supplier_name || '';
+          break;
+        case 'unit_price':
+          aValue = a.unit_price || 0;
+          bValue = b.unit_price || 0;
+          break;
+        case 'total_price':
+          aValue = a.total_price || 0;
+          bValue = b.total_price || 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aValue === 'string') {
+        const result = aValue.localeCompare(bValue);
+        return sortDirection === 'asc' ? result : -result;
+      } else {
+        const result = aValue - bValue;
+        return sortDirection === 'asc' ? result : -result;
+      }
+    });
+  };
+
+  const getPaginatedRecords = () => {
+    const sortedRecords = getSortedRecords();
+    return sortedRecords.slice(
+      page * rowsPerPage,
+      page * rowsPerPage + rowsPerPage
+    );
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
@@ -640,6 +713,9 @@ ${inboundRecords.map(record =>
                         <MenuItem value="ATH">ATH</MenuItem>
                         <MenuItem value="UIL">UIL</MenuItem>
                       </Select>
+                      <Typography variant="caption" sx={{ mt: 0.5, color: 'text.secondary' }}>
+                        공급업체로 검색
+                      </Typography>
                     </FormControl>
                   </Grid>
                   
@@ -679,31 +755,78 @@ ${inboundRecords.map(record =>
                 <Table>
                   <TableHead>
                     <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                      <TableCell><strong>입고 ID</strong></TableCell>
-                      <TableCell><strong>부품 코드</strong></TableCell>
-                      <TableCell><strong>부품명</strong></TableCell>
-                      <TableCell><strong>수량</strong></TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'part_code'}
+                          direction={sortField === 'part_code' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('part_code')}
+                        >
+                          <strong>부품 코드</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'part_name'}
+                          direction={sortField === 'part_name' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('part_name')}
+                        >
+                          <strong>부품명</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'quantity'}
+                          direction={sortField === 'quantity' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('quantity')}
+                        >
+                          <strong>수량</strong>
+                        </TableSortLabel>
+                      </TableCell>
                       <TableCell><strong>단위</strong></TableCell>
-                      <TableCell><strong>입고일</strong></TableCell>
-                      <TableCell><strong>공급업체</strong></TableCell>
-                      <TableCell><strong>단가</strong></TableCell>
-                      <TableCell><strong>총액</strong></TableCell>
-                      <TableCell><strong>참조번호</strong></TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'inbound_date'}
+                          direction={sortField === 'inbound_date' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('inbound_date')}
+                        >
+                          <strong>입고일</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'supplier_name'}
+                          direction={sortField === 'supplier_name' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('supplier_name')}
+                        >
+                          <strong>공급업체</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'unit_price'}
+                          direction={sortField === 'unit_price' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('unit_price')}
+                        >
+                          <strong>단가</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === 'total_price'}
+                          direction={sortField === 'total_price' ? sortDirection : 'asc'}
+                          onClick={() => handleSort('total_price')}
+                        >
+                          <strong>총액</strong>
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell><strong>인보이스번호</strong></TableCell>
                       <TableCell><strong>등록자</strong></TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {inboundRecords.length > 0 ? (
-                      inboundRecords.map((record) => (
+                    {getPaginatedRecords().length > 0 ? (
+                      getPaginatedRecords().map((record) => (
                         <TableRow key={record.inbound_id} hover>
-                          <TableCell>
-                            <Chip 
-                              label={record.inbound_id} 
-                              size="small" 
-                              color="primary" 
-                              variant="outlined"
-                            />
-                          </TableCell>
                           <TableCell>
                             <Typography variant="body2" fontWeight="bold">
                               {record.part_code}
@@ -749,7 +872,7 @@ ${inboundRecords.map(record =>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                           <Typography variant="body2" color="text.secondary">
                             검색 결과가 없습니다.
                           </Typography>
@@ -759,6 +882,26 @@ ${inboundRecords.map(record =>
                   </TableBody>
                 </Table>
               </TableContainer>
+              
+              {inboundRecords.length > 0 && (
+                <TablePagination
+                  component="div"
+                  count={inboundRecords.length}
+                  page={page}
+                  onPageChange={(_, newPage) => setPage(newPage)}
+                  rowsPerPage={rowsPerPage}
+                  onRowsPerPageChange={(e) => {
+                    setRowsPerPage(parseInt(e.target.value));
+                    setPage(0);
+                  }}
+                  rowsPerPageOptions={[5, 10, 25, 50]}
+                  labelRowsPerPage="페이지당 행 수:"
+                  labelDisplayedRows={({ from, to, count }) =>
+                    `${count}개 중 ${from}-${to}`
+                  }
+                  sx={{ borderTop: 1, borderColor: 'divider' }}
+                />
+              )}
               
               {inboundRecords.length > 0 && (
                 <Alert severity="info" sx={{ mb: 3 }}>

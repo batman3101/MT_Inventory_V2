@@ -41,7 +41,8 @@ import {
   TablePagination,
   Avatar,
   Badge,
-  LinearProgress
+  LinearProgress,
+  TableSortLabel
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -169,6 +170,8 @@ const PartsPage: React.FC = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [sortField, setSortField] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [detailsExpanded, setDetailsExpanded] = useState<string | false>(false);
   const [categories, setCategories] = useState<string[]>([]);
 
@@ -465,7 +468,67 @@ const PartsPage: React.FC = () => {
     return matchesSearch && matchesCategory && matchesStatus && matchesStockStatus;
   });
 
-  const paginatedParts = filteredParts.slice(
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortedParts = (parts: PartWithInventory[]) => {
+    if (!sortField) return parts;
+    
+    return [...parts].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+      
+      switch (sortField) {
+        case 'part_code':
+          aValue = a.part_code || '';
+          bValue = b.part_code || '';
+          break;
+        case 'vietnamese_name':
+          aValue = a.vietnamese_name || '';
+          bValue = b.vietnamese_name || '';
+          break;
+        case 'category':
+          aValue = a.category || '';
+          bValue = b.category || '';
+          break;
+        case 'current_stock':
+          aValue = a.current_stock || 0;
+          bValue = b.current_stock || 0;
+          break;
+        case 'stock_status':
+          aValue = a.stock_status || '';
+          bValue = b.stock_status || '';
+          break;
+        case 'stock_value':
+          aValue = a.stock_value || 0;
+          bValue = b.stock_value || 0;
+          break;
+        case 'status':
+          aValue = a.status || '';
+          bValue = b.status || '';
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aValue === 'string') {
+        const result = aValue.localeCompare(bValue);
+        return sortDirection === 'asc' ? result : -result;
+      } else {
+        const result = aValue - bValue;
+        return sortDirection === 'asc' ? result : -result;
+      }
+    });
+  };
+
+  const sortedParts = getSortedParts(filteredParts);
+  const paginatedParts = sortedParts.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
@@ -480,11 +543,29 @@ const PartsPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <InfoIcon />
-        부품 관리
-      </Typography>
+    <Box sx={{ width: '100%' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <Box sx={{ 
+          width: 48, 
+          height: 48, 
+          borderRadius: 2, 
+          bgcolor: '#1976d2', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          mr: 2
+        }}>
+          <InfoIcon sx={{ color: 'white', fontSize: 24 }} />
+        </Box>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2', mb: 0.5 }}>
+            부품 관리
+          </Typography>
+          <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+            부품 정보 조회 및 관리
+          </Typography>
+        </Box>
+      </Box>
 
       {/* 재고 현황 요약 */}
       <Grid container spacing={2} sx={{ mb: 3 }}>

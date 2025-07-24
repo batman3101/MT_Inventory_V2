@@ -30,7 +30,8 @@ import {
   Switch,
   FormControlLabel,
   TablePagination,
-  Avatar
+  Avatar,
+  TableSortLabel
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -100,6 +101,10 @@ const UserManagementPage: React.FC = () => {
   // 삭제 확인 다이얼로그 상태
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserWithDepartment | null>(null);
+  
+  // 정렬 상태
+  const [sortField, setSortField] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     loadUsers();
@@ -383,6 +388,65 @@ const UserManagementPage: React.FC = () => {
     }
   };
 
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortedUsers = (users: UserWithDepartment[]) => {
+    if (!sortField) return users;
+    
+    return [...users].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+      
+      switch (sortField) {
+        case 'username':
+          aValue = a.username || '';
+          bValue = b.username || '';
+          break;
+        case 'full_name':
+          aValue = a.full_name || '';
+          bValue = b.full_name || '';
+          break;
+        case 'email':
+          aValue = a.email || '';
+          bValue = b.email || '';
+          break;
+        case 'role':
+          aValue = a.role || '';
+          bValue = b.role || '';
+          break;
+        case 'department':
+          aValue = a.department?.department_name || '';
+          bValue = b.department?.department_name || '';
+          break;
+        case 'status':
+          aValue = a.is_active ? 'active' : 'inactive';
+          bValue = b.is_active ? 'active' : 'inactive';
+          break;
+        case 'created_at':
+          aValue = new Date(a.created_at);
+          bValue = new Date(b.created_at);
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aValue === 'string') {
+        const result = aValue.localeCompare(bValue);
+        return sortDirection === 'asc' ? result : -result;
+      } else {
+        const result = aValue - bValue;
+        return sortDirection === 'asc' ? result : -result;
+      }
+    });
+  };
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -397,7 +461,8 @@ const UserManagementPage: React.FC = () => {
     return matchesSearch && matchesRole && matchesDepartment && matchesStatus;
   });
 
-  const paginatedUsers = filteredUsers.slice(
+  const sortedUsers = getSortedUsers(filteredUsers);
+  const paginatedUsers = sortedUsers.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
@@ -412,11 +477,29 @@ const UserManagementPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <GroupIcon />
-        사용자 관리
-      </Typography>
+    <Box sx={{ width: '100%' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <Box sx={{ 
+          width: 48, 
+          height: 48, 
+          borderRadius: 2, 
+          bgcolor: '#1976d2', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          mr: 2
+        }}>
+          <GroupIcon sx={{ color: 'white', fontSize: 24 }} />
+        </Box>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2', mb: 0.5 }}>
+            사용자 관리
+          </Typography>
+          <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+            사용자 계정 조회 및 관리
+          </Typography>
+        </Box>
+      </Box>
 
       {/* 사용자 현황 요약 */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -602,14 +685,54 @@ const UserManagementPage: React.FC = () => {
           <TableContainer>
             <Table>
               <TableHead>
-                <TableRow>
-                  <TableCell>사용자 정보</TableCell>
-                  <TableCell>부서</TableCell>
-                  <TableCell>역할</TableCell>
-                  <TableCell>상태</TableCell>
-                  <TableCell>최종 로그인</TableCell>
-                  <TableCell>등록일</TableCell>
-                  <TableCell>작업</TableCell>
+                <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortField === 'full_name'}
+                      direction={sortField === 'full_name' ? sortDirection : 'asc'}
+                      onClick={() => handleSort('full_name')}
+                    >
+                      <strong>사용자 정보</strong>
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortField === 'department'}
+                      direction={sortField === 'department' ? sortDirection : 'asc'}
+                      onClick={() => handleSort('department')}
+                    >
+                      <strong>부서</strong>
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortField === 'role'}
+                      direction={sortField === 'role' ? sortDirection : 'asc'}
+                      onClick={() => handleSort('role')}
+                    >
+                      <strong>역할</strong>
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortField === 'status'}
+                      direction={sortField === 'status' ? sortDirection : 'asc'}
+                      onClick={() => handleSort('status')}
+                    >
+                      <strong>상태</strong>
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell><strong>최종 로그인</strong></TableCell>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortField === 'created_at'}
+                      direction={sortField === 'created_at' ? sortDirection : 'asc'}
+                      onClick={() => handleSort('created_at')}
+                    >
+                      <strong>등록일</strong>
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell><strong>작업</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -718,11 +841,15 @@ const UserManagementPage: React.FC = () => {
             onPageChange={(_, newPage) => setPage(newPage)}
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
+              setRowsPerPage(parseInt(e.target.value));
               setPage(0);
             }}
+            rowsPerPageOptions={[5, 10, 25, 50]}
             labelRowsPerPage="페이지당 행 수:"
-            labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+            labelDisplayedRows={({ from, to, count }) =>
+              `${count}개 중 ${from}-${to}`
+            }
+            sx={{ borderTop: 1, borderColor: 'divider' }}
           />
         </CardContent>
       </Card>

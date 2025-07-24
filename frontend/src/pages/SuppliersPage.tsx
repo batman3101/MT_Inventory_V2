@@ -33,7 +33,8 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  TablePagination
+  TablePagination,
+  TableSortLabel
 } from '@mui/material';
 import {
   Business as BusinessIcon,
@@ -143,6 +144,8 @@ const SuppliersPage: React.FC = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [sortField, setSortField] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [detailsExpanded, setDetailsExpanded] = useState<string | false>(false);
 
   useEffect(() => {
@@ -342,6 +345,53 @@ const SuppliersPage: React.FC = () => {
     }
   };
 
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortedSuppliers = (suppliers: Supplier[]) => {
+    if (!sortField) return suppliers;
+    
+    return [...suppliers].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+      
+      switch (sortField) {
+        case 'supplier_name':
+          aValue = a.supplier_name || '';
+          bValue = b.supplier_name || '';
+          break;
+        case 'contact_person':
+          aValue = a.contact_person || '';
+          bValue = b.contact_person || '';
+          break;
+        case 'status':
+          aValue = a.is_active ? 'active' : 'inactive';
+          bValue = b.is_active ? 'active' : 'inactive';
+          break;
+        case 'created_at':
+          aValue = new Date(a.created_at);
+          bValue = new Date(b.created_at);
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aValue === 'string') {
+        const result = aValue.localeCompare(bValue);
+        return sortDirection === 'asc' ? result : -result;
+      } else {
+        const result = aValue - bValue;
+        return sortDirection === 'asc' ? result : -result;
+      }
+    });
+  };
+
   const filteredSuppliers = suppliers.filter(supplier => {
     const matchesSearch = supplier.supplier_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          supplier.contact_person?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -352,7 +402,8 @@ const SuppliersPage: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const paginatedSuppliers = filteredSuppliers.slice(
+  const sortedSuppliers = getSortedSuppliers(filteredSuppliers);
+  const paginatedSuppliers = sortedSuppliers.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
@@ -360,20 +411,70 @@ const SuppliersPage: React.FC = () => {
 
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <BusinessIcon />
-        공급업체 관리
-      </Typography>
-
-      {/* 탭 메뉴 */}
-      <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
-          <Tab label="공급업체 검색" />
-          <Tab label="공급업체 추가" />
-          <Tab label="공급업체 상세" />
-        </Tabs>
-      </Paper>
+    <Box sx={{ width: '100%' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <Box sx={{ 
+          width: 48, 
+          height: 48, 
+          borderRadius: 2, 
+          bgcolor: '#1976d2', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          mr: 2
+        }}>
+          <BusinessIcon sx={{ color: 'white', fontSize: 24 }} />
+        </Box>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2', mb: 0.5 }}>
+            공급업체 관리
+          </Typography>
+          <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+            공급업체 정보 조회 및 관리
+          </Typography>
+        </Box>
+      </Box>
+      
+      <Card>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs 
+            value={tabValue} 
+            onChange={(_, newValue) => setTabValue(newValue)}
+            sx={{ 
+              '& .MuiTab-root': {
+                minHeight: 64,
+                fontSize: '1rem',
+                fontWeight: 500
+              },
+              '& .Mui-selected': {
+                color: '#1976d2 !important',
+                fontWeight: 'bold'
+              },
+              '& .MuiTabs-indicator': {
+                backgroundColor: '#1976d2',
+                height: 3
+              }
+            }}
+          >
+            <Tab 
+              icon={<SearchIcon />} 
+              label="공급업체 검색" 
+              iconPosition="start"
+            />
+            <Tab 
+              icon={<AddIcon />} 
+              label="공급업체 추가" 
+              iconPosition="start"
+            />
+            <Tab 
+              icon={<BusinessIcon />} 
+              label="공급업체 상세" 
+              iconPosition="start"
+            />
+          </Tabs>
+        </Box>
+        
+        <CardContent sx={{ p: 3 }}>
 
       {/* 공급업체 검색 탭 */}
       <TabPanel value={tabValue} index={0}>
@@ -447,14 +548,46 @@ const SuppliersPage: React.FC = () => {
             <TableContainer>
               <Table>
                 <TableHead>
-                  <TableRow>
-                    <TableCell>공급업체명</TableCell>
-                    <TableCell>담당자</TableCell>
-                    <TableCell>연락처</TableCell>
-                    <TableCell>비고</TableCell>
-                    <TableCell>상태</TableCell>
-                    <TableCell>등록일</TableCell>
-                    <TableCell>작업</TableCell>
+                  <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                    <TableCell>
+                      <TableSortLabel
+                        active={sortField === 'supplier_name'}
+                        direction={sortField === 'supplier_name' ? sortDirection : 'asc'}
+                        onClick={() => handleSort('supplier_name')}
+                      >
+                        <strong>공급업체명</strong>
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={sortField === 'contact_person'}
+                        direction={sortField === 'contact_person' ? sortDirection : 'asc'}
+                        onClick={() => handleSort('contact_person')}
+                      >
+                        <strong>담당자</strong>
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell><strong>연락처</strong></TableCell>
+                    <TableCell><strong>비고</strong></TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={sortField === 'status'}
+                        direction={sortField === 'status' ? sortDirection : 'asc'}
+                        onClick={() => handleSort('status')}
+                      >
+                        <strong>상태</strong>
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={sortField === 'created_at'}
+                        direction={sortField === 'created_at' ? sortDirection : 'asc'}
+                        onClick={() => handleSort('created_at')}
+                      >
+                        <strong>등록일</strong>
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell><strong>작업</strong></TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -529,11 +662,15 @@ const SuppliersPage: React.FC = () => {
               onPageChange={(_, newPage) => setPage(newPage)}
               rowsPerPage={rowsPerPage}
               onRowsPerPageChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
+                setRowsPerPage(parseInt(e.target.value));
                 setPage(0);
               }}
+              rowsPerPageOptions={[5, 10, 25, 50]}
               labelRowsPerPage="페이지당 행 수:"
-              labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+              labelDisplayedRows={({ from, to, count }) =>
+                `${count}개 중 ${from}-${to}`
+              }
+              sx={{ borderTop: 1, borderColor: 'divider' }}
             />
           </CardContent>
         </Card>
