@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(if [ -d \"CNC_MT_Inventory_V3\" ])",
+      "Bash(then echo \"CNC_MT_Inventory_V3 exists\")",
+      "Bash(else echo \"CNC_MT_Inventory_V3 does not exist\")",
+      "Bash(fi)",
+      "Bash(if [ -d \"client\" ])",
+      "Bash(then echo \"client exists\")",
+      "Bash(else echo \"client does not exist\")",
+      "Bash(if [ -d \"node_modules\" ])",
+      "Bash(then echo \"node_modules exists\")",
+      "Bash(else echo \"node_modules does not exist\")",
+      "Bash(test:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
