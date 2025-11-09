@@ -1144,6 +1144,8 @@ const SuppliersPage: React.FC = () => {
           </Alert>
         )}
       </TabPanel>
+        </CardContent>
+      </Card>
 
       {/* 공급업체 추가 다이얼로그 */}
       <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} maxWidth="md" fullWidth>
