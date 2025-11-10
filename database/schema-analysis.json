@@ -1,0 +1,468 @@
+{
+  "parts": {
+    "columns": {
+      "part_id": {
+        "type": "uuid",
+        "sample": "e256f683-f662-443d-bb2b-c1aba6d51eb9"
+      },
+      "part_code": {
+        "type": "string",
+        "sample": "TR025.4"
+      },
+      "part_name": {
+        "type": "string",
+        "sample": "LIP"
+      },
+      "vietnamese_name": {
+        "type": "string",
+        "sample": "LIP"
+      },
+      "korean_name": {
+        "type": "string",
+        "sample": ""
+      },
+      "spec": {
+        "type": "string",
+        "sample": "-"
+      },
+      "unit": {
+        "type": "string",
+        "sample": "EA"
+      },
+      "category": {
+        "type": "string",
+        "sample": "SPINDLE"
+      },
+      "status": {
+        "type": "string",
+        "sample": "NEW"
+      },
+      "min_stock": {
+        "type": "number",
+        "sample": 1
+      },
+      "description": {
+        "type": "string",
+        "sample": ""
+      },
+      "created_at": {
+        "type": "timestamp",
+        "sample": "2025-09-10T09:32:59.113083+00:00"
+      },
+      "created_by": {
+        "type": "string",
+        "sample": "dungnguyen2002bn"
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "sample": "2025-09-11T08:20:28.422098+00:00"
+      },
+      "updated_by": {
+        "type": "string",
+        "sample": "dungnguyen2002bn"
+      }
+    },
+    "sampleRecord": {
+      "part_id": "e256f683-f662-443d-bb2b-c1aba6d51eb9",
+      "part_code": "TR025.4",
+      "part_name": "LIP",
+      "vietnamese_name": "LIP",
+      "korean_name": "",
+      "spec": "-",
+      "unit": "EA",
+      "category": "SPINDLE",
+      "status": "NEW",
+      "min_stock": 1,
+      "description": "",
+      "created_at": "2025-09-10T09:32:59.113083+00:00",
+      "created_by": "dungnguyen2002bn",
+      "updated_at": "2025-09-11T08:20:28.422098+00:00",
+      "updated_by": "dungnguyen2002bn"
+    }
+  },
+  "suppliers": {
+    "columns": {
+      "supplier_id": {
+        "type": "uuid",
+        "sample": "8e9e9246-aeda-4ef5-8318-53d65a8ebff2"
+      },
+      "supplier_code": {
+        "type": "string",
+        "sample": "ALMT002"
+      },
+      "supplier_name": {
+        "type": "string",
+        "sample": "SAMSOO VINA"
+      },
+      "contact_person": {
+        "type": "string",
+        "sample": "LEE SUNG HWAN"
+      },
+      "email": {
+        "type": "string",
+        "sample": "whwu77@naver.com"
+      },
+      "phone": {
+        "type": "string",
+        "sample": "0395171566"
+      },
+      "address": {
+        "type": "string",
+        "sample": "Thôn Bất Lự, xã Hoàn Sơn, huyện Tiên Du, Bắc Ninh."
+      },
+      "country": {
+        "type": "string",
+        "sample": "VIETNAM"
+      },
+      "website": {
+        "type": "string",
+        "sample": ""
+      },
+      "status": {
+        "type": "string",
+        "sample": "ACTIVE"
+      },
+      "created_at": {
+        "type": "timestamp",
+        "sample": "2025-05-10T07:57:22.020064+00:00"
+      },
+      "created_by": {
+        "type": "string",
+        "sample": "system_migration"
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "sample": "2025-05-10T07:57:22.020064+00:00"
+      }
+    },
+    "sampleRecord": {
+      "supplier_id": "8e9e9246-aeda-4ef5-8318-53d65a8ebff2",
+      "supplier_code": "ALMT002",
+      "supplier_name": "SAMSOO VINA",
+      "contact_person": "LEE SUNG HWAN",
+      "email": "whwu77@naver.com",
+      "phone": "0395171566",
+      "address": "Thôn Bất Lự, xã Hoàn Sơn, huyện Tiên Du, Bắc Ninh.",
+      "country": "VIETNAM",
+      "website": "",
+      "status": "ACTIVE",
+      "created_at": "2025-05-10T07:57:22.020064+00:00",
+      "created_by": "system_migration",
+      "updated_at": "2025-05-10T07:57:22.020064+00:00"
+    }
+  },
+  "inventory": {
+    "columns": {
+      "inventory_id": {
+        "type": "uuid",
+        "sample": "787f2032-e2a9-40c9-a233-f76512631d66"
+      },
+      "part_id": {
+        "type": "uuid",
+        "sample": "70a2ab02-d5b3-42b5-9332-3efdcb5cf1f0"
+      },
+      "current_quantity": {
+        "type": "number",
+        "sample": 8
+      },
+      "last_count_date": {
+        "type": "timestamp",
+        "sample": "2025-05-20T00:00:00+00:00"
+      },
+      "location": {
+        "type": "string",
+        "sample": "main"
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "sample": "2025-08-11T07:26:31.539225+00:00"
+      },
+      "updated_by": {
+        "type": "string",
+        "sample": "dungnguyen2002bn"
+      }
+    },
+    "sampleRecord": {
+      "inventory_id": "787f2032-e2a9-40c9-a233-f76512631d66",
+      "part_id": "70a2ab02-d5b3-42b5-9332-3efdcb5cf1f0",
+      "current_quantity": 8,
+      "last_count_date": "2025-05-20T00:00:00+00:00",
+      "location": "main",
+      "updated_at": "2025-08-11T07:26:31.539225+00:00",
+      "updated_by": "dungnguyen2002bn"
+    }
+  },
+  "inbound": {
+    "columns": {
+      "inbound_id": {
+        "type": "uuid",
+        "sample": "274648fb-2bc5-4be0-a4fa-34a1438c5991"
+      },
+      "inbound_date": {
+        "type": "string",
+        "sample": "2025-05-18"
+      },
+      "part_id": {
+        "type": "uuid",
+        "sample": "55ca5756-7af5-4936-baaf-0403acceab52"
+      },
+      "supplier_id": {
+        "type": "uuid",
+        "sample": "8e9e9246-aeda-4ef5-8318-53d65a8ebff2"
+      },
+      "quantity": {
+        "type": "number",
+        "sample": 110
+      },
+      "unit_price": {
+        "type": "number",
+        "sample": 34000
+      },
+      "total_price": {
+        "type": "number",
+        "sample": 3740000
+      },
+      "currency": {
+        "type": "string",
+        "sample": "₫"
+      },
+      "notes": {
+        "type": "string",
+        "sample": ""
+      },
+      "created_at": {
+        "type": "timestamp",
+        "sample": "2025-05-18T09:11:22.900758+00:00"
+      },
+      "created_by": {
+        "type": "string",
+        "sample": "dangthuymai041988"
+      },
+      "reference_number": {
+        "type": "string",
+        "sample": "IN-20250518-001"
+      },
+      "part_code": {
+        "type": "string",
+        "sample": "MT010"
+      },
+      "part_name": {
+        "type": "string",
+        "sample": "LOWER SOUND TSTM-02"
+      },
+      "supplier_name": {
+        "type": "string",
+        "sample": "SAMSOO VINA"
+      },
+      "part_unit": {
+        "type": "string",
+        "sample": "EA"
+      }
+    },
+    "sampleRecord": {
+      "inbound_id": "274648fb-2bc5-4be0-a4fa-34a1438c5991",
+      "inbound_date": "2025-05-18",
+      "part_id": "55ca5756-7af5-4936-baaf-0403acceab52",
+      "supplier_id": "8e9e9246-aeda-4ef5-8318-53d65a8ebff2",
+      "quantity": 110,
+      "unit_price": 34000,
+      "total_price": 3740000,
+      "currency": "₫",
+      "notes": "",
+      "created_at": "2025-05-18T09:11:22.900758+00:00",
+      "created_by": "dangthuymai041988",
+      "reference_number": "IN-20250518-001",
+      "part_code": "MT010",
+      "part_name": "LOWER SOUND TSTM-02",
+      "supplier_name": "SAMSOO VINA",
+      "part_unit": "EA"
+    }
+  },
+  "outbound": {
+    "columns": {
+      "outbound_id": {
+        "type": "uuid",
+        "sample": "85ead71c-a161-4949-b1ff-c0f01e7d41e6"
+      },
+      "outbound_date": {
+        "type": "string",
+        "sample": "2025-06-08"
+      },
+      "part_id": {
+        "type": "uuid",
+        "sample": "e6de6b28-ffd4-4189-91d6-39e5de6dc4ef"
+      },
+      "quantity": {
+        "type": "number",
+        "sample": 1
+      },
+      "requester": {
+        "type": "string",
+        "sample": "NGA"
+      },
+      "department": {
+        "type": "null",
+        "sample": null
+      },
+      "reason": {
+        "type": "string",
+        "sample": "고장 수리"
+      },
+      "equipment": {
+        "type": "string",
+        "sample": "547"
+      },
+      "notes": {
+        "type": "string",
+        "sample": ""
+      },
+      "created_at": {
+        "type": "timestamp",
+        "sample": "2025-06-08T10:40:38.902385+00:00"
+      },
+      "created_by": {
+        "type": "string",
+        "sample": "nguyennga.hus"
+      },
+      "department_id": {
+        "type": "uuid",
+        "sample": "18416a0f-cf05-42f4-9ebd-1ac9580a2bbe"
+      },
+      "reference_number": {
+        "type": "string",
+        "sample": "OUT-20250608-019"
+      },
+      "part_code": {
+        "type": "string",
+        "sample": "MT020.1"
+      },
+      "part_name": {
+        "type": "string",
+        "sample": "AMP FAN-0575"
+      },
+      "department_name": {
+        "type": "string",
+        "sample": "자재 입출고 관리"
+      },
+      "part_unit": {
+        "type": "string",
+        "sample": "EA"
+      }
+    },
+    "sampleRecord": {
+      "outbound_id": "85ead71c-a161-4949-b1ff-c0f01e7d41e6",
+      "outbound_date": "2025-06-08",
+      "part_id": "e6de6b28-ffd4-4189-91d6-39e5de6dc4ef",
+      "quantity": 1,
+      "requester": "NGA",
+      "department": null,
+      "reason": "고장 수리",
+      "equipment": "547",
+      "notes": "",
+      "created_at": "2025-06-08T10:40:38.902385+00:00",
+      "created_by": "nguyennga.hus",
+      "department_id": "18416a0f-cf05-42f4-9ebd-1ac9580a2bbe",
+      "reference_number": "OUT-20250608-019",
+      "part_code": "MT020.1",
+      "part_name": "AMP FAN-0575",
+      "department_name": "자재 입출고 관리",
+      "part_unit": "EA"
+    }
+  },
+  "users": {
+    "columns": {
+      "user_id": {
+        "type": "uuid",
+        "sample": "6c02062d-77fe-4a28-92c0-a46f1cd052b5"
+      },
+      "username": {
+        "type": "string",
+        "sample": "zetooo1972@gmail.com"
+      },
+      "full_name": {
+        "type": "string",
+        "sample": "PARK YOUNG IL"
+      },
+      "email": {
+        "type": "string",
+        "sample": "zetooo1972@gmail.com"
+      },
+      "role": {
+        "type": "string",
+        "sample": "system_admin"
+      },
+      "department": {
+        "type": "null",
+        "sample": null
+      },
+      "created_at": {
+        "type": "timestamp",
+        "sample": "2025-05-08T06:41:20.646245+00:00"
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "sample": "2025-05-08T06:41:20.646245+00:00"
+      },
+      "profile_image_url": {
+        "type": "null",
+        "sample": null
+      },
+      "phone_number": {
+        "type": "string",
+        "sample": "0388715364"
+      },
+      "position": {
+        "type": "null",
+        "sample": null
+      },
+      "last_password_change": {
+        "type": "null",
+        "sample": null
+      },
+      "login_attempt_count": {
+        "type": "number",
+        "sample": 0
+      },
+      "account_expiry_date": {
+        "type": "null",
+        "sample": null
+      },
+      "user_settings": {
+        "type": "object",
+        "sample": {}
+      },
+      "password_hash": {
+        "type": "string",
+        "sample": "$2b$12$cPPk6pouCHQBJ3HDV1Qek.niLgm4eNdg8d1HsxTKjejKoeITWeYM6"
+      },
+      "is_active": {
+        "type": "boolean",
+        "sample": true
+      },
+      "department_id": {
+        "type": "null",
+        "sample": null
+      }
+    },
+    "sampleRecord": {
+      "user_id": "6c02062d-77fe-4a28-92c0-a46f1cd052b5",
+      "username": "zetooo1972@gmail.com",
+      "full_name": "PARK YOUNG IL",
+      "email": "zetooo1972@gmail.com",
+      "role": "system_admin",
+      "department": null,
+      "created_at": "2025-05-08T06:41:20.646245+00:00",
+      "updated_at": "2025-05-08T06:41:20.646245+00:00",
+      "profile_image_url": null,
+      "phone_number": "0388715364",
+      "position": null,
+      "last_password_change": null,
+      "login_attempt_count": 0,
+      "account_expiry_date": null,
+      "user_settings": {},
+      "password_hash": "$2b$12$cPPk6pouCHQBJ3HDV1Qek.niLgm4eNdg8d1HsxTKjejKoeITWeYM6",
+      "is_active": true,
+      "department_id": null
+    }
+  }
+}

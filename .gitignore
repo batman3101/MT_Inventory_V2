@@ -46,4 +46,9 @@ wheels/
 
 # 운영체제 관련 파일
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# MCP configuration (contains tokens)
+.mcp.json
+.claude/
+.env.local 
