@@ -4,7 +4,8 @@
       "Bash(do sed -i '1i// @ts-nocheck' \"$file\")",
       "Bash(npm run lint)",
       "Bash(npm uninstall:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

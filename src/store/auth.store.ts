@@ -1,17 +1,26 @@
 /**
  * Auth (인증) Zustand 스토어
  *
- * ⚠️ Supabase Auth를 사용합니다.
+ * ⚠️ 커스텀 인증 API를 사용합니다 (users 테이블 기반).
+ * Streamlit 앱과 동일한 인증 방식을 사용합니다.
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { supabase } from '../lib/supabase';
-import type { User, Session } from '@supabase/supabase-js';
+import axios from 'axios';
+import type { User as CustomUser } from '../types/database.types';
+
+const API_URL = 'http://localhost:3001';
+
+// Supabase Auth의 User 타입 대신 커스텀 User 타입 사용
+interface Session {
+  access_token: string;
+  user: CustomUser;
+}
 
 interface AuthState {
   // 상태
-  user: User | null;
+  user: CustomUser | null;
   session: Session | null;
   isLoading: boolean;
   error: string | null;
@@ -38,26 +47,33 @@ export const useAuthStore = create<AuthState>()(
       signIn: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
         try {
-          const { data, error } = await supabase.auth.signInWithPassword({
+          const response = await axios.post(`${API_URL}/api/auth/login`, {
             email,
             password,
           });
 
-          if (error) throw error;
+          const { user } = response.data;
+
+          // 세션 생성 (간단한 토큰 기반)
+          const session: Session = {
+            access_token: `token_${user.user_id}`,
+            user,
+          };
 
           set({
-            user: data.user,
-            session: data.session,
+            user,
+            session,
             isAuthenticated: true,
             isLoading: false,
           });
         } catch (error: any) {
+          const errorMessage = error.response?.data?.error || 'Login failed';
           set({
-            error: error.message || 'Login failed',
+            error: errorMessage,
             isLoading: false,
             isAuthenticated: false,
           });
-          throw error;
+          throw new Error(errorMessage);
         }
       },
 
@@ -65,9 +81,7 @@ export const useAuthStore = create<AuthState>()(
       signOut: async () => {
         set({ isLoading: true, error: null });
         try {
-          const { error } = await supabase.auth.signOut();
-          if (error) throw error;
-
+          // 로컬 상태만 클리어 (서버에 로그아웃 API가 필요하면 나중에 추가)
           set({
             user: null,
             session: null,
@@ -83,29 +97,13 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 세션 확인
+      // 세션 확인 (persist 미들웨어가 자동으로 처리)
       checkSession: async () => {
         set({ isLoading: true });
         try {
-          const { data: { session }, error } = await supabase.auth.getSession();
-
-          if (error) throw error;
-
-          if (session) {
-            set({
-              user: session.user,
-              session: session,
-              isAuthenticated: true,
-              isLoading: false,
-            });
-          } else {
-            set({
-              user: null,
-              session: null,
-              isAuthenticated: false,
-              isLoading: false,
-            });
-          }
+          // persist 미들웨어가 localStorage에서 자동으로 복원
+          // 추가 검증이 필요한 경우 여기에 구현
+          set({ isLoading: false });
         } catch (error: any) {
           set({
             error: error.message || 'Session check failed',
