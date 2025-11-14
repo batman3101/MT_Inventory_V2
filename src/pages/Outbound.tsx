@@ -1,9 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { Card, Input, Button, Space, Typography, Row, Col, Statistic, Modal, Form, message, DatePicker, Select, Spin, Alert, InputNumber } from 'antd';
-import { PlusOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, DownloadOutlined, ClearOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
+
+dayjs.extend(isBetween);
 import { useOutboundStore, usePartsStore, useDepartmentsStore } from '../store';
 import type { Outbound } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
@@ -11,6 +14,7 @@ import { ResizableTable } from '../components/ResizableTable';
 
 const { Title } = Typography;
 const { Option } = Select;
+const { RangePicker } = DatePicker;
 
 /**
  * Outbound (출고) 페이지
@@ -20,6 +24,7 @@ const { Option } = Select;
 const Outbound = () => {
   const { t } = useTranslation();
   const [searchText, setSearchText] = useState('');
+  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Outbound | null>(null);
   const [form] = Form.useForm();
@@ -29,6 +34,22 @@ const Outbound = () => {
   const { outbounds, isLoading, error, stats, fetchOutbounds, fetchOutboundStats, createOutbound, updateOutbound, deleteOutbound } = useOutboundStore();
   const { parts, fetchParts } = usePartsStore();
   const { departments, fetchDepartments } = useDepartmentsStore();
+
+  // 동적 필터 옵션 생성
+  const getDepartmentFilters = () => {
+    const deptNames = [...new Set(outbounds.map(item => item.department_name).filter(Boolean))];
+    return deptNames.map(name => ({ text: name, value: name }));
+  };
+
+  const getPartCodeFilters = () => {
+    const partCodes = [...new Set(outbounds.map(item => item.part_code).filter(Boolean))];
+    return partCodes.map(code => ({ text: code, value: code }));
+  };
+
+  const getReasonFilters = () => {
+    const reasons = [...new Set(outbounds.map(item => item.reason).filter(Boolean))];
+    return reasons.map(reason => ({ text: reason, value: reason }));
+  };
 
   // 컴포넌트 마운트 시 실제 데이터 로드
   useEffect(() => {
@@ -117,6 +138,7 @@ const Outbound = () => {
       dataIndex: 'reference_number',
       key: 'reference_number',
       width: 140,
+      sorter: (a, b) => (a.reference_number || '').localeCompare(b.reference_number || ''),
     },
     {
       title: t('outbound.outboundDate'),
@@ -131,17 +153,26 @@ const Outbound = () => {
       dataIndex: 'department_name',
       key: 'department_name',
       width: 150,
+      sorter: (a, b) => (a.department_name || '').localeCompare(b.department_name || ''),
+      filters: getDepartmentFilters(),
+      onFilter: (value, record) => record.department_name === value,
+      filterSearch: true,
     },
     {
       title: t('parts.partCode'),
       dataIndex: 'part_code',
       key: 'part_code',
       width: 120,
+      sorter: (a, b) => (a.part_code || '').localeCompare(b.part_code || ''),
+      filters: getPartCodeFilters(),
+      onFilter: (value, record) => record.part_code === value,
+      filterSearch: true,
     },
     {
       title: t('outbound.partName'),
       dataIndex: 'part_name',
       key: 'part_name',
+      sorter: (a, b) => (a.part_name || '').localeCompare(b.part_name || ''),
     },
     {
       title: t('outbound.quantity'),
@@ -157,18 +188,24 @@ const Outbound = () => {
       dataIndex: 'requester',
       key: 'requester',
       width: 120,
+      sorter: (a, b) => (a.requester || '').localeCompare(b.requester || ''),
     },
     {
       title: t('outbound.reason'),
       dataIndex: 'reason',
       key: 'reason',
       width: 150,
+      sorter: (a, b) => (a.reason || '').localeCompare(b.reason || ''),
+      filters: getReasonFilters(),
+      onFilter: (value, record) => record.reason === value,
+      filterSearch: true,
     },
     {
       title: t('outbound.equipment'),
       dataIndex: 'equipment',
       key: 'equipment',
       width: 120,
+      sorter: (a, b) => (a.equipment || '').localeCompare(b.equipment || ''),
     },
     {
       title: t('inventory.actions'),
@@ -188,19 +225,33 @@ const Outbound = () => {
     },
   ];
 
-  // 검색 필터링
+  // 검색 및 날짜 필터링
   const filteredList = outbounds.filter(item => {
-    if (!searchText) return true;
-    const search = searchText.toLowerCase();
-    return (
-      item.reference_number?.toLowerCase().includes(search) ||
-      item.department_name?.toLowerCase().includes(search) ||
-      item.part_code?.toLowerCase().includes(search) ||
-      item.part_name?.toLowerCase().includes(search) ||
-      item.requester?.toLowerCase().includes(search) ||
-      item.reason?.toLowerCase().includes(search) ||
-      item.equipment?.toLowerCase().includes(search)
-    );
+    // 검색 필터
+    if (searchText) {
+      const search = searchText.toLowerCase();
+      const matchesSearch =
+        item.reference_number?.toLowerCase().includes(search) ||
+        item.department_name?.toLowerCase().includes(search) ||
+        item.part_code?.toLowerCase().includes(search) ||
+        item.part_name?.toLowerCase().includes(search) ||
+        item.requester?.toLowerCase().includes(search) ||
+        item.reason?.toLowerCase().includes(search) ||
+        item.equipment?.toLowerCase().includes(search);
+      if (!matchesSearch) return false;
+    }
+
+    // 날짜 필터
+    if (dateRange[0] && dateRange[1]) {
+      const itemDate = dayjs(item.outbound_date);
+      const startDate = dateRange[0].startOf('day');
+      const endDate = dateRange[1].endOf('day');
+      if (!itemDate.isBetween(startDate, endDate, null, '[]')) {
+        return false;
+      }
+    }
+
+    return true;
   });
 
   // Excel 내보내기
@@ -286,24 +337,45 @@ const Outbound = () => {
         </Row>
 
         <Card>
-          <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
-            <Input
-              placeholder={t('common.search')}
-              prefix={<SearchOutlined />}
-              style={{ width: 300 }}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-            />
-            <Space>
-              <span>{t('common.total')}: {filteredList.length} {t('common.items')}</span>
-              <Button
-                type="default"
-                icon={<DownloadOutlined />}
-                onClick={handleExportExcel}
-              >
-                {t('common.exportExcel')}
-              </Button>
+          <Space direction="vertical" style={{ marginBottom: 16, width: '100%' }} size="middle">
+            <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+              <Space>
+                <Input
+                  placeholder={t('common.search')}
+                  prefix={<SearchOutlined />}
+                  style={{ width: 300 }}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                />
+                <RangePicker
+                  value={dateRange}
+                  onChange={(dates) => setDateRange(dates as [Dayjs | null, Dayjs | null])}
+                  format="YYYY-MM-DD"
+                  placeholder={[t('common.startDate'), t('common.endDate')]}
+                  style={{ width: 260 }}
+                  allowClear
+                />
+                <Button
+                  icon={<ClearOutlined />}
+                  onClick={() => {
+                    setSearchText('');
+                    setDateRange([null, null]);
+                  }}
+                >
+                  {t('common.resetFilter')}
+                </Button>
+              </Space>
+              <Space>
+                <span>{t('common.total')}: {filteredList.length} {t('common.items')}</span>
+                <Button
+                  type="default"
+                  icon={<DownloadOutlined />}
+                  onClick={handleExportExcel}
+                >
+                  {t('common.exportExcel')}
+                </Button>
+              </Space>
             </Space>
           </Space>
 

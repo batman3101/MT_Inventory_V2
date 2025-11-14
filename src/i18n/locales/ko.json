@@ -202,7 +202,14 @@
     "selectPart": "부품 선택",
     "selectSupplier": "공급업체 선택",
     "selectDepartment": "부서 선택",
-    "invalidEmail": "유효하지 않은 이메일 형식입니다"
+    "invalidEmail": "유효하지 않은 이메일 형식입니다",
+    "dateFilter": "날짜 필터",
+    "startDate": "시작일",
+    "endDate": "종료일",
+    "dateRange": "기간",
+    "filterByDate": "날짜로 필터",
+    "resetFilter": "필터 초기화",
+    "selectDateRange": "기간 선택"
   },
   "language": {
     "korean": "한국어",
@@ -260,10 +267,14 @@
     "weekly": "주별",
     "monthly": "월별",
     "yearly": "연별",
+    "custom": "사용자 지정",
     "period": "기간",
     "selectPeriod": "기간 선택",
+    "customDateRange": "기간 직접 선택",
     "inboundAnalysis": "입고 분석",
     "outboundAnalysis": "출고 분석",
+    "inboundValue": "입고 금액",
+    "outboundValue": "출고 금액",
     "inventoryTrend": "재고 추이",
     "topParts": "주요 부품",
     "byCategory": "카테고리별",
@@ -279,6 +290,17 @@
     "summary": "요약",
     "details": "상세",
     "exportReport": "보고서 내보내기",
-    "noDataAvailable": "표시할 데이터가 없습니다"
+    "noDataAvailable": "표시할 데이터가 없습니다",
+    "topInboundParts": "입고량 상위 부품",
+    "topOutboundParts": "출고량 상위 부품",
+    "topInboundPartsByValue": "입고 금액 상위 부품",
+    "topOutboundPartsByValue": "출고 금액 상위 부품",
+    "categoryBreakdown": "카테고리별 분석",
+    "supplierBreakdown": "공급업체별 분석",
+    "departmentBreakdown": "부서별 출고 분석",
+    "rank": "순위",
+    "percentage": "비율",
+    "value": "금액",
+    "viewMore": "더보기"
   }
 }

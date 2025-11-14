@@ -80,24 +80,43 @@ const Users = () => {
     }
   };
 
+  // 동적 필터 옵션 생성
+  const getRoleFilters = () => {
+    const roles = [...new Set(users.map(item => item.role).filter(Boolean))];
+    return roles.map(role => ({ text: t(`users.roles.${role.toLowerCase()}`) || role, value: role }));
+  };
+
+  const getStatusFilters = () => {
+    const statuses = [...new Set(users.map(item => item.status).filter(Boolean))];
+    return statuses.map(status => ({
+      text: status === 'ACTIVE' ? t('users.active') : t('users.inactive'),
+      value: status
+    }));
+  };
+
   const columns: ColumnsType<User> = [
     {
       title: t('users.username'),
       dataIndex: 'username',
       key: 'username',
       width: 150,
+      sorter: (a, b) => (a.username || '').localeCompare(b.username || ''),
     },
     {
       title: t('users.email'),
       dataIndex: 'email',
       key: 'email',
       width: 200,
+      sorter: (a, b) => (a.email || '').localeCompare(b.email || ''),
     },
     {
       title: t('users.role'),
       dataIndex: 'role',
       key: 'role',
       width: 120,
+      sorter: (a, b) => a.role.localeCompare(b.role),
+      filters: getRoleFilters(),
+      onFilter: (value, record) => record.role === value,
       render: (role: string) => {
         const roleColors: Record<string, string> = {
           ADMIN: 'red',
@@ -117,6 +136,9 @@ const Users = () => {
       dataIndex: 'status',
       key: 'status',
       width: 100,
+      sorter: (a, b) => a.status.localeCompare(b.status),
+      filters: getStatusFilters(),
+      onFilter: (value, record) => record.status === value,
       render: (status: string) => (
         <Tag color={status === 'ACTIVE' ? 'success' : 'default'}>
           {status === 'ACTIVE' ? t('users.active') : t('users.inactive')}
@@ -128,6 +150,7 @@ const Users = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 150,
+      sorter: (a, b) => dayjs(a.created_at).diff(dayjs(b.created_at)),
       render: (date: string) => dayjs(date).format('YYYY-MM-DD'),
     },
     {
@@ -135,6 +158,11 @@ const Users = () => {
       dataIndex: 'last_login',
       key: 'last_login',
       width: 150,
+      sorter: (a, b) => {
+        if (!a.last_login) return 1;
+        if (!b.last_login) return -1;
+        return dayjs(a.last_login).diff(dayjs(b.last_login));
+      },
       render: (date: string | null) =>
         date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-',
     },

@@ -1,9 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { Card, Input, Button, Space, Typography, Row, Col, Statistic, Modal, Form, message, DatePicker, Select, Spin, Alert, InputNumber } from 'antd';
-import { PlusOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, DownloadOutlined, ClearOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
+
+dayjs.extend(isBetween);
 import { useInboundStore, usePartsStore, useSuppliersStore } from '../store';
 import type { Inbound } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
@@ -11,6 +14,7 @@ import { ResizableTable } from '../components/ResizableTable';
 
 const { Title } = Typography;
 const { Option } = Select;
+const { RangePicker } = DatePicker;
 
 /**
  * Inbound (입고) 페이지
@@ -20,6 +24,7 @@ const { Option } = Select;
 const Inbound = () => {
   const { t } = useTranslation();
   const [searchText, setSearchText] = useState('');
+  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Inbound | null>(null);
   const [form] = Form.useForm();
@@ -29,6 +34,17 @@ const Inbound = () => {
   const { inbounds, isLoading, error, stats, fetchInbounds, fetchInboundStats, createInbound, updateInbound, deleteInbound } = useInboundStore();
   const { parts, fetchParts } = usePartsStore();
   const { suppliers, fetchSuppliers } = useSuppliersStore();
+
+  // 동적 필터 옵션 생성
+  const getSupplierFilters = () => {
+    const supplierNames = [...new Set(inbounds.map(item => item.supplier_name).filter(Boolean))];
+    return supplierNames.map(name => ({ text: name, value: name }));
+  };
+
+  const getPartCodeFilters = () => {
+    const partCodes = [...new Set(inbounds.map(item => item.part_code).filter(Boolean))];
+    return partCodes.map(code => ({ text: code, value: code }));
+  };
 
   // 컴포넌트 마운트 시 실제 데이터 로드
   useEffect(() => {
@@ -116,6 +132,7 @@ const Inbound = () => {
       dataIndex: 'reference_number',
       key: 'reference_number',
       width: 140,
+      sorter: (a, b) => (a.reference_number || '').localeCompare(b.reference_number || ''),
     },
     {
       title: t('inbound.receiveDate'),
@@ -129,17 +146,26 @@ const Inbound = () => {
       title: t('inbound.supplier'),
       dataIndex: 'supplier_name',
       key: 'supplier_name',
+      sorter: (a, b) => (a.supplier_name || '').localeCompare(b.supplier_name || ''),
+      filters: getSupplierFilters(),
+      onFilter: (value, record) => record.supplier_name === value,
+      filterSearch: true,
     },
     {
       title: t('parts.partCode'),
       dataIndex: 'part_code',
       key: 'part_code',
       width: 120,
+      sorter: (a, b) => (a.part_code || '').localeCompare(b.part_code || ''),
+      filters: getPartCodeFilters(),
+      onFilter: (value, record) => record.part_code === value,
+      filterSearch: true,
     },
     {
       title: t('inbound.partName'),
       dataIndex: 'part_name',
       key: 'part_name',
+      sorter: (a, b) => (a.part_name || '').localeCompare(b.part_name || ''),
     },
     {
       title: t('inbound.quantity'),
@@ -156,6 +182,7 @@ const Inbound = () => {
       key: 'unit_price',
       width: 120,
       align: 'right',
+      sorter: (a, b) => (a.unit_price || 0) - (b.unit_price || 0),
       render: (price: number, record: Inbound) => price ? `${price.toLocaleString()} ${record.currency || '₫'}` : '-',
     },
     {
@@ -164,6 +191,7 @@ const Inbound = () => {
       key: 'total_price',
       width: 140,
       align: 'right',
+      sorter: (a, b) => (a.total_price || 0) - (b.total_price || 0),
       render: (price: number, record: Inbound) => price ? `${price.toLocaleString()} ${record.currency || '₫'}` : '-',
     },
     {
@@ -184,16 +212,30 @@ const Inbound = () => {
     },
   ];
 
-  // 검색 필터링
+  // 검색 및 날짜 필터링
   const filteredList = inbounds.filter(item => {
-    if (!searchText) return true;
-    const search = searchText.toLowerCase();
-    return (
-      item.reference_number?.toLowerCase().includes(search) ||
-      item.supplier_name?.toLowerCase().includes(search) ||
-      item.part_code?.toLowerCase().includes(search) ||
-      item.part_name?.toLowerCase().includes(search)
-    );
+    // 검색 필터
+    if (searchText) {
+      const search = searchText.toLowerCase();
+      const matchesSearch =
+        item.reference_number?.toLowerCase().includes(search) ||
+        item.supplier_name?.toLowerCase().includes(search) ||
+        item.part_code?.toLowerCase().includes(search) ||
+        item.part_name?.toLowerCase().includes(search);
+      if (!matchesSearch) return false;
+    }
+
+    // 날짜 필터
+    if (dateRange[0] && dateRange[1]) {
+      const itemDate = dayjs(item.inbound_date);
+      const startDate = dateRange[0].startOf('day');
+      const endDate = dateRange[1].endOf('day');
+      if (!itemDate.isBetween(startDate, endDate, null, '[]')) {
+        return false;
+      }
+    }
+
+    return true;
   });
 
   // Excel 내보내기
@@ -272,24 +314,45 @@ const Inbound = () => {
         </Row>
 
         <Card>
-          <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
-            <Input
-              placeholder={t('common.search')}
-              prefix={<SearchOutlined />}
-              style={{ width: 300 }}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-            />
-            <Space>
-              <span>{t('common.total')}: {filteredList.length} {t('common.items')}</span>
-              <Button
-                type="default"
-                icon={<DownloadOutlined />}
-                onClick={handleExportExcel}
-              >
-                {t('common.exportExcel')}
-              </Button>
+          <Space direction="vertical" style={{ marginBottom: 16, width: '100%' }} size="middle">
+            <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+              <Space>
+                <Input
+                  placeholder={t('common.search')}
+                  prefix={<SearchOutlined />}
+                  style={{ width: 300 }}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                />
+                <RangePicker
+                  value={dateRange}
+                  onChange={(dates) => setDateRange(dates as [Dayjs | null, Dayjs | null])}
+                  format="YYYY-MM-DD"
+                  placeholder={[t('common.startDate'), t('common.endDate')]}
+                  style={{ width: 260 }}
+                  allowClear
+                />
+                <Button
+                  icon={<ClearOutlined />}
+                  onClick={() => {
+                    setSearchText('');
+                    setDateRange([null, null]);
+                  }}
+                >
+                  {t('common.resetFilter')}
+                </Button>
+              </Space>
+              <Space>
+                <span>{t('common.total')}: {filteredList.length} {t('common.items')}</span>
+                <Button
+                  type="default"
+                  icon={<DownloadOutlined />}
+                  onClick={handleExportExcel}
+                >
+                  {t('common.exportExcel')}
+                </Button>
+              </Space>
             </Space>
           </Space>
 

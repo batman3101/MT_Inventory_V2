@@ -27,6 +27,33 @@ const Parts = () => {
   // Zustand 스토어에서 실제 데이터 가져오기
   const { parts, isLoading, error, stats, fetchParts, fetchPartsStats, createPart, updatePart, deletePart, searchParts } = usePartsStore();
 
+  // 동적 필터 옵션 생성
+  const getCategoryFilters = () => {
+    const categories = [...new Set(parts.map(item => item.category).filter(Boolean))];
+    return categories.map(cat => ({ text: cat, value: cat }));
+  };
+
+  const getUnitFilters = () => {
+    const units = [...new Set(parts.map(item => item.unit).filter(Boolean))];
+    return units.map(unit => ({ text: unit, value: unit }));
+  };
+
+  const getStatusFilters = () => {
+    const statuses = [...new Set(parts.map(item => item.status).filter(Boolean))];
+    return statuses.map(status => ({ text: status, value: status }));
+  };
+
+  // 모달 Select 옵션 생성 (실제 데이터 기반)
+  const getAllCategories = () => {
+    const categories = [...new Set(parts.map(item => item.category).filter(Boolean))];
+    return categories.sort();
+  };
+
+  const getAllUnits = () => {
+    const units = [...new Set(parts.map(item => item.unit).filter(Boolean))];
+    return units.sort();
+  };
+
   // 컴포넌트 마운트 시 실제 데이터 로드
   useEffect(() => {
     fetchParts();
@@ -135,35 +162,27 @@ const Parts = () => {
       title: t('parts.vietnameseName'),
       dataIndex: 'vietnamese_name',
       key: 'vietnamese_name',
+      sorter: (a, b) => (a.vietnamese_name || '').localeCompare(b.vietnamese_name || ''),
     },
     {
       title: t('parts.category'),
       dataIndex: 'category',
       key: 'category',
-      width: 120,
-      filters: [
-        { text: 'SPINDLE', value: 'SPINDLE' },
-        { text: 'MOTOR', value: 'MOTOR' },
-        { text: 'BEARING', value: 'BEARING' },
-        { text: 'TOOL', value: 'TOOL' },
-        { text: 'ELECTRIC', value: 'ELECTRIC' },
-        { text: 'OTHER', value: 'OTHER' },
-      ],
+      width: 150,
+      sorter: (a, b) => a.category.localeCompare(b.category),
+      filters: getCategoryFilters(),
       onFilter: (value, record) => record.category === value,
+      filterSearch: true,
     },
     {
       title: t('parts.unit'),
       dataIndex: 'unit',
       key: 'unit',
       width: 80,
-      filters: [
-        { text: 'EA', value: 'EA' },
-        { text: 'SET', value: 'SET' },
-        { text: 'M', value: 'M' },
-        { text: 'KG', value: 'KG' },
-        { text: 'L', value: 'L' },
-      ],
+      sorter: (a, b) => a.unit.localeCompare(b.unit),
+      filters: getUnitFilters(),
       onFilter: (value, record) => record.unit === value,
+      filterSearch: true,
     },
     {
       title: t('parts.minStock'),
@@ -171,24 +190,23 @@ const Parts = () => {
       key: 'min_stock',
       width: 100,
       align: 'right',
+      sorter: (a, b) => a.min_stock - b.min_stock,
     },
     {
       title: t('parts.status'),
       dataIndex: 'status',
       key: 'status',
-      width: 100,
-      filters: [
-        { text: 'NEW', value: 'NEW' },
-        { text: 'ACTIVE', value: 'ACTIVE' },
-        { text: 'INACTIVE', value: 'INACTIVE' },
-        { text: 'DISCONTINUED', value: 'DISCONTINUED' },
-      ],
+      width: 120,
+      sorter: (a, b) => a.status.localeCompare(b.status),
+      filters: getStatusFilters(),
       onFilter: (value, record) => record.status === value,
+      filterSearch: true,
       render: (status: string) => {
         let color = 'default';
         if (status === 'ACTIVE') color = 'green';
         if (status === 'NEW') color = 'blue';
         if (status === 'INACTIVE') color = 'red';
+        if (status === 'DISCONTINUED') color = 'orange';
         return <Tag color={color}>{status}</Tag>;
       },
     },
@@ -372,13 +390,14 @@ const Parts = () => {
             label={t('parts.category')}
             rules={[{ required: true, message: t('common.required') }]}
           >
-            <Select placeholder={t('common.selectCategory')}>
-              <Option value="SPINDLE">SPINDLE</Option>
-              <Option value="MOTOR">MOTOR</Option>
-              <Option value="BEARING">BEARING</Option>
-              <Option value="TOOL">TOOL</Option>
-              <Option value="ELECTRIC">ELECTRIC</Option>
-              <Option value="OTHER">OTHER</Option>
+            <Select
+              placeholder={t('common.selectCategory')}
+              showSearch
+              optionFilterProp="children"
+            >
+              {getAllCategories().map(category => (
+                <Option key={category} value={category}>{category}</Option>
+              ))}
             </Select>
           </Form.Item>
 
@@ -394,12 +413,14 @@ const Parts = () => {
             label={t('parts.unit')}
             rules={[{ required: true, message: t('common.required') }]}
           >
-            <Select placeholder={t('common.selectUnit')}>
-              <Option value="EA">EA</Option>
-              <Option value="SET">SET</Option>
-              <Option value="M">M</Option>
-              <Option value="KG">KG</Option>
-              <Option value="L">L</Option>
+            <Select
+              placeholder={t('common.selectUnit')}
+              showSearch
+              optionFilterProp="children"
+            >
+              {getAllUnits().map(unit => (
+                <Option key={unit} value={unit}>{unit}</Option>
+              ))}
             </Select>
           </Form.Item>
 

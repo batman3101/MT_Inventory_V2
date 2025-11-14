@@ -202,7 +202,14 @@
     "selectPart": "Chọn phụ tùng",
     "selectSupplier": "Chọn nhà cung cấp",
     "selectDepartment": "Chọn phòng ban",
-    "invalidEmail": "Định dạng email không hợp lệ"
+    "invalidEmail": "Định dạng email không hợp lệ",
+    "dateFilter": "Lọc theo ngày",
+    "startDate": "Ngày bắt đầu",
+    "endDate": "Ngày kết thúc",
+    "dateRange": "Khoảng thời gian",
+    "filterByDate": "Lọc theo ngày",
+    "resetFilter": "Đặt lại bộ lọc",
+    "selectDateRange": "Chọn khoảng thời gian"
   },
   "language": {
     "korean": "Tiếng Hàn",
@@ -260,10 +267,14 @@
     "weekly": "Hàng tuần",
     "monthly": "Hàng tháng",
     "yearly": "Hàng năm",
+    "custom": "Tùy chỉnh",
     "period": "Thời kỳ",
     "selectPeriod": "Chọn thời kỳ",
+    "customDateRange": "Chọn khoảng thời gian",
     "inboundAnalysis": "Phân tích nhập kho",
     "outboundAnalysis": "Phân tích xuất kho",
+    "inboundValue": "Giá trị nhập kho",
+    "outboundValue": "Giá trị xuất kho",
     "inventoryTrend": "Xu hướng tồn kho",
     "topParts": "Phụ tùng hàng đầu",
     "byCategory": "Theo danh mục",
@@ -279,6 +290,17 @@
     "summary": "Tóm tắt",
     "details": "Chi tiết",
     "exportReport": "Xuất báo cáo",
-    "noDataAvailable": "Không có dữ liệu hiển thị"
+    "noDataAvailable": "Không có dữ liệu hiển thị",
+    "topInboundParts": "Phụ tùng nhập kho hàng đầu",
+    "topOutboundParts": "Phụ tùng xuất kho hàng đầu",
+    "topInboundPartsByValue": "Phụ tùng theo giá trị nhập kho",
+    "topOutboundPartsByValue": "Phụ tùng theo giá trị xuất kho",
+    "categoryBreakdown": "Phân tích theo danh mục",
+    "supplierBreakdown": "Phân tích theo nhà cung cấp",
+    "departmentBreakdown": "Phân tích xuất kho theo phòng ban",
+    "rank": "Thứ hạng",
+    "percentage": "Tỷ lệ",
+    "value": "Giá trị",
+    "viewMore": "Xem thêm"
   }
 }

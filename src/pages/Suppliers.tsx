@@ -27,6 +27,12 @@ const Suppliers = () => {
   // Zustand 스토어에서 실제 데이터 가져오기
   const { suppliers, isLoading, error, fetchSuppliers, createSupplier, updateSupplier, deleteSupplier, searchSuppliers } = useSuppliersStore();
 
+  // 동적 필터 옵션 생성
+  const getCountryFilters = () => {
+    const countries = [...new Set(suppliers.map(item => item.country).filter(Boolean))];
+    return countries.map(country => ({ text: country, value: country }));
+  };
+
   // 컴포넌트 마운트 시 실제 데이터 로드
   useEffect(() => {
     fetchSuppliers();
@@ -133,29 +139,37 @@ const Suppliers = () => {
       title: t('suppliers.contact'),
       dataIndex: 'contact_person',
       key: 'contact_person',
+      sorter: (a, b) => (a.contact_person || '').localeCompare(b.contact_person || ''),
     },
     {
       title: t('suppliers.phone'),
       dataIndex: 'phone',
       key: 'phone',
       width: 150,
+      sorter: (a, b) => (a.phone || '').localeCompare(b.phone || ''),
     },
     {
       title: t('suppliers.email'),
       dataIndex: 'email',
       key: 'email',
+      sorter: (a, b) => (a.email || '').localeCompare(b.email || ''),
     },
     {
       title: t('suppliers.country'),
       dataIndex: 'country',
       key: 'country',
       width: 100,
+      sorter: (a, b) => (a.country || '').localeCompare(b.country || ''),
+      filters: getCountryFilters(),
+      onFilter: (value, record) => record.country === value,
+      filterSearch: true,
     },
     {
       title: t('suppliers.status'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
+      sorter: (a, b) => a.status.localeCompare(b.status),
       filters: [
         { text: 'NEW', value: 'NEW' },
         { text: 'ACTIVE', value: 'ACTIVE' },

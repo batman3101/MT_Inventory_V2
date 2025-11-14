@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(for:*)",
-      "Bash(do sed -i '1i// @ts-nocheck' \"$f\")"
+      "Bash(do sed -i '1i// @ts-nocheck' \"$f\")",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []

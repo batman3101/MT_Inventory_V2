@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Select, Spin, Alert, Typography, Space } from 'antd';
+import { Card, Row, Col, Statistic, Select, Spin, Alert, Typography, Space, Tabs, DatePicker } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
@@ -8,12 +9,39 @@ import {
   LineChartOutlined,
 } from '@ant-design/icons';
 import { supabase } from '../lib/supabase';
-import dayjs from 'dayjs';
+import { ResizableTable } from '../components/ResizableTable';
+import dayjs, { Dayjs } from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
+
+dayjs.extend(isBetween);
 
 const { Title } = Typography;
 const { Option } = Select;
+const { RangePicker } = DatePicker;
 
-type PeriodType = 'daily' | 'weekly' | 'monthly' | 'yearly';
+type PeriodType = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+
+interface TopPart {
+  part_code: string;
+  part_name: string;
+  quantity: number;
+  value?: number;
+  percentage: number;
+}
+
+interface CategoryData {
+  category: string;
+  quantity: number;
+  value: number;
+  percentage: number;
+}
+
+interface SupplierData {
+  supplier_name: string;
+  quantity: number;
+  value: number;
+  count: number;
+}
 
 /**
  * Analytics (분석) 페이지
@@ -23,20 +51,26 @@ type PeriodType = 'daily' | 'weekly' | 'monthly' | 'yearly';
 const Analytics = () => {
   const { t } = useTranslation();
   const [period, setPeriod] = useState<PeriodType>('monthly');
+  const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
     totalInbound: 0,
     totalOutbound: 0,
     inboundValue: 0,
-    outboundQuantity: 0,
     previousInbound: 0,
     previousOutbound: 0,
   });
+  const [topInboundParts, setTopInboundParts] = useState<TopPart[]>([]);
+  const [topOutboundParts, setTopOutboundParts] = useState<TopPart[]>([]);
+  const [topInboundPartsByValue, setTopInboundPartsByValue] = useState<TopPart[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [supplierData, setSupplierData] = useState<SupplierData[]>([]);
 
   useEffect(() => {
     fetchAnalytics();
-  }, [period]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, dateRange]);
 
   const fetchAnalytics = async () => {
     setIsLoading(true);
@@ -45,37 +79,54 @@ const Analytics = () => {
       // 현재 기간 계산
       const now = dayjs();
       let startDate: dayjs.Dayjs;
+      let endDate: dayjs.Dayjs;
       let prevStartDate: dayjs.Dayjs;
       let prevEndDate: dayjs.Dayjs;
 
-      switch (period) {
-        case 'daily':
-          startDate = now.startOf('day');
-          prevStartDate = now.subtract(1, 'day').startOf('day');
-          prevEndDate = now.subtract(1, 'day').endOf('day');
-          break;
-        case 'weekly':
-          startDate = now.startOf('week');
-          prevStartDate = now.subtract(1, 'week').startOf('week');
-          prevEndDate = now.subtract(1, 'week').endOf('week');
-          break;
-        case 'monthly':
-          startDate = now.startOf('month');
-          prevStartDate = now.subtract(1, 'month').startOf('month');
-          prevEndDate = now.subtract(1, 'month').endOf('month');
-          break;
-        case 'yearly':
-          startDate = now.startOf('year');
-          prevStartDate = now.subtract(1, 'year').startOf('year');
-          prevEndDate = now.subtract(1, 'year').endOf('year');
-          break;
+      if (period === 'custom' && dateRange[0] && dateRange[1]) {
+        // 커스텀 기간
+        startDate = dateRange[0].startOf('day');
+        endDate = dateRange[1].endOf('day');
+        const daysDiff = endDate.diff(startDate, 'day');
+        prevStartDate = startDate.subtract(daysDiff + 1, 'day');
+        prevEndDate = startDate.subtract(1, 'day').endOf('day');
+      } else {
+        // 기본 기간
+        endDate = now.endOf('day');
+        switch (period) {
+          case 'daily':
+            startDate = now.startOf('day');
+            prevStartDate = now.subtract(1, 'day').startOf('day');
+            prevEndDate = now.subtract(1, 'day').endOf('day');
+            break;
+          case 'weekly':
+            startDate = now.startOf('week');
+            prevStartDate = now.subtract(1, 'week').startOf('week');
+            prevEndDate = now.subtract(1, 'week').endOf('week');
+            break;
+          case 'monthly':
+            startDate = now.startOf('month');
+            prevStartDate = now.subtract(1, 'month').startOf('month');
+            prevEndDate = now.subtract(1, 'month').endOf('month');
+            break;
+          case 'yearly':
+            startDate = now.startOf('year');
+            prevStartDate = now.subtract(1, 'year').startOf('year');
+            prevEndDate = now.subtract(1, 'year').endOf('year');
+            break;
+          default:
+            startDate = now.startOf('month');
+            prevStartDate = now.subtract(1, 'month').startOf('month');
+            prevEndDate = now.subtract(1, 'month').endOf('month');
+        }
       }
 
       // 현재 기간 입고 데이터
       const { data: inboundData, error: inboundError } = await supabase
         .from('inbound')
         .select('quantity, total_price')
-        .gte('inbound_date', startDate.format('YYYY-MM-DD'));
+        .gte('inbound_date', startDate.format('YYYY-MM-DD'))
+        .lte('inbound_date', endDate.format('YYYY-MM-DD'));
 
       if (inboundError) throw inboundError;
 
@@ -83,7 +134,8 @@ const Analytics = () => {
       const { data: outboundData, error: outboundError } = await supabase
         .from('outbound')
         .select('quantity')
-        .gte('outbound_date', startDate.format('YYYY-MM-DD'));
+        .gte('outbound_date', startDate.format('YYYY-MM-DD'))
+        .lte('outbound_date', endDate.format('YYYY-MM-DD'));
 
       if (outboundError) throw outboundError;
 
@@ -111,14 +163,131 @@ const Analytics = () => {
         totalInbound,
         totalOutbound,
         inboundValue,
-        outboundQuantity: totalOutbound,
         previousInbound,
         previousOutbound,
       });
+
+      // 상세 분석 데이터 가져오기
+      await fetchDetailedAnalytics(startDate, endDate);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch analytics');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchDetailedAnalytics = async (startDate: dayjs.Dayjs, endDate: dayjs.Dayjs) => {
+    try {
+      // 입고 상위 부품 (수량 및 금액)
+      const { data: inboundPartsData } = await supabase
+        .from('inbound')
+        .select('part_id, quantity, total_price, parts(part_code, part_name)')
+        .gte('inbound_date', startDate.format('YYYY-MM-DD'))
+        .lte('inbound_date', endDate.format('YYYY-MM-DD'));
+
+      const inboundByPart = (inboundPartsData as any[])?.reduce((acc: any, item: any) => {
+        const partCode = item.parts?.part_code || 'Unknown';
+        const partName = item.parts?.part_name || 'Unknown';
+        if (!acc[partCode]) {
+          acc[partCode] = { part_code: partCode, part_name: partName, quantity: 0, value: 0 };
+        }
+        acc[partCode].quantity += item.quantity || 0;
+        acc[partCode].value += item.total_price || 0;
+        return acc;
+      }, {});
+
+      // 수량 기준 상위 부품
+      const topInbound = Object.values(inboundByPart || {})
+        .sort((a: any, b: any) => b.quantity - a.quantity)
+        .slice(0, 10) as TopPart[];
+      const totalInboundQty = topInbound.reduce((sum: number, item: TopPart) => sum + item.quantity, 0);
+      setTopInboundParts(topInbound.map((item: TopPart) => ({
+        ...item,
+        percentage: Number(totalInboundQty) > 0 ? (Number(item.quantity) / Number(totalInboundQty) * 100) : 0
+      })));
+
+      // 금액 기준 상위 부품
+      const topInboundByValue = Object.values(inboundByPart || {})
+        .sort((a: any, b: any) => (b.value || 0) - (a.value || 0))
+        .slice(0, 10) as TopPart[];
+      const totalInboundValue = topInboundByValue.reduce((sum: number, item: TopPart) => sum + (item.value || 0), 0);
+      setTopInboundPartsByValue(topInboundByValue.map((item: TopPart) => ({
+        ...item,
+        percentage: Number(totalInboundValue) > 0 ? (Number(item.value || 0) / Number(totalInboundValue) * 100) : 0
+      })));
+
+      // 출고 상위 부품 (수량만)
+      const { data: outboundPartsData } = await supabase
+        .from('outbound')
+        .select('part_id, quantity, parts(part_code, part_name)')
+        .gte('outbound_date', startDate.format('YYYY-MM-DD'))
+        .lte('outbound_date', endDate.format('YYYY-MM-DD'));
+
+      const outboundByPart = (outboundPartsData as any[])?.reduce((acc: any, item: any) => {
+        const partCode = item.parts?.part_code || 'Unknown';
+        const partName = item.parts?.part_name || 'Unknown';
+        if (!acc[partCode]) {
+          acc[partCode] = { part_code: partCode, part_name: partName, quantity: 0 };
+        }
+        acc[partCode].quantity += item.quantity || 0;
+        return acc;
+      }, {});
+
+      // 수량 기준 상위 부품
+      const topOutbound = Object.values(outboundByPart || {})
+        .sort((a: any, b: any) => b.quantity - a.quantity)
+        .slice(0, 10) as TopPart[];
+      const totalOutboundQty = topOutbound.reduce((sum: number, item: TopPart) => sum + item.quantity, 0);
+      setTopOutboundParts(topOutbound.map((item: TopPart) => ({
+        ...item,
+        percentage: Number(totalOutboundQty) > 0 ? (Number(item.quantity) / Number(totalOutboundQty) * 100) : 0
+      })));
+
+      // 카테고리별 분석
+      const { data: categoryInboundData } = await supabase
+        .from('inbound')
+        .select('quantity, total_price, parts(category)')
+        .gte('inbound_date', startDate.format('YYYY-MM-DD'))
+        .lte('inbound_date', endDate.format('YYYY-MM-DD'));
+
+      const categoryStats = (categoryInboundData as any[])?.reduce((acc: any, item: any) => {
+        const category = item.parts?.category || 'Unknown';
+        if (!acc[category]) {
+          acc[category] = { category, quantity: 0, value: 0 };
+        }
+        acc[category].quantity += item.quantity || 0;
+        acc[category].value += item.total_price || 0;
+        return acc;
+      }, {});
+
+      const categories = Object.values(categoryStats || {}) as CategoryData[];
+      const totalCategoryQty = categories.reduce((sum: number, item: CategoryData) => sum + item.quantity, 0);
+      setCategoryData(categories.map((item: CategoryData) => ({
+        ...item,
+        percentage: Number(totalCategoryQty) > 0 ? (Number(item.quantity) / Number(totalCategoryQty) * 100) : 0
+      })).sort((a: CategoryData, b: CategoryData) => b.quantity - a.quantity));
+
+      // 공급업체별 분석
+      const { data: supplierInboundData } = await supabase
+        .from('inbound')
+        .select('quantity, total_price, suppliers(supplier_name)')
+        .gte('inbound_date', startDate.format('YYYY-MM-DD'))
+        .lte('inbound_date', endDate.format('YYYY-MM-DD'));
+
+      const supplierStats = (supplierInboundData as any[])?.reduce((acc: any, item: any) => {
+        const supplierName = item.suppliers?.supplier_name || 'Unknown';
+        if (!acc[supplierName]) {
+          acc[supplierName] = { supplier_name: supplierName, quantity: 0, value: 0, count: 0 };
+        }
+        acc[supplierName].quantity += item.quantity || 0;
+        acc[supplierName].value += item.total_price || 0;
+        acc[supplierName].count += 1;
+        return acc;
+      }, {});
+
+      setSupplierData((Object.values(supplierStats || {}) as SupplierData[]).sort((a: SupplierData, b: SupplierData) => b.quantity - a.quantity));
+    } catch (err: any) {
+      console.error('Failed to fetch detailed analytics:', err);
     }
   };
 
@@ -141,27 +310,57 @@ const Analytics = () => {
     );
   }
 
+  const handlePeriodChange = (value: PeriodType) => {
+    setPeriod(value);
+    if (value !== 'custom') {
+      setDateRange([null, null]);
+    }
+  };
+
+  const handleDateRangeChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
+    if (dates) {
+      setDateRange(dates);
+      setPeriod('custom');
+    } else {
+      setDateRange([null, null]);
+      setPeriod('monthly');
+    }
+  };
+
   return (
     <div>
       <Space style={{ marginBottom: 24, width: '100%', justifyContent: 'space-between' }}>
         <Title level={2} style={{ margin: 0 }}>
           {t('analytics.title')}
         </Title>
-        <Select
-          value={period}
-          onChange={setPeriod}
-          style={{ width: 150 }}
-        >
-          <Option value="daily">{t('analytics.daily')}</Option>
-          <Option value="weekly">{t('analytics.weekly')}</Option>
-          <Option value="monthly">{t('analytics.monthly')}</Option>
-          <Option value="yearly">{t('analytics.yearly')}</Option>
-        </Select>
+        <Space>
+          <Select
+            value={period}
+            onChange={handlePeriodChange}
+            style={{ width: 150 }}
+          >
+            <Option value="daily">{t('analytics.daily')}</Option>
+            <Option value="weekly">{t('analytics.weekly')}</Option>
+            <Option value="monthly">{t('analytics.monthly')}</Option>
+            <Option value="yearly">{t('analytics.yearly')}</Option>
+            <Option value="custom">{t('analytics.custom')}</Option>
+          </Select>
+          {period === 'custom' && (
+            <RangePicker
+              value={dateRange}
+              onChange={handleDateRangeChange}
+              format="YYYY-MM-DD"
+              placeholder={[t('common.startDate'), t('common.endDate')]}
+              style={{ width: 260 }}
+              allowClear
+            />
+          )}
+        </Space>
       </Space>
 
       <Spin spinning={isLoading}>
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} lg={8}>
             <Card>
               <Statistic
                 title={t('analytics.inboundAnalysis')}
@@ -187,7 +386,7 @@ const Analytics = () => {
             </Card>
           </Col>
 
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} lg={8}>
             <Card>
               <Statistic
                 title={t('analytics.outboundAnalysis')}
@@ -213,10 +412,10 @@ const Analytics = () => {
             </Card>
           </Col>
 
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} lg={8}>
             <Card>
               <Statistic
-                title={t('inbound.totalValue')}
+                title={t('analytics.inboundValue')}
                 value={stats.inboundValue}
                 precision={0}
                 suffix="₫"
@@ -224,27 +423,241 @@ const Analytics = () => {
               />
             </Card>
           </Col>
-
-          <Col xs={24} sm={12} lg={6}>
-            <Card>
-              <Statistic
-                title={t('analytics.summary')}
-                value={stats.totalInbound - stats.totalOutbound}
-                suffix={t('common.items')}
-                valueStyle={{
-                  color: stats.totalInbound - stats.totalOutbound >= 0 ? '#3f8600' : '#cf1322'
-                }}
-              />
-            </Card>
-          </Col>
         </Row>
 
         <Card style={{ marginTop: 24 }}>
           <Title level={4}>{t('analytics.details')}</Title>
-          <p>{t('analytics.noDataAvailable')}</p>
-          <p style={{ color: '#999', fontSize: 14 }}>
-            차트 및 상세 분석 기능은 추후 추가 예정입니다.
-          </p>
+          <Tabs
+            defaultActiveKey="1"
+            items={[
+              {
+                key: '1',
+                label: t('analytics.topInboundParts'),
+                children: (
+                  <ResizableTable
+                    columns={[
+                      {
+                        title: t('analytics.rank'),
+                        key: 'rank',
+                        width: 80,
+                        render: (_: any, __: any, index: number) => index + 1,
+                      },
+                      {
+                        title: t('parts.partCode'),
+                        dataIndex: 'part_code',
+                        key: 'part_code',
+                        width: 120,
+                      },
+                      {
+                        title: t('parts.partName'),
+                        dataIndex: 'part_name',
+                        key: 'part_name',
+                      },
+                      {
+                        title: t('inbound.quantity'),
+                        dataIndex: 'quantity',
+                        key: 'quantity',
+                        width: 120,
+                        align: 'right',
+                        render: (val: number) => val.toLocaleString(),
+                      },
+                      {
+                        title: t('analytics.percentage'),
+                        dataIndex: 'percentage',
+                        key: 'percentage',
+                        width: 100,
+                        align: 'right',
+                        render: (val: number) => `${val.toFixed(1)}%`,
+                      },
+                    ]}
+                    dataSource={topInboundParts}
+                    rowKey="part_code"
+                    pagination={false}
+                    scroll={{ x: 600 }}
+                  />
+                ),
+              },
+              {
+                key: '2',
+                label: t('analytics.topOutboundParts'),
+                children: (
+                  <ResizableTable
+                    columns={[
+                      {
+                        title: t('analytics.rank'),
+                        key: 'rank',
+                        width: 80,
+                        render: (_: any, __: any, index: number) => index + 1,
+                      },
+                      {
+                        title: t('parts.partCode'),
+                        dataIndex: 'part_code',
+                        key: 'part_code',
+                        width: 120,
+                      },
+                      {
+                        title: t('parts.partName'),
+                        dataIndex: 'part_name',
+                        key: 'part_name',
+                      },
+                      {
+                        title: t('outbound.quantity'),
+                        dataIndex: 'quantity',
+                        key: 'quantity',
+                        width: 120,
+                        align: 'right',
+                        render: (val: number) => val.toLocaleString(),
+                      },
+                      {
+                        title: t('analytics.percentage'),
+                        dataIndex: 'percentage',
+                        key: 'percentage',
+                        width: 100,
+                        align: 'right',
+                        render: (val: number) => `${val.toFixed(1)}%`,
+                      },
+                    ]}
+                    dataSource={topOutboundParts}
+                    rowKey="part_code"
+                    pagination={false}
+                    scroll={{ x: 600 }}
+                  />
+                ),
+              },
+              {
+                key: '3',
+                label: t('analytics.topInboundPartsByValue'),
+                children: (
+                  <ResizableTable
+                    columns={[
+                      {
+                        title: t('analytics.rank'),
+                        key: 'rank',
+                        width: 80,
+                        render: (_: any, __: any, index: number) => index + 1,
+                      },
+                      {
+                        title: t('parts.partCode'),
+                        dataIndex: 'part_code',
+                        key: 'part_code',
+                        width: 120,
+                      },
+                      {
+                        title: t('parts.partName'),
+                        dataIndex: 'part_name',
+                        key: 'part_name',
+                      },
+                      {
+                        title: t('analytics.value'),
+                        dataIndex: 'value',
+                        key: 'value',
+                        width: 150,
+                        align: 'right',
+                        render: (val: number) => `${(val || 0).toLocaleString()} ₫`,
+                      },
+                      {
+                        title: t('analytics.percentage'),
+                        dataIndex: 'percentage',
+                        key: 'percentage',
+                        width: 100,
+                        align: 'right',
+                        render: (val: number) => `${val.toFixed(1)}%`,
+                      },
+                    ]}
+                    dataSource={topInboundPartsByValue}
+                    rowKey="part_code"
+                    pagination={false}
+                    scroll={{ x: 600 }}
+                  />
+                ),
+              },
+              {
+                key: '4',
+                label: t('analytics.categoryBreakdown'),
+                children: (
+                  <ResizableTable
+                    columns={[
+                      {
+                        title: t('parts.category'),
+                        dataIndex: 'category',
+                        key: 'category',
+                      },
+                      {
+                        title: t('inbound.quantity'),
+                        dataIndex: 'quantity',
+                        key: 'quantity',
+                        width: 120,
+                        align: 'right',
+                        render: (val: number) => val.toLocaleString(),
+                      },
+                      {
+                        title: t('analytics.value'),
+                        dataIndex: 'value',
+                        key: 'value',
+                        width: 150,
+                        align: 'right',
+                        render: (val: number) => `${val.toLocaleString()} ₫`,
+                      },
+                      {
+                        title: t('analytics.percentage'),
+                        dataIndex: 'percentage',
+                        key: 'percentage',
+                        width: 100,
+                        align: 'right',
+                        render: (val: number) => `${val.toFixed(1)}%`,
+                      },
+                    ]}
+                    dataSource={categoryData}
+                    rowKey="category"
+                    pagination={false}
+                    scroll={{ x: 600 }}
+                  />
+                ),
+              },
+              {
+                key: '5',
+                label: t('analytics.supplierBreakdown'),
+                children: (
+                  <ResizableTable
+                    columns={[
+                      {
+                        title: t('suppliers.name'),
+                        dataIndex: 'supplier_name',
+                        key: 'supplier_name',
+                      },
+                      {
+                        title: t('inbound.totalCount'),
+                        dataIndex: 'count',
+                        key: 'count',
+                        width: 100,
+                        align: 'right',
+                      },
+                      {
+                        title: t('inbound.quantity'),
+                        dataIndex: 'quantity',
+                        key: 'quantity',
+                        width: 120,
+                        align: 'right',
+                        render: (val: number) => val.toLocaleString(),
+                      },
+                      {
+                        title: t('analytics.value'),
+                        dataIndex: 'value',
+                        key: 'value',
+                        width: 150,
+                        align: 'right',
+                        render: (val: number) => `${val.toLocaleString()} ₫`,
+                      },
+                    ]}
+                    dataSource={supplierData}
+                    rowKey="supplier_name"
+                    pagination={false}
+                    scroll={{ x: 600 }}
+                  />
+                ),
+              },
+            ]}
+          />
         </Card>
       </Spin>
     </div>

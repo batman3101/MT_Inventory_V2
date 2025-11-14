@@ -27,6 +27,22 @@ const Inventory = () => {
   // Zustand 스토어에서 실제 데이터 가져오기
   const { inventory, isLoading, error, stats, fetchInventory, fetchInventoryStats, updateInventory } = useInventoryStore();
 
+  // 동적 필터 옵션 생성
+  const getCategoryFilters = () => {
+    const categories = [...new Set(inventory.map(item => item.part?.category).filter(Boolean))];
+    return categories.map(cat => ({ text: cat as string, value: cat as string }));
+  };
+
+  const getUnitFilters = () => {
+    const units = [...new Set(inventory.map(item => item.part?.unit).filter(Boolean))];
+    return units.map(unit => ({ text: unit as string, value: unit as string }));
+  };
+
+  const getLocationFilters = () => {
+    const locations = [...new Set(inventory.map(item => item.location).filter(Boolean))];
+    return locations.map(loc => ({ text: loc, value: loc }));
+  };
+
   // 컴포넌트 마운트 시 실제 데이터 로드
   useEffect(() => {
     fetchInventory();
@@ -88,15 +104,10 @@ const Inventory = () => {
       dataIndex: ['part', 'category'],
       key: 'category',
       width: 120,
-      filters: [
-        { text: 'SPINDLE', value: 'SPINDLE' },
-        { text: 'MOTOR', value: 'MOTOR' },
-        { text: 'BEARING', value: 'BEARING' },
-        { text: 'TOOL', value: 'TOOL' },
-        { text: 'ELECTRIC', value: 'ELECTRIC' },
-        { text: 'OTHER', value: 'OTHER' },
-      ],
+      sorter: (a, b) => (a.part?.category || '').localeCompare(b.part?.category || ''),
+      filters: getCategoryFilters(),
       onFilter: (value, record) => record.part?.category === value,
+      filterSearch: true,
     },
     {
       title: t('inventory.currentQuantity'),
@@ -121,26 +132,27 @@ const Inventory = () => {
       key: 'min_stock',
       width: 100,
       align: 'right',
+      sorter: (a, b) => (a.part?.min_stock || 0) - (b.part?.min_stock || 0),
     },
     {
       title: t('parts.unit'),
       dataIndex: ['part', 'unit'],
       key: 'unit',
       width: 80,
-      filters: [
-        { text: 'EA', value: 'EA' },
-        { text: 'SET', value: 'SET' },
-        { text: 'M', value: 'M' },
-        { text: 'KG', value: 'KG' },
-        { text: 'L', value: 'L' },
-      ],
+      sorter: (a, b) => (a.part?.unit || '').localeCompare(b.part?.unit || ''),
+      filters: getUnitFilters(),
       onFilter: (value, record) => record.part?.unit === value,
+      filterSearch: true,
     },
     {
       title: t('inventory.location'),
       dataIndex: 'location',
       key: 'location',
-      width: 100,
+      width: 120,
+      sorter: (a, b) => a.location.localeCompare(b.location),
+      filters: getLocationFilters(),
+      onFilter: (value, record) => record.location === value,
+      filterSearch: true,
       render: (location: string) => <Tag color="blue">{location}</Tag>,
     },
     {
