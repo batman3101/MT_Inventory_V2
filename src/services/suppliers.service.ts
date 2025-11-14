@@ -127,7 +127,7 @@ export async function createSupplier(
 ): Promise<Supplier> {
   const { data, error } = await supabase
     .from('suppliers')
-    .insert(supplier as any)
+    .insert(supplier as Database["public"]["Tables"]["suppliers"]["Insert"])
     .select()
     .single();
 
@@ -154,8 +154,13 @@ export async function updateSupplier(
     .single();
 
   if (error) {
-    console.error('공급업체 수정 에러:', error);
-    throw new Error(error.message);
+    console.error('공급업체 수정 에러:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw new Error(`공급업체 수정 실패: ${error.message}`);
   }
 
   return data;

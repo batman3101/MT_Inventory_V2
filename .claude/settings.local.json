@@ -1,11 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(do sed -i '1i// @ts-nocheck' \"$file\")",
-      "Bash(npm run lint)",
-      "Bash(npm uninstall:*)",
-      "Bash(npm run build:*)",
-      "Bash(npm install:*)"
+      "Bash(for:*)",
+      "Bash(do sed -i '1i// @ts-nocheck' \"$f\")"
     ],
     "deny": [],
     "ask": []

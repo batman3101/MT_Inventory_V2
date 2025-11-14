@@ -148,7 +148,7 @@ export async function createOutbound(
 ): Promise<Outbound> {
   const { data, error } = await supabase
     .from('outbound')
-    .insert(outbound as any)
+    .insert(outbound as Database["public"]["Tables"]["outbound"]["Insert"])
     .select()
     .single();
 

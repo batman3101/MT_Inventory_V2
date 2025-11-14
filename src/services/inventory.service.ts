@@ -124,7 +124,7 @@ export async function createInventory(
 ): Promise<Inventory> {
   const { data, error } = await supabase
     .from('inventory')
-    .insert(inventory as any)
+    .insert(inventory as Database["public"]["Tables"]["inventory"]["Insert"])
     .select()
     .single();
 

@@ -42,6 +42,9 @@ const AntConfigProvider = ({ children }: AntConfigProviderProps) => {
           },
         },
       }}
+      warning={{
+        strict: false,
+      }}
     >
       {children}
     </ConfigProvider>

@@ -1,5 +1,10 @@
 # 환경 변수 파일
 .env
+.env.local
+.env.production
+.env.development
+.env.test
+.env*.local
 
 # 백업 및 임시 파일
 *.bak
