@@ -11,7 +11,9 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(dir \"C:\\WORK\\app_management\\CNC_MT_Inventory_V2\\src\\lib\" /b)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

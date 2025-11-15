@@ -4,7 +4,7 @@
  * Ant Design Table with resizable columns
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Table } from 'antd';
 import type { TableProps } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -46,6 +46,12 @@ export function ResizableTable<T extends Record<string, any>>({
   ...restProps
 }: ResizableTableProps<T>) {
   const [resizableColumns, setResizableColumns] = useState(columns);
+
+  // columns prop이 변경되면 resizableColumns 업데이트
+  // 데이터 로드 후 필터 옵션이 동적으로 추가되는 경우를 처리
+  useEffect(() => {
+    setResizableColumns(columns);
+  }, [columns]);
 
   const handleResize =
     (index: number) =>
