@@ -8,7 +8,7 @@ import {
   BarChartOutlined,
   LineChartOutlined,
 } from '@ant-design/icons';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { ResizableTable } from '../components/ResizableTable';
 import dayjs, { Dayjs } from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';

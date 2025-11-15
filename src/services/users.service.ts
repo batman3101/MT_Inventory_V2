@@ -6,7 +6,7 @@
  * Mock 데이터나 테스트 데이터를 사용하지 않습니다.
  */
 
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import type { User, InsertDto, UpdateDto } from '../types/database.types';
 
 /**

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import type { Department } from '../types/database.types';
 
 /**

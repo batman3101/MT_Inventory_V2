@@ -5,7 +5,7 @@
  * ⚠️ 실제 Supabase 데이터베이스에서 출고 데이터를 조회/관리합니다.
  */
 
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import type { Outbound, OutboundDetail, InsertDto, UpdateDto } from '../types/database.types';
 import dayjs from 'dayjs';
 
