@@ -19,6 +19,8 @@
     "outOfStock": "Hết hàng",
     "totalSuppliers": "Tổng số nhà cung cấp",
     "recentActivity": "Hoạt động gần đây",
+    "recentInboundActivity": "Nhập kho gần đây",
+    "recentOutboundActivity": "Xuất kho gần đây",
     "partAdded": "Phụ tùng #{{partNumber}} đã thêm vào kho",
     "partRemoved": "Phụ tùng #{{partNumber}} đã xóa khỏi kho",
     "supplierAdded": "Nhà cung cấp mới '{{supplierName}}' đã được thêm",

@@ -5,7 +5,8 @@
       "Bash(do sed -i '1i// @ts-nocheck' \"$f\")",
       "Bash(npm run build:*)",
       "Bash(npm run dev:*)",
-      "Bash(dir \"C:\\WORK\\app_management\\CNC_MT_Inventory_V2\\assets\\images\" /b)"
+      "Bash(dir \"C:\\WORK\\app_management\\CNC_MT_Inventory_V2\\assets\\images\" /b)",
+      "Bash(DEPLOYMENT.md)"
     ],
     "deny": [],
     "ask": []

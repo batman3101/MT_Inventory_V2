@@ -44,23 +44,19 @@ const Dashboard = () => {
     ? inventoryStats.totalItems - (inventoryStats.totalQuantity > 0 ? inventoryStats.totalItems : 0)
     : 0;
 
-  // 최근 활동 통합 (입고 + 출고)
-  const recentActivities = [
-    ...recentInbounds.map(item => ({
-      id: `in-${item.inbound_id}`,
-      text: `${t('dashboard.inbound')}: ${item.part_code} - ${item.part_name} (${item.quantity} ${item.part_unit})`,
-      type: 'inbound',
-      date: item.created_at
-    })),
-    ...recentOutbounds.map(item => ({
-      id: `out-${item.outbound_id}`,
-      text: `${t('dashboard.outbound')}: ${item.part_code} - ${item.part_name} (${item.quantity} ${item.part_unit})`,
-      type: 'outbound',
-      date: item.created_at
-    }))
-  ]
-    .sort((a, b) => dayjs(b.date).diff(dayjs(a.date)))
-    .slice(0, 10);
+  // 최근 입고 활동
+  const recentInboundActivities = recentInbounds.map(item => ({
+    id: `in-${item.inbound_id}`,
+    text: `${item.part_code} - ${item.part_name} (${item.quantity} ${item.part_unit})`,
+    date: item.created_at
+  }));
+
+  // 최근 출고 활동
+  const recentOutboundActivities = recentOutbounds.map(item => ({
+    id: `out-${item.outbound_id}`,
+    text: `${item.part_code} - ${item.part_name} (${item.quantity} ${item.part_unit})`,
+    date: item.created_at
+  }));
 
   if (inventoryError) {
     return (
@@ -124,25 +120,42 @@ const Dashboard = () => {
           </Col>
         </Row>
 
-        <Card title={t('dashboard.recentActivity')} style={{ marginTop: 24 }}>
-          <List
-            dataSource={recentActivities}
-            renderItem={(item) => (
-              <List.Item key={item.id}>
-                {item.type === 'inbound' ? (
-                  <ArrowUpOutlined style={{ color: '#52c41a', marginRight: 8 }} />
-                ) : (
-                  <ArrowDownOutlined style={{ color: '#f5222d', marginRight: 8 }} />
+        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+          <Col xs={24} lg={12}>
+            <Card title={t('dashboard.recentInboundActivity')} style={{ height: '100%' }}>
+              <List
+                dataSource={recentInboundActivities}
+                renderItem={(item) => (
+                  <List.Item key={item.id}>
+                    <ArrowUpOutlined style={{ color: '#52c41a', marginRight: 8 }} />
+                    {item.text}
+                    <span style={{ color: '#8c8c8c', marginLeft: 8, fontSize: 12 }}>
+                      ({dayjs(item.date).format('YYYY-MM-DD HH:mm')})
+                    </span>
+                  </List.Item>
                 )}
-                {item.text}
-                <span style={{ color: '#8c8c8c', marginLeft: 8, fontSize: 12 }}>
-                  ({dayjs(item.date).format('YYYY-MM-DD HH:mm')})
-                </span>
-              </List.Item>
-            )}
-            locale={{ emptyText: t('common.noData') }}
-          />
-        </Card>
+                locale={{ emptyText: t('common.noData') }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card title={t('dashboard.recentOutboundActivity')} style={{ height: '100%' }}>
+              <List
+                dataSource={recentOutboundActivities}
+                renderItem={(item) => (
+                  <List.Item key={item.id}>
+                    <ArrowDownOutlined style={{ color: '#f5222d', marginRight: 8 }} />
+                    {item.text}
+                    <span style={{ color: '#8c8c8c', marginLeft: 8, fontSize: 12 }}>
+                      ({dayjs(item.date).format('YYYY-MM-DD HH:mm')})
+                    </span>
+                  </List.Item>
+                )}
+                locale={{ emptyText: t('common.noData') }}
+              />
+            </Card>
+          </Col>
+        </Row>
       </Spin>
     </div>
   );

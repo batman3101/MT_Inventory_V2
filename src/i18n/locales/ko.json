@@ -19,6 +19,8 @@
     "outOfStock": "재고 없음",
     "totalSuppliers": "총 공급업체",
     "recentActivity": "최근 활동",
+    "recentInboundActivity": "최근 입고",
+    "recentOutboundActivity": "최근 출고",
     "partAdded": "부품 #{{partNumber}} 재고에 추가됨",
     "partRemoved": "부품 #{{partNumber}} 재고에서 제거됨",
     "supplierAdded": "새 공급업체 '{{supplierName}}' 추가됨",
