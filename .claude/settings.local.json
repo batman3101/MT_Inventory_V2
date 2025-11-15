@@ -6,7 +6,10 @@
       "Bash(npm run build:*)",
       "Bash(npm run dev:*)",
       "Bash(dir \"C:\\WORK\\app_management\\CNC_MT_Inventory_V2\\assets\\images\" /b)",
-      "Bash(DEPLOYMENT.md)"
+      "Bash(DEPLOYMENT.md)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
