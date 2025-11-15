@@ -1,24 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Tag, Spin, Alert, Row, Col, Statistic } from 'antd';
-import { SearchOutlined, UserOutlined } from '@ant-design/icons';
+import { Card, Input, Button, Space, Typography, Tag, Spin, Alert, Row, Col, Statistic, Modal, Form, Select, message } from 'antd';
+import { PlusOutlined, SearchOutlined, UserOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { supabase } from '../lib/supabase';
 import { ResizableTable } from '../components/ResizableTable';
 import dayjs from 'dayjs';
+import { useUsersStore } from '../store';
+import type { User } from '../types/database.types';
 
 const { Title } = Typography;
-
-interface User {
-  user_id: string;
-  username: string;
-  email: string;
-  role: string;
-  department_id: string | null;
-  status: string;
-  created_at: string;
-  last_login: string | null;
-}
+const { Option } = Select;
 
 /**
  * Users (사용자 관리) 페이지
@@ -28,70 +19,135 @@ interface User {
 const Users = () => {
   const { t } = useTranslation();
   const [searchText, setSearchText] = useState('');
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeUsers: 0,
-  });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [form] = Form.useForm();
+  const [messageApi, contextHolder] = message.useMessage();
 
-  // 실제 Supabase에서 사용자 데이터 로드
+  // Zustand 스토어에서 실제 데이터 가져오기
+  const { users, isLoading, error, stats, fetchUsers, fetchUsersStats, createUser, updateUser, updateUserStatus, deleteUser, activateAllUsers } = useUsersStore();
+
+  // 컴포넌트 마운트 시 실제 데이터 로드
   useEffect(() => {
     fetchUsers();
-    fetchStats();
+    fetchUsersStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchUsers = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
+  const showAddModal = () => {
+    setEditingUser(null);
+    form.resetFields();
+    setIsModalOpen(true);
+  };
 
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch users');
-    } finally {
-      setIsLoading(false);
+  const showEditModal = (user: User) => {
+    setEditingUser(user);
+    form.setFieldsValue({
+      username: user.username,
+      full_name: user.full_name,
+      email: user.email,
+      role: user.role,
+      department_id: user.department_id,
+      phone_number: user.phone_number,
+      position: user.position,
+      is_active: user.is_active,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
+    try {
+      await updateUserStatus(userId, !currentStatus);
+      messageApi.success(!currentStatus ? '사용자가 활성화되었습니다' : '사용자가 비활성화되었습니다');
+    } catch {
+      messageApi.error('사용자 상태 변경 중 오류가 발생했습니다');
     }
   };
 
-  const fetchStats = async () => {
+  const handleDelete = (userId: string, username: string) => {
+    Modal.confirm({
+      title: t('users.deleteConfirm'),
+      content: `사용자 "${username}"를 삭제하시겠습니까?`,
+      okText: t('common.yes'),
+      cancelText: t('common.no'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await deleteUser(userId);
+          messageApi.success(t('users.userDeleted'));
+        } catch {
+          messageApi.error(t('users.deleteError'));
+        }
+      },
+    });
+  };
+
+  const handleActivateAll = () => {
+    Modal.confirm({
+      title: '모든 사용자 활성화',
+      content: '모든 사용자를 활성화하시겠습니까?',
+      okText: t('common.yes'),
+      cancelText: t('common.no'),
+      onOk: async () => {
+        try {
+          await activateAllUsers();
+          messageApi.success('모든 사용자가 활성화되었습니다');
+        } catch {
+          messageApi.error('사용자 활성화 중 오류가 발생했습니다');
+        }
+      },
+    });
+  };
+
+  const handleOk = async () => {
     try {
-      const { count: totalUsers } = await supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true });
+      const values = await form.validateFields();
 
-      const { count: activeUsers } = await supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'ACTIVE');
+      if (editingUser) {
+        // 기존 사용자 수정
+        await updateUser(editingUser.user_id, values);
+        messageApi.success(t('users.userUpdated'));
+      } else {
+        // 새 사용자 추가
+        await createUser({
+          ...values,
+          department: values.department_id || null,
+          user_settings: {},
+          profile_image_url: null,
+          last_password_change: null,
+          login_attempt_count: 0,
+          account_expiry_date: null,
+          password_hash: 'temporary_hash', // TODO: 실제 패스워드 해싱 필요
+        });
+        messageApi.success(t('users.userAdded'));
+      }
 
-      setStats({
-        totalUsers: totalUsers || 0,
-        activeUsers: activeUsers || 0,
-      });
-    } catch (err) {
-      console.error('Failed to fetch user stats:', err);
+      setIsModalOpen(false);
+      form.resetFields();
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : t('common.error'));
     }
+  };
+
+  const handleCancel = () => {
+    setIsModalOpen(false);
+    form.resetFields();
   };
 
   // 동적 필터 옵션 생성
   const getRoleFilters = () => {
     const roles = [...new Set(users.map(item => item.role).filter(Boolean))];
-    return roles.map(role => ({ text: t(`users.roles.${role.toLowerCase()}`) || role, value: role }));
+    return roles.map(role => ({
+      text: t(`users.roles.${role.toLowerCase()}`) || role,
+      value: role
+    }));
   };
 
   const getStatusFilters = () => {
-    const statuses = [...new Set(users.map(item => item.status).filter(Boolean))];
-    return statuses.map(status => ({
-      text: status === 'ACTIVE' ? t('users.active') : t('users.inactive'),
-      value: status
-    }));
+    return [
+      { text: t('users.active'), value: true },
+      { text: t('users.inactive'), value: false },
+    ];
   };
 
   const columns: ColumnsType<User> = [
@@ -101,6 +157,13 @@ const Users = () => {
       key: 'username',
       width: 150,
       sorter: (a, b) => (a.username || '').localeCompare(b.username || ''),
+    },
+    {
+      title: '성명',
+      dataIndex: 'full_name',
+      key: 'full_name',
+      width: 150,
+      sorter: (a, b) => (a.full_name || '').localeCompare(b.full_name || ''),
     },
     {
       title: t('users.email'),
@@ -114,15 +177,16 @@ const Users = () => {
       dataIndex: 'role',
       key: 'role',
       width: 120,
-      sorter: (a, b) => a.role.localeCompare(b.role),
+      sorter: (a, b) => (a.role || '').localeCompare(b.role || ''),
       filters: getRoleFilters(),
       onFilter: (value, record) => record.role === value,
       render: (role: string) => {
         const roleColors: Record<string, string> = {
-          ADMIN: 'red',
-          MANAGER: 'blue',
-          USER: 'green',
-          VIEWER: 'default',
+          system_admin: 'red',
+          admin: 'red',
+          manager: 'blue',
+          user: 'green',
+          viewer: 'default',
         };
         return (
           <Tag color={roleColors[role] || 'default'}>
@@ -133,17 +197,24 @@ const Users = () => {
     },
     {
       title: t('users.status'),
-      dataIndex: 'status',
-      key: 'status',
+      dataIndex: 'is_active',
+      key: 'is_active',
       width: 100,
-      sorter: (a, b) => a.status.localeCompare(b.status),
+      sorter: (a, b) => Number(a.is_active) - Number(b.is_active),
       filters: getStatusFilters(),
-      onFilter: (value, record) => record.status === value,
-      render: (status: string) => (
-        <Tag color={status === 'ACTIVE' ? 'success' : 'default'}>
-          {status === 'ACTIVE' ? t('users.active') : t('users.inactive')}
+      onFilter: (value, record) => record.is_active === value,
+      render: (isActive: boolean) => (
+        <Tag color={isActive ? 'success' : 'default'}>
+          {isActive ? t('users.active') : t('users.inactive')}
         </Tag>
       ),
+    },
+    {
+      title: '직책',
+      dataIndex: 'position',
+      key: 'position',
+      width: 120,
+      render: (position: string | null) => position || '-',
     },
     {
       title: t('users.createdAt'),
@@ -154,17 +225,32 @@ const Users = () => {
       render: (date: string) => dayjs(date).format('YYYY-MM-DD'),
     },
     {
-      title: t('users.lastLogin'),
-      dataIndex: 'last_login',
-      key: 'last_login',
-      width: 150,
-      sorter: (a, b) => {
-        if (!a.last_login) return 1;
-        if (!b.last_login) return -1;
-        return dayjs(a.last_login).diff(dayjs(b.last_login));
-      },
-      render: (date: string | null) =>
-        date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-',
+      title: t('inventory.actions'),
+      key: 'actions',
+      width: 200,
+      fixed: 'right',
+      render: (_, record) => (
+        <Space>
+          <Button type="link" size="small" onClick={() => showEditModal(record)}>
+            {t('common.edit')}
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => handleToggleStatus(record.user_id, record.is_active)}
+          >
+            {record.is_active ? '비활성화' : '활성화'}
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            onClick={() => handleDelete(record.user_id, record.username)}
+          >
+            {t('common.delete')}
+          </Button>
+        </Space>
+      ),
     },
   ];
 
@@ -174,6 +260,7 @@ const Users = () => {
     const search = searchText.toLowerCase();
     return (
       user.username?.toLowerCase().includes(search) ||
+      user.full_name?.toLowerCase().includes(search) ||
       user.email?.toLowerCase().includes(search) ||
       user.role?.toLowerCase().includes(search)
     );
@@ -192,10 +279,19 @@ const Users = () => {
 
   return (
     <div>
+      {contextHolder}
       <Space style={{ marginBottom: 24, width: '100%', justifyContent: 'space-between' }}>
         <Title level={2} style={{ margin: 0 }}>
           {t('users.title')}
         </Title>
+        <Space>
+          <Button onClick={handleActivateAll}>
+            모든 사용자 활성화
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal}>
+            {t('users.addUser')}
+          </Button>
+        </Space>
       </Space>
 
       <Spin spinning={isLoading}>
@@ -204,7 +300,7 @@ const Users = () => {
             <Card>
               <Statistic
                 title={t('users.totalUsers')}
-                value={stats.totalUsers}
+                value={stats?.totalUsers || 0}
                 prefix={<UserOutlined />}
               />
             </Card>
@@ -213,7 +309,7 @@ const Users = () => {
             <Card>
               <Statistic
                 title={t('users.activeUsers')}
-                value={stats.activeUsers}
+                value={stats?.activeUsers || 0}
                 valueStyle={{ color: '#52c41a' }}
                 prefix={<UserOutlined />}
               />
@@ -243,10 +339,101 @@ const Users = () => {
               showSizeChanger: true,
               showTotal: (total) => `${t('common.total')} ${total} ${t('common.items')}`
             }}
-            scroll={{ x: 1200 }}
+            scroll={{ x: 1400 }}
           />
         </Card>
       </Spin>
+
+      <Modal
+        title={editingUser ? t('users.editUser') : t('users.addUser')}
+        open={isModalOpen}
+        onOk={handleOk}
+        onCancel={handleCancel}
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
+        width={700}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          name="userForm"
+        >
+          <Form.Item
+            name="username"
+            label={t('users.username')}
+            rules={[{ required: true, message: t('common.required') }]}
+          >
+            <Input placeholder="사용자명" />
+          </Form.Item>
+
+          <Form.Item
+            name="full_name"
+            label="성명"
+            rules={[{ required: true, message: t('common.required') }]}
+          >
+            <Input placeholder="전체 이름" />
+          </Form.Item>
+
+          <Form.Item
+            name="email"
+            label={t('users.email')}
+            rules={[
+              { required: true, message: t('common.required') },
+              { type: 'email', message: t('common.invalidEmail') }
+            ]}
+          >
+            <Input placeholder="email@example.com" />
+          </Form.Item>
+
+          <Form.Item
+            name="role"
+            label={t('users.role')}
+            rules={[{ required: true, message: t('common.required') }]}
+          >
+            <Select placeholder="역할 선택">
+              <Option value="system_admin">{t('users.roles.system_admin') || 'System Admin'}</Option>
+              <Option value="admin">{t('users.roles.admin') || 'Admin'}</Option>
+              <Option value="manager">{t('users.roles.manager') || 'Manager'}</Option>
+              <Option value="user">{t('users.roles.user') || 'User'}</Option>
+              <Option value="viewer">{t('users.roles.viewer') || 'Viewer'}</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="phone_number"
+            label="전화번호"
+          >
+            <Input placeholder="+84 123 456 789" />
+          </Form.Item>
+
+          <Form.Item
+            name="position"
+            label="직책"
+          >
+            <Input placeholder="예: 팀장, 매니저" />
+          </Form.Item>
+
+          <Form.Item
+            name="department_id"
+            label="부서 ID"
+          >
+            <Input placeholder="부서 UUID (선택사항)" />
+          </Form.Item>
+
+          {editingUser && (
+            <Form.Item
+              name="is_active"
+              label={t('users.status')}
+              valuePropName="checked"
+            >
+              <Select>
+                <Option value={true}>{t('users.active')}</Option>
+                <Option value={false}>{t('users.inactive')}</Option>
+              </Select>
+            </Form.Item>
+          )}
+        </Form>
+      </Modal>
     </div>
   );
 };

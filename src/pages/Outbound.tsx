@@ -11,6 +11,7 @@ import { useOutboundStore, usePartsStore, useDepartmentsStore } from '../store';
 import type { Outbound } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
 import { ResizableTable } from '../components/ResizableTable';
+import { generateOutboundReferenceNumber } from '../services/outbound.service';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -27,6 +28,7 @@ const Outbound = () => {
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Outbound | null>(null);
+  const [referenceNumber, setReferenceNumber] = useState('');
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -60,14 +62,22 @@ const Outbound = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const showAddModal = () => {
+  const showAddModal = async () => {
     setEditingItem(null);
     form.resetFields();
+    // 오늘 날짜로 참조번호 자동 생성
+    const today = dayjs();
+    const refNumber = await generateOutboundReferenceNumber(today.format('YYYY-MM-DD'));
+    setReferenceNumber(refNumber);
+    form.setFieldsValue({
+      outbound_date: today,
+    });
     setIsModalOpen(true);
   };
 
   const showEditModal = (item: Outbound) => {
     setEditingItem(item);
+    setReferenceNumber(item.reference_number || '');
     form.setFieldsValue({
       part_id: item.part_id,
       department_id: item.department_id,
@@ -99,12 +109,21 @@ const Outbound = () => {
     });
   };
 
+  // 출고 날짜 변경 시 참조번호 재생성
+  const handleDateChange = async (date: Dayjs | null) => {
+    if (date && !editingItem) {
+      const refNumber = await generateOutboundReferenceNumber(date.format('YYYY-MM-DD'));
+      setReferenceNumber(refNumber);
+    }
+  };
+
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
       const formattedValues = {
         ...values,
         outbound_date: values.outbound_date.format('YYYY-MM-DD'),
+        reference_number: referenceNumber,
       };
 
       if (editingItem) {
@@ -122,6 +141,7 @@ const Outbound = () => {
 
       setIsModalOpen(false);
       form.resetFields();
+      setReferenceNumber('');
     } catch (error) {
       messageApi.error(error instanceof Error ? error.message : t('common.error'));
     }
@@ -130,6 +150,7 @@ const Outbound = () => {
   const handleCancel = () => {
     setIsModalOpen(false);
     form.resetFields();
+    setReferenceNumber('');
   };
 
   const columns: ColumnsType<Outbound> = [
@@ -408,6 +429,12 @@ const Outbound = () => {
           name="outboundForm"
         >
           <Form.Item
+            label={t('outbound.reference')}
+          >
+            <Input value={referenceNumber} disabled style={{ color: '#000', fontWeight: 'bold' }} />
+          </Form.Item>
+
+          <Form.Item
             name="part_id"
             label={t('outbound.part')}
             rules={[{ required: true, message: t('common.required') }]}
@@ -448,7 +475,11 @@ const Outbound = () => {
             label={t('outbound.outboundDate')}
             rules={[{ required: true, message: t('common.required') }]}
           >
-            <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
+            <DatePicker
+              style={{ width: '100%' }}
+              format="YYYY-MM-DD"
+              onChange={handleDateChange}
+            />
           </Form.Item>
 
           <Form.Item

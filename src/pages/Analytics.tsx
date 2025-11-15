@@ -27,6 +27,11 @@ interface TopPart {
   quantity: number;
   value?: number;
   percentage: number;
+  suppliers?: Array<{
+    supplier_name: string;
+    unit_price: number;
+    quantity: number;
+  }>;
 }
 
 interface CategoryData {
@@ -181,18 +186,43 @@ const Analytics = () => {
       // 입고 상위 부품 (수량 및 금액)
       const { data: inboundPartsData } = await supabase
         .from('inbound')
-        .select('part_id, quantity, total_price, parts(part_code, part_name)')
+        .select('part_id, quantity, total_price, unit_price, parts(part_code, part_name), suppliers(supplier_name)')
         .gte('inbound_date', startDate.format('YYYY-MM-DD'))
         .lte('inbound_date', endDate.format('YYYY-MM-DD'));
 
       const inboundByPart = (inboundPartsData as any[])?.reduce((acc: any, item: any) => {
-        const partCode = item.parts?.part_code || 'Unknown';
-        const partName = item.parts?.part_name || 'Unknown';
+        const partCode = item.parts?.part_code || t('analytics.unknown');
+        const partName = item.parts?.part_name || t('analytics.unknown');
+        const supplierName = item.suppliers?.supplier_name || t('analytics.unknown');
+        const unitPrice = item.unit_price || 0;
+        const quantity = item.quantity || 0;
+
         if (!acc[partCode]) {
-          acc[partCode] = { part_code: partCode, part_name: partName, quantity: 0, value: 0 };
+          acc[partCode] = {
+            part_code: partCode,
+            part_name: partName,
+            quantity: 0,
+            value: 0,
+            suppliers: []
+          };
         }
-        acc[partCode].quantity += item.quantity || 0;
+        acc[partCode].quantity += quantity;
         acc[partCode].value += item.total_price || 0;
+
+        // 공급업체 정보 추가 (중복 체크)
+        const existingSupplier = acc[partCode].suppliers.find(
+          (s: any) => s.supplier_name === supplierName && s.unit_price === unitPrice
+        );
+        if (existingSupplier) {
+          existingSupplier.quantity += quantity;
+        } else {
+          acc[partCode].suppliers.push({
+            supplier_name: supplierName,
+            unit_price: unitPrice,
+            quantity: quantity
+          });
+        }
+
         return acc;
       }, {});
 
@@ -224,8 +254,8 @@ const Analytics = () => {
         .lte('outbound_date', endDate.format('YYYY-MM-DD'));
 
       const outboundByPart = (outboundPartsData as any[])?.reduce((acc: any, item: any) => {
-        const partCode = item.parts?.part_code || 'Unknown';
-        const partName = item.parts?.part_name || 'Unknown';
+        const partCode = item.parts?.part_code || t('analytics.unknown');
+        const partName = item.parts?.part_name || t('analytics.unknown');
         if (!acc[partCode]) {
           acc[partCode] = { part_code: partCode, part_name: partName, quantity: 0 };
         }
@@ -251,7 +281,7 @@ const Analytics = () => {
         .lte('inbound_date', endDate.format('YYYY-MM-DD'));
 
       const categoryStats = (categoryInboundData as any[])?.reduce((acc: any, item: any) => {
-        const category = item.parts?.category || 'Unknown';
+        const category = item.parts?.category || t('analytics.unknown');
         if (!acc[category]) {
           acc[category] = { category, quantity: 0, value: 0 };
         }
@@ -275,7 +305,7 @@ const Analytics = () => {
         .lte('inbound_date', endDate.format('YYYY-MM-DD'));
 
       const supplierStats = (supplierInboundData as any[])?.reduce((acc: any, item: any) => {
-        const supplierName = item.suppliers?.supplier_name || 'Unknown';
+        const supplierName = item.suppliers?.supplier_name || t('analytics.unknown');
         if (!acc[supplierName]) {
           acc[supplierName] = { supplier_name: supplierName, quantity: 0, value: 0, count: 0 };
         }
@@ -546,6 +576,36 @@ const Analytics = () => {
                         title: t('parts.partName'),
                         dataIndex: 'part_name',
                         key: 'part_name',
+                        width: 200,
+                      },
+                      {
+                        title: t('inbound.quantity'),
+                        dataIndex: 'quantity',
+                        key: 'quantity',
+                        width: 120,
+                        align: 'right',
+                        render: (val: number) => val.toLocaleString(),
+                      },
+                      {
+                        title: t('suppliers.name'),
+                        dataIndex: 'suppliers',
+                        key: 'suppliers',
+                        width: 200,
+                        render: (suppliers: Array<{ supplier_name: string; unit_price: number; quantity: number }>) => {
+                          if (!suppliers || suppliers.length === 0) return t('analytics.notAvailable');
+                          return suppliers.map(s => s.supplier_name).join(', ');
+                        },
+                      },
+                      {
+                        title: t('inbound.unitPrice'),
+                        dataIndex: 'suppliers',
+                        key: 'unit_price',
+                        width: 150,
+                        align: 'right',
+                        render: (suppliers: Array<{ supplier_name: string; unit_price: number; quantity: number }>) => {
+                          if (!suppliers || suppliers.length === 0) return t('analytics.notAvailable');
+                          return suppliers.map(s => `${s.unit_price.toLocaleString()} ₫`).join(', ');
+                        },
                       },
                       {
                         title: t('analytics.value'),
@@ -567,7 +627,7 @@ const Analytics = () => {
                     dataSource={topInboundPartsByValue}
                     rowKey="part_code"
                     pagination={false}
-                    scroll={{ x: 600 }}
+                    scroll={{ x: 1200 }}
                   />
                 ),
               },

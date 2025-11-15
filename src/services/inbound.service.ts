@@ -7,6 +7,40 @@
 
 import { supabase } from '../lib/supabase';
 import type { Inbound, InboundDetail, InsertDto, UpdateDto } from '../types/database.types';
+import dayjs from 'dayjs';
+
+/**
+ * 참조번호 자동 생성 (형식: IN-YYYYMMDD-XXX)
+ */
+export async function generateInboundReferenceNumber(date?: string): Promise<string> {
+  const targetDate = date || dayjs().format('YYYY-MM-DD');
+  const dateStr = dayjs(targetDate).format('YYYYMMDD');
+
+  // 해당 날짜의 모든 입고 내역 조회
+  const { data, error } = await supabase
+    .from('inbound')
+    .select('reference_number')
+    .like('reference_number', `IN-${dateStr}%`)
+    .order('reference_number', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error('참조번호 생성 에러:', error);
+    throw new Error(error.message);
+  }
+
+  // 카운터 계산
+  let counter = 1;
+  if (data && data.length > 0 && data[0].reference_number) {
+    const lastRef = data[0].reference_number;
+    const lastCounter = parseInt(lastRef.split('-')[2] || '0');
+    counter = lastCounter + 1;
+  }
+
+  // 3자리 숫자로 포맷
+  const counterStr = counter.toString().padStart(3, '0');
+  return `IN-${dateStr}-${counterStr}`;
+}
 
 /**
  * 모든 입고 내역 조회

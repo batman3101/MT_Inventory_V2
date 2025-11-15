@@ -11,3 +11,4 @@ export * from './departments.store';
 export * from './inventory.store';
 export * from './inbound.store';
 export * from './outbound.store';
+export * from './users.store';

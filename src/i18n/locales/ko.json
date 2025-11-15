@@ -255,6 +255,7 @@
     "totalUsers": "총 사용자",
     "activeUsers": "활성 사용자",
     "roles": {
+      "system_admin": "시스템 관리자",
       "admin": "관리자",
       "manager": "매니저",
       "user": "사용자",
@@ -301,6 +302,8 @@
     "rank": "순위",
     "percentage": "비율",
     "value": "금액",
-    "viewMore": "더보기"
+    "viewMore": "더보기",
+    "unknown": "알 수 없음",
+    "notAvailable": "-"
   }
 }

@@ -255,6 +255,7 @@
     "totalUsers": "Tổng người dùng",
     "activeUsers": "Người dùng hoạt động",
     "roles": {
+      "system_admin": "Quản trị viên hệ thống",
       "admin": "Quản trị viên",
       "manager": "Quản lý",
       "user": "Người dùng",
@@ -301,6 +302,8 @@
     "rank": "Thứ hạng",
     "percentage": "Tỷ lệ",
     "value": "Giá trị",
-    "viewMore": "Xem thêm"
+    "viewMore": "Xem thêm",
+    "unknown": "Không rõ",
+    "notAvailable": "-"
   }
 }

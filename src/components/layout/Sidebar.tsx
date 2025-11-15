@@ -14,6 +14,8 @@ import {
 } from '@ant-design/icons';
 import LanguageSwitcher from '../LanguageSwitcher';
 import { useAuthStore } from '../../store';
+import AlmusLogo from '../../../assets/images/ALMUS_SYMBOL.png';
+import WorkerImage from '../../../assets/images/worker2.png';
 
 const { Sider } = Layout;
 
@@ -99,8 +101,10 @@ const Sidebar = () => {
           fontWeight: 'bold',
           color: '#fff',
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          gap: '12px',
         }}
       >
+        <img src={AlmusLogo} alt="ALMUS" style={{ height: 40, width: 'auto' }} />
         {t('app.title')}
       </div>
 
@@ -123,6 +127,9 @@ const Sidebar = () => {
           borderTop: '1px solid rgba(255, 255, 255, 0.1)',
         }}
       >
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
+          <img src={WorkerImage} alt="Worker" style={{ width: '80%', height: 'auto', borderRadius: 8 }} />
+        </div>
         {user && (
           <div style={{ marginBottom: 12, color: '#fff', fontSize: 12, textAlign: 'center' }}>
             {user.email}
