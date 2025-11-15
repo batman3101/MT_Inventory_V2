@@ -5,7 +5,7 @@
  * ⚠️ 실제 Supabase 데이터베이스에서 입고 데이터를 조회/관리합니다.
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase.ts';
 import type { Inbound, InboundDetail, InsertDto, UpdateDto } from '../types/database.types';
 import dayjs from 'dayjs';
 
