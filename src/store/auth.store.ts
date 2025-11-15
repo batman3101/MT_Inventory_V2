@@ -10,8 +10,9 @@ import { persist } from 'zustand/middleware';
 import axios from 'axios';
 import type { User as CustomUser } from '../types/database.types';
 
-// 개발 환경에서는 Vite 프록시 사용, 프로덕션에서는 동일 도메인 사용
-const API_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || '');
+// 개발 환경에서는 Vite 프록시 사용, 프로덕션에서는 Vercel Serverless Functions 사용
+// Vercel은 /api/* 경로를 자동으로 api/ 폴더의 함수로 라우팅
+const API_URL = '';
 
 // Supabase Auth의 User 타입 대신 커스텀 User 타입 사용
 interface Session {
