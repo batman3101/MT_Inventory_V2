@@ -48,7 +48,11 @@ export async function generateInboundReferenceNumber(date?: string): Promise<str
 export async function getAllInbound(): Promise<Inbound[]> {
   const { data, error } = await supabase
     .from('inbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      suppliers!inner(supplier_name)
+    `)
     .order('inbound_date', { ascending: false });
 
   if (error) {
@@ -56,7 +60,16 @@ export async function getAllInbound(): Promise<Inbound[]> {
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    supplier_name: item.suppliers?.supplier_name || '',
+    parts: undefined,
+    suppliers: undefined,
+  }));
 }
 
 /**
@@ -90,7 +103,11 @@ export async function getInboundByDateRange(
 ): Promise<Inbound[]> {
   const { data, error } = await supabase
     .from('inbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      suppliers!inner(supplier_name)
+    `)
     .gte('inbound_date', startDate)
     .lte('inbound_date', endDate)
     .order('inbound_date', { ascending: false });
@@ -100,7 +117,16 @@ export async function getInboundByDateRange(
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    supplier_name: item.suppliers?.supplier_name || '',
+    parts: undefined,
+    suppliers: undefined,
+  }));
 }
 
 /**
@@ -109,7 +135,11 @@ export async function getInboundByDateRange(
 export async function getInboundByPartId(partId: string): Promise<Inbound[]> {
   const { data, error } = await supabase
     .from('inbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      suppliers!inner(supplier_name)
+    `)
     .eq('part_id', partId)
     .order('inbound_date', { ascending: false });
 
@@ -118,7 +148,16 @@ export async function getInboundByPartId(partId: string): Promise<Inbound[]> {
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    supplier_name: item.suppliers?.supplier_name || '',
+    parts: undefined,
+    suppliers: undefined,
+  }));
 }
 
 /**
@@ -127,7 +166,11 @@ export async function getInboundByPartId(partId: string): Promise<Inbound[]> {
 export async function getInboundBySupplierId(supplierId: string): Promise<Inbound[]> {
   const { data, error } = await supabase
     .from('inbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      suppliers!inner(supplier_name)
+    `)
     .eq('supplier_id', supplierId)
     .order('inbound_date', { ascending: false});
 
@@ -136,7 +179,16 @@ export async function getInboundBySupplierId(supplierId: string): Promise<Inboun
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    supplier_name: item.suppliers?.supplier_name || '',
+    parts: undefined,
+    suppliers: undefined,
+  }));
 }
 
 /**
@@ -233,7 +285,11 @@ export async function getInboundStats(startDate?: string, endDate?: string) {
 export async function getRecentInbound(limit: number = 10): Promise<Inbound[]> {
   const { data, error } = await supabase
     .from('inbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      suppliers!inner(supplier_name)
+    `)
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -242,5 +298,14 @@ export async function getRecentInbound(limit: number = 10): Promise<Inbound[]> {
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    supplier_name: item.suppliers?.supplier_name || '',
+    parts: undefined,
+    suppliers: undefined,
+  }));
 }

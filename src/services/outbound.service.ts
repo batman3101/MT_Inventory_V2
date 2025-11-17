@@ -46,9 +46,13 @@ export async function generateOutboundReferenceNumber(date?: string): Promise<st
  * 모든 출고 내역 조회
  */
 export async function getAllOutbound(): Promise<Outbound[]> {
-  const { data, error } = await supabase
+  const { data, error} = await supabase
     .from('outbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      departments(department_name)
+    `)
     .order('outbound_date', { ascending: false });
 
   if (error) {
@@ -56,7 +60,16 @@ export async function getAllOutbound(): Promise<Outbound[]> {
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    department_name: item.departments?.department_name || item.department || '',
+    parts: undefined,
+    departments: undefined,
+  }));
 }
 
 /**
@@ -89,17 +102,30 @@ export async function getOutboundByDateRange(
 ): Promise<Outbound[]> {
   const { data, error } = await supabase
     .from('outbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      departments(department_name)
+    `)
     .gte('outbound_date', startDate)
     .lte('outbound_date', endDate)
-    .order('outbound_date', { ascending: false });
+    .order('outbound_date', { ascending: false});
 
   if (error) {
     console.error('출고 조회 에러:', error);
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    department_name: item.departments?.department_name || item.department || '',
+    parts: undefined,
+    departments: undefined,
+  }));
 }
 
 /**
@@ -108,7 +134,11 @@ export async function getOutboundByDateRange(
 export async function getOutboundByPartId(partId: string): Promise<Outbound[]> {
   const { data, error } = await supabase
     .from('outbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      departments(department_name)
+    `)
     .eq('part_id', partId)
     .order('outbound_date', { ascending: false });
 
@@ -117,7 +147,16 @@ export async function getOutboundByPartId(partId: string): Promise<Outbound[]> {
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    department_name: item.departments?.department_name || item.department || '',
+    parts: undefined,
+    departments: undefined,
+  }));
 }
 
 /**
@@ -126,7 +165,11 @@ export async function getOutboundByPartId(partId: string): Promise<Outbound[]> {
 export async function getOutboundByDepartmentId(departmentId: string): Promise<Outbound[]> {
   const { data, error } = await supabase
     .from('outbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      departments(department_name)
+    `)
     .eq('department_id', departmentId)
     .order('outbound_date', { ascending: false });
 
@@ -135,7 +178,16 @@ export async function getOutboundByDepartmentId(departmentId: string): Promise<O
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    department_name: item.departments?.department_name || item.department || '',
+    parts: undefined,
+    departments: undefined,
+  }));
 }
 
 /**
@@ -144,7 +196,11 @@ export async function getOutboundByDepartmentId(departmentId: string): Promise<O
 export async function getOutboundByRequester(requester: string): Promise<Outbound[]> {
   const { data, error } = await supabase
     .from('outbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      departments(department_name)
+    `)
     .eq('requester', requester)
     .order('outbound_date', { ascending: false });
 
@@ -153,7 +209,16 @@ export async function getOutboundByRequester(requester: string): Promise<Outboun
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    department_name: item.departments?.department_name || item.department || '',
+    parts: undefined,
+    departments: undefined,
+  }));
 }
 
 /**
@@ -162,7 +227,11 @@ export async function getOutboundByRequester(requester: string): Promise<Outboun
 export async function getOutboundByEquipment(equipment: string): Promise<Outbound[]> {
   const { data, error } = await supabase
     .from('outbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      departments(department_name)
+    `)
     .eq('equipment', equipment)
     .order('outbound_date', { ascending: false });
 
@@ -171,7 +240,16 @@ export async function getOutboundByEquipment(equipment: string): Promise<Outboun
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    department_name: item.departments?.department_name || item.department || '',
+    parts: undefined,
+    departments: undefined,
+  }));
 }
 
 /**
@@ -274,7 +352,11 @@ export async function getOutboundStats(startDate?: string, endDate?: string) {
 export async function getRecentOutbound(limit: number = 10): Promise<Outbound[]> {
   const { data, error } = await supabase
     .from('outbound')
-    .select('*')
+    .select(`
+      *,
+      parts!inner(part_code, part_name, unit),
+      departments(department_name)
+    `)
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -283,5 +365,14 @@ export async function getRecentOutbound(limit: number = 10): Promise<Outbound[]>
     throw new Error(error.message);
   }
 
-  return data;
+  // JOIN된 데이터를 평탄화
+  return data.map((item: any) => ({
+    ...item,
+    part_code: item.parts?.part_code || '',
+    part_name: item.parts?.part_name || '',
+    part_unit: item.parts?.unit || '',
+    department_name: item.departments?.department_name || item.department || '',
+    parts: undefined,
+    departments: undefined,
+  }));
 }

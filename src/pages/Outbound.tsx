@@ -84,7 +84,6 @@ const Outbound = () => {
       quantity: item.quantity,
       outbound_date: item.outbound_date ? dayjs(item.outbound_date) : undefined,
       requester: item.requester,
-      department: item.department,
       reason: item.reason,
       equipment: item.equipment,
       notes: item.notes,
@@ -455,12 +454,12 @@ const Outbound = () => {
           <Form.Item
             name="department_id"
             label={t('outbound.department')}
+            rules={[{ required: true, message: t('common.required') }]}
           >
             <Select
               showSearch
               placeholder={t('common.selectDepartment')}
               optionFilterProp="children"
-              allowClear
             >
               {departments.map(dept => (
                 <Option key={dept.department_id} value={dept.department_id}>
@@ -496,13 +495,6 @@ const Outbound = () => {
             rules={[{ required: true, message: t('common.required') }]}
           >
             <Input placeholder={t('outbound.requesterPlaceholder')} />
-          </Form.Item>
-
-          <Form.Item
-            name="department"
-            label={t('outbound.departmentName')}
-          >
-            <Input placeholder={t('outbound.departmentNamePlaceholder')} />
           </Form.Item>
 
           <Form.Item
