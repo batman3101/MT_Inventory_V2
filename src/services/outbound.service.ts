@@ -50,8 +50,7 @@ export async function getAllOutbound(): Promise<Outbound[]> {
     .from('outbound')
     .select(`
       *,
-      parts!inner(part_code, part_name, unit),
-      departments(department_name)
+      parts!inner(part_code, part_name, unit)
     `)
     .order('outbound_date', { ascending: false });
 
@@ -66,9 +65,8 @@ export async function getAllOutbound(): Promise<Outbound[]> {
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.departments?.department_name || item.department || '',
+    department_name: item.department || '',
     parts: undefined,
-    departments: undefined,
   }));
 }
 
@@ -104,8 +102,7 @@ export async function getOutboundByDateRange(
     .from('outbound')
     .select(`
       *,
-      parts!inner(part_code, part_name, unit),
-      departments(department_name)
+      parts!inner(part_code, part_name, unit)
     `)
     .gte('outbound_date', startDate)
     .lte('outbound_date', endDate)
@@ -122,9 +119,8 @@ export async function getOutboundByDateRange(
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.departments?.department_name || item.department || '',
+    department_name: item.department || '',
     parts: undefined,
-    departments: undefined,
   }));
 }
 
@@ -136,8 +132,7 @@ export async function getOutboundByPartId(partId: string): Promise<Outbound[]> {
     .from('outbound')
     .select(`
       *,
-      parts!inner(part_code, part_name, unit),
-      departments(department_name)
+      parts!inner(part_code, part_name, unit)
     `)
     .eq('part_id', partId)
     .order('outbound_date', { ascending: false });
@@ -153,9 +148,8 @@ export async function getOutboundByPartId(partId: string): Promise<Outbound[]> {
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.departments?.department_name || item.department || '',
+    department_name: item.department || '',
     parts: undefined,
-    departments: undefined,
   }));
 }
 
@@ -167,8 +161,7 @@ export async function getOutboundByDepartmentId(departmentId: string): Promise<O
     .from('outbound')
     .select(`
       *,
-      parts!inner(part_code, part_name, unit),
-      departments(department_name)
+      parts!inner(part_code, part_name, unit)
     `)
     .eq('department_id', departmentId)
     .order('outbound_date', { ascending: false });
@@ -184,9 +177,8 @@ export async function getOutboundByDepartmentId(departmentId: string): Promise<O
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.departments?.department_name || item.department || '',
+    department_name: item.department || '',
     parts: undefined,
-    departments: undefined,
   }));
 }
 
@@ -198,8 +190,7 @@ export async function getOutboundByRequester(requester: string): Promise<Outboun
     .from('outbound')
     .select(`
       *,
-      parts!inner(part_code, part_name, unit),
-      departments(department_name)
+      parts!inner(part_code, part_name, unit)
     `)
     .eq('requester', requester)
     .order('outbound_date', { ascending: false });
@@ -215,9 +206,8 @@ export async function getOutboundByRequester(requester: string): Promise<Outboun
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.departments?.department_name || item.department || '',
+    department_name: item.department || '',
     parts: undefined,
-    departments: undefined,
   }));
 }
 
@@ -229,8 +219,7 @@ export async function getOutboundByEquipment(equipment: string): Promise<Outboun
     .from('outbound')
     .select(`
       *,
-      parts!inner(part_code, part_name, unit),
-      departments(department_name)
+      parts!inner(part_code, part_name, unit)
     `)
     .eq('equipment', equipment)
     .order('outbound_date', { ascending: false });
@@ -246,9 +235,8 @@ export async function getOutboundByEquipment(equipment: string): Promise<Outboun
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.departments?.department_name || item.department || '',
+    department_name: item.department || '',
     parts: undefined,
-    departments: undefined,
   }));
 }
 
@@ -354,8 +342,7 @@ export async function getRecentOutbound(limit: number = 10): Promise<Outbound[]>
     .from('outbound')
     .select(`
       *,
-      parts!inner(part_code, part_name, unit),
-      departments(department_name)
+      parts!inner(part_code, part_name, unit)
     `)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -371,8 +358,7 @@ export async function getRecentOutbound(limit: number = 10): Promise<Outbound[]>
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.departments?.department_name || item.department || '',
+    department_name: item.department || '',
     parts: undefined,
-    departments: undefined,
   }));
 }

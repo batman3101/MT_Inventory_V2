@@ -37,19 +37,31 @@ const Outbound = () => {
   const { parts, fetchParts } = usePartsStore();
   const { departments, fetchDepartments } = useDepartmentsStore();
 
+  // department_name 보강: department_id가 있는데 department_name이 없는 경우 departments에서 찾아서 채움
+  const enrichedOutbounds = outbounds.map(item => {
+    if (item.department_id && !item.department_name) {
+      const dept = departments.find(d => d.department_id === item.department_id);
+      return {
+        ...item,
+        department_name: dept?.department_name || '',
+      };
+    }
+    return item;
+  });
+
   // 동적 필터 옵션 생성
   const getDepartmentFilters = () => {
-    const deptNames = [...new Set(outbounds.map(item => item.department_name).filter(Boolean))];
+    const deptNames = [...new Set(enrichedOutbounds.map(item => item.department_name).filter(Boolean))];
     return deptNames.map(name => ({ text: name, value: name }));
   };
 
   const getPartCodeFilters = () => {
-    const partCodes = [...new Set(outbounds.map(item => item.part_code).filter(Boolean))];
+    const partCodes = [...new Set(enrichedOutbounds.map(item => item.part_code).filter(Boolean))];
     return partCodes.map(code => ({ text: code, value: code }));
   };
 
   const getReasonFilters = () => {
-    const reasons = [...new Set(outbounds.map(item => item.reason).filter(Boolean))];
+    const reasons = [...new Set(enrichedOutbounds.map(item => item.reason).filter(Boolean))];
     return reasons.map(reason => ({ text: reason, value: reason }));
   };
 
@@ -81,6 +93,7 @@ const Outbound = () => {
     form.setFieldsValue({
       part_id: item.part_id,
       department_id: item.department_id,
+      department: item.department,
       quantity: item.quantity,
       outbound_date: item.outbound_date ? dayjs(item.outbound_date) : undefined,
       requester: item.requester,
@@ -246,7 +259,7 @@ const Outbound = () => {
   ];
 
   // 검색 및 날짜 필터링
-  const filteredList = outbounds.filter(item => {
+  const filteredList = enrichedOutbounds.filter(item => {
     // 검색 필터
     if (searchText) {
       const search = searchText.toLowerCase();
@@ -460,6 +473,12 @@ const Outbound = () => {
               showSearch
               placeholder={t('common.selectDepartment')}
               optionFilterProp="children"
+              onChange={(value) => {
+                const selectedDept = departments.find(d => d.department_id === value);
+                if (selectedDept) {
+                  form.setFieldsValue({ department: selectedDept.department_name });
+                }
+              }}
             >
               {departments.map(dept => (
                 <Option key={dept.department_id} value={dept.department_id}>
@@ -467,6 +486,13 @@ const Outbound = () => {
                 </Option>
               ))}
             </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="department"
+            hidden
+          >
+            <Input />
           </Form.Item>
 
           <Form.Item

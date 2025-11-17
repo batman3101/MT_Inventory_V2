@@ -13,7 +13,9 @@
       "Bash(dir \"C:\\WORK\\app_management\\CNC_MT_Inventory_V2\\src\\lib\" /b)",
       "Bash(find:*)",
       "Bash(git check-ignore:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []
