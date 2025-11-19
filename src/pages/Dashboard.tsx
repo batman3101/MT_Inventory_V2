@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons';
 import { useInventoryStore, useSuppliersStore, useInboundStore, useOutboundStore } from '../store';
 import dayjs from 'dayjs';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getLast7DaysInboundAmount } from '../services/inbound.service';
 import { getLast7DaysOutboundAmount } from '../services/outbound.service';
 
@@ -53,15 +53,10 @@ const Dashboard = () => {
   const loadChartData = async () => {
     setChartLoading(true);
     try {
-      console.log('차트 데이터 로딩 시작...');
-
       const [inboundData, outboundData] = await Promise.all([
         getLast7DaysInboundAmount(),
         getLast7DaysOutboundAmount()
       ]);
-
-      console.log('입고 데이터:', inboundData);
-      console.log('출고 데이터:', outboundData);
 
       // 두 데이터를 날짜별로 병합
       const mergedData = inboundData.map((inbound) => {
@@ -73,7 +68,6 @@ const Dashboard = () => {
         };
       });
 
-      console.log('병합된 차트 데이터:', mergedData);
       setChartData(mergedData);
     } catch (error) {
       console.error('차트 데이터 로드 에러:', error);
@@ -170,46 +164,62 @@ const Dashboard = () => {
           <Col xs={24}>
             <Card title="최근 7일 입고/출고 금액 비교" loading={chartLoading}>
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart
+                <LineChart
                   data={chartData}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis
                     dataKey="date"
                     style={{ fontSize: 14 }}
+                    tick={{ fill: '#666' }}
                   />
                   <YAxis
                     tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
                     style={{ fontSize: 14 }}
+                    tick={{ fill: '#666' }}
                   />
                   <Tooltip
-                    formatter={(value: number) => [`${value.toLocaleString()} VND`, '']}
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #d9d9d9', borderRadius: 4 }}
+                    formatter={(value: number, name: string) => [
+                      `${value.toLocaleString()} VND`,
+                      name === 'inbound' ? '입고 금액' : '출고 금액'
+                    ]}
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #d9d9d9',
+                      borderRadius: 4,
+                      padding: 10
+                    }}
                   />
                   <Legend
                     wrapperStyle={{ paddingTop: 20 }}
                     formatter={(value) => value === 'inbound' ? '입고 금액' : '출고 금액'}
                   />
-                  <Bar
+                  <Line
+                    type="monotone"
                     dataKey="inbound"
-                    fill="#52c41a"
-                    name="입고 금액"
+                    stroke="#52c41a"
+                    strokeWidth={3}
+                    name="inbound"
+                    dot={{ fill: '#52c41a', r: 5 }}
+                    activeDot={{ r: 7 }}
                     animationBegin={0}
                     animationDuration={1500}
                     animationEasing="ease-in-out"
-                    radius={[8, 8, 0, 0]}
                   />
-                  <Bar
+                  <Line
+                    type="monotone"
                     dataKey="outbound"
-                    fill="#f5222d"
-                    name="출고 금액"
+                    stroke="#f5222d"
+                    strokeWidth={3}
+                    name="outbound"
+                    dot={{ fill: '#f5222d', r: 5 }}
+                    activeDot={{ r: 7 }}
                     animationBegin={300}
                     animationDuration={1500}
                     animationEasing="ease-in-out"
-                    radius={[8, 8, 0, 0]}
                   />
-                </BarChart>
+                </LineChart>
               </ResponsiveContainer>
             </Card>
           </Col>
