@@ -309,3 +309,45 @@ export async function getRecentInbound(limit: number = 10): Promise<Inbound[]> {
     suppliers: undefined,
   }));
 }
+
+/**
+ * 최근 7일의 입고 금액을 날짜별로 집계
+ */
+export async function getLast7DaysInboundAmount(): Promise<{ date: string; amount: number }[]> {
+  const endDate = dayjs();
+  const startDate = endDate.subtract(6, 'day');
+
+  const { data, error } = await supabase
+    .from('inbound')
+    .select('inbound_date, total_price')
+    .gte('inbound_date', startDate.format('YYYY-MM-DD'))
+    .lte('inbound_date', endDate.format('YYYY-MM-DD'))
+    .order('inbound_date', { ascending: true });
+
+  if (error) {
+    console.error('입고 금액 집계 에러:', error);
+    throw new Error(error.message);
+  }
+
+  // 날짜별로 금액 집계
+  const amountByDate = new Map<string, number>();
+
+  // 7일 전부터 오늘까지 모든 날짜를 0으로 초기화
+  for (let i = 0; i < 7; i++) {
+    const date = startDate.add(i, 'day').format('YYYY-MM-DD');
+    amountByDate.set(date, 0);
+  }
+
+  // 실제 데이터로 금액 업데이트
+  data.forEach((item: any) => {
+    const date = item.inbound_date;
+    const currentAmount = amountByDate.get(date) || 0;
+    amountByDate.set(date, currentAmount + (item.total_price || 0));
+  });
+
+  // Map을 배열로 변환
+  return Array.from(amountByDate.entries()).map(([date, amount]) => ({
+    date,
+    amount
+  }));
+}

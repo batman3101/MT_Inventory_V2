@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, Row, Col, Statistic, List, Typography, Spin, Alert } from 'antd';
 import {
   InboxOutlined,
@@ -11,6 +11,9 @@ import {
 } from '@ant-design/icons';
 import { useInventoryStore, useSuppliersStore, useInboundStore, useOutboundStore } from '../store';
 import dayjs from 'dayjs';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { getLast7DaysInboundAmount } from '../services/inbound.service';
+import { getLast7DaysOutboundAmount } from '../services/outbound.service';
 
 const { Title } = Typography;
 
@@ -28,14 +31,50 @@ const Dashboard = () => {
   const { recentInbounds, fetchRecentInbounds, isLoading: inboundLoading } = useInboundStore();
   const { recentOutbounds, fetchRecentOutbounds, isLoading: outboundLoading } = useOutboundStore();
 
+  // 차트 데이터 상태
+  const [chartData, setChartData] = useState<Array<{
+    date: string;
+    inbound: number;
+    outbound: number;
+  }>>([]);
+  const [chartLoading, setChartLoading] = useState(false);
+
   // 컴포넌트 마운트 시 실제 데이터 로드
   useEffect(() => {
     fetchInventoryStats();
     fetchSuppliers();
     fetchRecentInbounds(5);
     fetchRecentOutbounds(5);
+    loadChartData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 차트 데이터 로드
+  const loadChartData = async () => {
+    setChartLoading(true);
+    try {
+      const [inboundData, outboundData] = await Promise.all([
+        getLast7DaysInboundAmount(),
+        getLast7DaysOutboundAmount()
+      ]);
+
+      // 두 데이터를 날짜별로 병합
+      const mergedData = inboundData.map((inbound) => {
+        const outbound = outboundData.find(out => out.date === inbound.date);
+        return {
+          date: dayjs(inbound.date).format('MM/DD'),
+          inbound: Math.round(inbound.amount),
+          outbound: Math.round(outbound?.amount || 0)
+        };
+      });
+
+      setChartData(mergedData);
+    } catch (error) {
+      console.error('차트 데이터 로드 에러:', error);
+    } finally {
+      setChartLoading(false);
+    }
+  };
 
   const isLoading = inventoryLoading || suppliersLoading || inboundLoading || outboundLoading;
 
@@ -116,6 +155,56 @@ const Dashboard = () => {
                 prefix={<TeamOutlined />}
                 valueStyle={{ color: '#52c41a' }}
               />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 최근 7일 입고/출고 금액 차트 */}
+        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+          <Col xs={24}>
+            <Card title="최근 7일 입고/출고 금액 비교" loading={chartLoading}>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    style={{ fontSize: 14 }}
+                  />
+                  <YAxis
+                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                    style={{ fontSize: 14 }}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [`${value.toLocaleString()} VND`, '']}
+                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #d9d9d9', borderRadius: 4 }}
+                  />
+                  <Legend
+                    wrapperStyle={{ paddingTop: 20 }}
+                    formatter={(value) => value === 'inbound' ? '입고 금액' : '출고 금액'}
+                  />
+                  <Bar
+                    dataKey="inbound"
+                    fill="#52c41a"
+                    name="입고 금액"
+                    animationBegin={0}
+                    animationDuration={1500}
+                    animationEasing="ease-in-out"
+                    radius={[8, 8, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="outbound"
+                    fill="#f5222d"
+                    name="출고 금액"
+                    animationBegin={300}
+                    animationDuration={1500}
+                    animationEasing="ease-in-out"
+                    radius={[8, 8, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </Card>
           </Col>
         </Row>
