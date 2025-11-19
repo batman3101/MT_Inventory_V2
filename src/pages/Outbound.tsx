@@ -480,11 +480,13 @@ const Outbound = () => {
                 }
               }}
             >
-              {departments.map(dept => (
-                <Option key={dept.department_id} value={dept.department_id}>
-                  {dept.department_code} - {dept.department_name}
-                </Option>
-              ))}
+              {departments
+                .filter(dept => dept.department_code !== 'EQUIP')
+                .map(dept => (
+                  <Option key={dept.department_id} value={dept.department_id}>
+                    {dept.department_code} - {dept.department_name}
+                  </Option>
+                ))}
             </Select>
           </Form.Item>
 

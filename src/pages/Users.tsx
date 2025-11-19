@@ -5,7 +5,7 @@ import { PlusOutlined, SearchOutlined, UserOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { ResizableTable } from '../components/ResizableTable';
 import dayjs from 'dayjs';
-import { useUsersStore } from '../store';
+import { useUsersStore, useDepartmentsStore } from '../store';
 import type { User } from '../types/database.types';
 
 const { Title } = Typography;
@@ -26,11 +26,13 @@ const Users = () => {
 
   // Zustand 스토어에서 실제 데이터 가져오기
   const { users, isLoading, error, stats, fetchUsers, fetchUsersStats, createUser, updateUser, updateUserStatus, deleteUser, activateAllUsers } = useUsersStore();
+  const { departments, fetchDepartments } = useDepartmentsStore();
 
   // 컴포넌트 마운트 시 실제 데이터 로드
   useEffect(() => {
     fetchUsers();
     fetchUsersStats();
+    fetchDepartments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -415,9 +417,22 @@ const Users = () => {
 
           <Form.Item
             name="department_id"
-            label="부서 ID"
+            label="부서"
           >
-            <Input placeholder="부서 UUID (선택사항)" />
+            <Select
+              showSearch
+              placeholder="부서 선택"
+              optionFilterProp="children"
+              allowClear
+            >
+              {departments
+                .filter(dept => dept.department_code !== 'EQUIP')
+                .map(dept => (
+                  <Option key={dept.department_id} value={dept.department_id}>
+                    {dept.department_code} - {dept.department_name}
+                  </Option>
+                ))}
+            </Select>
           </Form.Item>
 
           {editingUser && (

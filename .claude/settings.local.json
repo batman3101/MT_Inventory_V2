@@ -15,7 +15,10 @@
       "Bash(git check-ignore:*)",
       "Bash(npm install:*)",
       "Bash(netstat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "mcp__supabase-cnc-mt-inventory__execute_sql",
+      "mcp__supabase-cnc-mt-inventory__list_tables",
+      "Bash(dir \"C:\\WORK\\app_management\\CNC_MT_Inventory_V2\\supabase\\migrations\" /b)"
     ],
     "deny": [],
     "ask": []
