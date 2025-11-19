@@ -365,7 +365,7 @@ export async function getRecentOutbound(limit: number = 10): Promise<Outbound[]>
 
 /**
  * 최근 7일의 출고 금액을 날짜별로 집계
- * (inventory의 avg_unit_price를 사용하여 계산)
+ * (inbound 테이블의 최근 단가를 사용하여 계산)
  */
 export async function getLast7DaysOutboundAmount(): Promise<{ date: string; amount: number }[]> {
   const endDate = dayjs();
@@ -383,24 +383,37 @@ export async function getLast7DaysOutboundAmount(): Promise<{ date: string; amou
     throw new Error(outboundError.message);
   }
 
-  // 모든 part_id 수집
-  const partIds = [...new Set(outboundData?.map(item => item.part_id) || [])];
-
-  // inventory에서 avg_unit_price 조회
-  const { data: inventoryData, error: inventoryError } = await supabase
-    .from('inventory')
-    .select('part_id, avg_unit_price')
-    .in('part_id', partIds);
-
-  if (inventoryError) {
-    console.error('재고 데이터 조회 에러:', inventoryError);
-    throw new Error(inventoryError.message);
+  if (!outboundData || outboundData.length === 0) {
+    // 데이터가 없으면 빈 배열 반환
+    const emptyData = [];
+    for (let i = 0; i < 7; i++) {
+      const date = startDate.add(i, 'day').format('YYYY-MM-DD');
+      emptyData.push({ date, amount: 0 });
+    }
+    return emptyData;
   }
 
-  // part_id별 평균 단가 맵 생성
+  // 최근 30일의 입고 데이터를 모두 가져와서 부품별 최근 단가를 계산
+  const priceStartDate = endDate.subtract(30, 'day');
+  const { data: recentInbounds } = await supabase
+    .from('inbound')
+    .select('part_id, unit_price, inbound_date')
+    .gte('inbound_date', priceStartDate.format('YYYY-MM-DD'))
+    .order('inbound_date', { ascending: false });
+
+  // 부품별로 가장 최근 단가를 찾아서 Map에 저장
   const priceMap = new Map<string, number>();
-  inventoryData?.forEach(item => {
-    priceMap.set(item.part_id, item.avg_unit_price || 0);
+
+  outboundData.forEach(outbound => {
+    if (!priceMap.has(outbound.part_id)) {
+      // 이 부품의 최근 입고 단가 찾기
+      const partInbound = recentInbounds?.find(ib => ib.part_id === outbound.part_id);
+      if (partInbound) {
+        priceMap.set(outbound.part_id, partInbound.unit_price || 0);
+      } else {
+        priceMap.set(outbound.part_id, 0);
+      }
+    }
   });
 
   // 날짜별로 금액 집계
@@ -413,10 +426,10 @@ export async function getLast7DaysOutboundAmount(): Promise<{ date: string; amou
   }
 
   // 실제 데이터로 금액 업데이트
-  outboundData?.forEach((item: any) => {
+  outboundData.forEach((item: any) => {
     const date = item.outbound_date;
-    const avgPrice = priceMap.get(item.part_id) || 0;
-    const amount = item.quantity * avgPrice;
+    const unitPrice = priceMap.get(item.part_id) || 0;
+    const amount = item.quantity * unitPrice;
     const currentAmount = amountByDate.get(date) || 0;
     amountByDate.set(date, currentAmount + amount);
   });
