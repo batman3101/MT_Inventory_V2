@@ -53,10 +53,15 @@ const Dashboard = () => {
   const loadChartData = async () => {
     setChartLoading(true);
     try {
+      console.log('차트 데이터 로딩 시작...');
+
       const [inboundData, outboundData] = await Promise.all([
         getLast7DaysInboundAmount(),
         getLast7DaysOutboundAmount()
       ]);
+
+      console.log('입고 데이터:', inboundData);
+      console.log('출고 데이터:', outboundData);
 
       // 두 데이터를 날짜별로 병합
       const mergedData = inboundData.map((inbound) => {
@@ -68,6 +73,7 @@ const Dashboard = () => {
         };
       });
 
+      console.log('병합된 차트 데이터:', mergedData);
       setChartData(mergedData);
     } catch (error) {
       console.error('차트 데이터 로드 에러:', error);

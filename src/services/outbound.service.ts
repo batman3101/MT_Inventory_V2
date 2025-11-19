@@ -371,22 +371,37 @@ export async function getLast7DaysOutboundAmount(): Promise<{ date: string; amou
   const endDate = dayjs();
   const startDate = endDate.subtract(6, 'day');
 
-  const { data, error } = await supabase
+  // 먼저 출고 데이터를 가져옴
+  const { data: outboundData, error: outboundError } = await supabase
     .from('outbound')
-    .select(`
-      outbound_date,
-      quantity,
-      part_id,
-      inventory!inner(avg_unit_price)
-    `)
+    .select('outbound_date, quantity, part_id')
     .gte('outbound_date', startDate.format('YYYY-MM-DD'))
-    .lte('outbound_date', endDate.format('YYYY-MM-DD'))
-    .order('outbound_date', { ascending: true });
+    .lte('outbound_date', endDate.format('YYYY-MM-DD'));
 
-  if (error) {
-    console.error('출고 금액 집계 에러:', error);
-    throw new Error(error.message);
+  if (outboundError) {
+    console.error('출고 데이터 조회 에러:', outboundError);
+    throw new Error(outboundError.message);
   }
+
+  // 모든 part_id 수집
+  const partIds = [...new Set(outboundData?.map(item => item.part_id) || [])];
+
+  // inventory에서 avg_unit_price 조회
+  const { data: inventoryData, error: inventoryError } = await supabase
+    .from('inventory')
+    .select('part_id, avg_unit_price')
+    .in('part_id', partIds);
+
+  if (inventoryError) {
+    console.error('재고 데이터 조회 에러:', inventoryError);
+    throw new Error(inventoryError.message);
+  }
+
+  // part_id별 평균 단가 맵 생성
+  const priceMap = new Map<string, number>();
+  inventoryData?.forEach(item => {
+    priceMap.set(item.part_id, item.avg_unit_price || 0);
+  });
 
   // 날짜별로 금액 집계
   const amountByDate = new Map<string, number>();
@@ -398,9 +413,9 @@ export async function getLast7DaysOutboundAmount(): Promise<{ date: string; amou
   }
 
   // 실제 데이터로 금액 업데이트
-  data.forEach((item: any) => {
+  outboundData?.forEach((item: any) => {
     const date = item.outbound_date;
-    const avgPrice = item.inventory?.avg_unit_price || 0;
+    const avgPrice = priceMap.get(item.part_id) || 0;
     const amount = item.quantity * avgPrice;
     const currentAmount = amountByDate.get(date) || 0;
     amountByDate.set(date, currentAmount + amount);
