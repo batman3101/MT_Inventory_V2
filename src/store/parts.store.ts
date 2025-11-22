@@ -29,6 +29,7 @@ interface PartsState {
   fetchPartsStats: () => Promise<void>;
   createPart: (part: Omit<Part, 'part_id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updatePart: (partId: string, updates: Partial<Part>) => Promise<void>;
+  updatePartStatus: (partId: string, status: string) => Promise<void>;
   deletePart: (partId: string) => Promise<void>;
   setSelectedPart: (part: Part | null) => void;
   clearError: () => void;
@@ -154,6 +155,23 @@ export const usePartsStore = create<PartsState>((set, get) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : '부품 삭제 실패',
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  // 부품 상태 변경
+  updatePartStatus: async (partId: string, status: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await partsService.updatePartStatus(partId, status);
+      // 부품 목록 및 통계 새로고침
+      await get().fetchParts();
+      await get().fetchPartsStats();
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : '부품 상태 변경 실패',
         isLoading: false,
       });
       throw error;

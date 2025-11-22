@@ -18,7 +18,11 @@
       "Bash(findstr:*)",
       "mcp__supabase-cnc-mt-inventory__execute_sql",
       "mcp__supabase-cnc-mt-inventory__list_tables",
-      "Bash(dir \"C:\\WORK\\app_management\\CNC_MT_Inventory_V2\\supabase\\migrations\" /b)"
+      "Bash(dir \"C:\\WORK\\app_management\\CNC_MT_Inventory_V2\\supabase\\migrations\" /b)",
+      "Bash(dir \"C:\\WORK\\app_management\\CNC_MT_Inventory_V2\\server\" /b)",
+      "Bash(dir \"C:\\WORK\\app_management\\CNC_MT_Inventory_V2\\api\" /s /b)",
+      "Bash(npm run lint)",
+      "Bash(npx eslint:*)"
     ],
     "deny": [],
     "ask": []

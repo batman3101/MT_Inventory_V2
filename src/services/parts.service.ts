@@ -178,6 +178,16 @@ export async function deletePart(partId: string): Promise<void> {
 }
 
 /**
+ * 부품 상태 변경 (활성화/비활성화)
+ */
+export async function updatePartStatus(
+  partId: string,
+  status: string
+): Promise<Part> {
+  return updatePart(partId, { status });
+}
+
+/**
  * 모든 카테고리 조회
  */
 export async function getAllCategories(): Promise<string[]> {
@@ -213,8 +223,10 @@ export async function getPartsStats() {
 
   return {
     totalParts: parts.length,
-    activeParts: parts.filter((p) => p.status === 'ACTIVE').length,
+    // 활성 부품: NEW와 ACTIVE 상태
+    activeParts: parts.filter((p) => p.status === 'NEW' || p.status === 'ACTIVE').length,
     categories: [...new Set(parts.map((p) => p.category))].length,
+    // 비활성 부품: INACTIVE와 DISCONTINUED 상태
     inactiveParts: parts.filter((p) => p.status === 'INACTIVE' || p.status === 'DISCONTINUED').length,
   };
 }

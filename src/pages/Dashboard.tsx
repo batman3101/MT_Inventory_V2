@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, List, Typography, Spin, Alert } from 'antd';
+import { Card, Row, Col, Statistic, List, Typography, Spin, Alert, Select, DatePicker, Space } from 'antd';
 import {
   InboxOutlined,
   WarningOutlined,
@@ -10,10 +10,12 @@ import {
   ArrowDownOutlined
 } from '@ant-design/icons';
 import { useInventoryStore, useSuppliersStore, useInboundStore, useOutboundStore } from '../store';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { getLast7DaysInboundAmount } from '../services/inbound.service';
-import { getLast7DaysOutboundAmount } from '../services/outbound.service';
+import { getLast7DaysInboundAmount, getInboundAmountByPeriod } from '../services/inbound.service';
+import { getLast7DaysOutboundAmount, getOutboundAmountByPeriod } from '../services/outbound.service';
+
+const { RangePicker } = DatePicker;
 
 const { Title } = Typography;
 
@@ -39,24 +41,56 @@ const Dashboard = () => {
   }>>([]);
   const [chartLoading, setChartLoading] = useState(false);
 
+  // 기간 선택 상태
+  const [periodType, setPeriodType] = useState<'7days' | 'month' | 'custom'>('7days');
+  const [customDateRange, setCustomDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+
   // 컴포넌트 마운트 시 실제 데이터 로드
   useEffect(() => {
     fetchInventoryStats();
     fetchSuppliers();
     fetchRecentInbounds(5);
     fetchRecentOutbounds(5);
-    loadChartData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 기간 선택이 변경될 때마다 차트 데이터 로드
+  useEffect(() => {
+    loadChartData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodType, customDateRange]);
 
   // 차트 데이터 로드
   const loadChartData = async () => {
     setChartLoading(true);
     try {
-      const [inboundData, outboundData] = await Promise.all([
-        getLast7DaysInboundAmount(),
-        getLast7DaysOutboundAmount()
-      ]);
+      let inboundData, outboundData;
+
+      if (periodType === '7days') {
+        // 최근 7일
+        [inboundData, outboundData] = await Promise.all([
+          getLast7DaysInboundAmount(),
+          getLast7DaysOutboundAmount()
+        ]);
+      } else if (periodType === 'month') {
+        // 최근 한 달
+        const endDate = dayjs().format('YYYY-MM-DD');
+        const startDate = dayjs().subtract(29, 'day').format('YYYY-MM-DD');
+        [inboundData, outboundData] = await Promise.all([
+          getInboundAmountByPeriod(startDate, endDate),
+          getOutboundAmountByPeriod(startDate, endDate)
+        ]);
+      } else if (periodType === 'custom' && customDateRange) {
+        // 사용자 지정 기간
+        const startDate = customDateRange[0].format('YYYY-MM-DD');
+        const endDate = customDateRange[1].format('YYYY-MM-DD');
+        [inboundData, outboundData] = await Promise.all([
+          getInboundAmountByPeriod(startDate, endDate),
+          getOutboundAmountByPeriod(startDate, endDate)
+        ]);
+      } else {
+        return;
+      }
 
       // 두 데이터를 날짜별로 병합
       const mergedData = inboundData.map((inbound) => {
@@ -162,7 +196,42 @@ const Dashboard = () => {
         {/* 최근 7일 입고/출고 금액 차트 */}
         <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
           <Col xs={24}>
-            <Card title="최근 7일 입고/출고 금액 비교" loading={chartLoading}>
+            <Card
+              title={
+                periodType === '7days'
+                  ? t('dashboard.chartTitle')
+                  : periodType === 'month'
+                  ? t('dashboard.chartTitleMonth')
+                  : t('dashboard.chartTitleCustom')
+              }
+              loading={chartLoading}
+              extra={
+                <Space>
+                  <Select
+                    value={periodType}
+                    onChange={(value) => {
+                      setPeriodType(value);
+                      if (value !== 'custom') {
+                        setCustomDateRange(null);
+                      }
+                    }}
+                    style={{ width: 150 }}
+                  >
+                    <Select.Option value="7days">{t('dashboard.last7Days')}</Select.Option>
+                    <Select.Option value="month">{t('dashboard.lastMonth')}</Select.Option>
+                    <Select.Option value="custom">{t('dashboard.customPeriod')}</Select.Option>
+                  </Select>
+                  {periodType === 'custom' && (
+                    <RangePicker
+                      value={customDateRange}
+                      onChange={(dates) => setCustomDateRange(dates as [Dayjs, Dayjs] | null)}
+                      format="YYYY-MM-DD"
+                      placeholder={[t('common.startDate'), t('common.endDate')]}
+                    />
+                  )}
+                </Space>
+              }
+            >
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart
                   data={chartData}
@@ -182,7 +251,7 @@ const Dashboard = () => {
                   <Tooltip
                     formatter={(value: number, name: string) => [
                       `${value.toLocaleString()} VND`,
-                      name === 'inbound' ? '입고 금액' : '출고 금액'
+                      name === 'inbound' ? t('dashboard.inboundAmount') : t('dashboard.outboundAmount')
                     ]}
                     contentStyle={{
                       backgroundColor: '#fff',
@@ -193,7 +262,7 @@ const Dashboard = () => {
                   />
                   <Legend
                     wrapperStyle={{ paddingTop: 20 }}
-                    formatter={(value) => value === 'inbound' ? '입고 금액' : '출고 금액'}
+                    formatter={(value) => value === 'inbound' ? t('dashboard.inboundAmount') : t('dashboard.outboundAmount')}
                   />
                   <Line
                     type="monotone"

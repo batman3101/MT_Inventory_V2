@@ -25,7 +25,7 @@ const Parts = () => {
   const [messageApi, contextHolder] = message.useMessage();
 
   // Zustand 스토어에서 실제 데이터 가져오기
-  const { parts, isLoading, error, stats, fetchParts, fetchPartsStats, createPart, updatePart, deletePart, searchParts } = usePartsStore();
+  const { parts, isLoading, error, stats, fetchParts, fetchPartsStats, createPart, updatePart, updatePartStatus, deletePart, searchParts } = usePartsStore();
 
   // 동적 필터 옵션 생성
   const getCategoryFilters = () => {
@@ -92,6 +92,18 @@ const Parts = () => {
       description: item.description,
     });
     setIsModalOpen(true);
+  };
+
+  const handleToggleStatus = async (partId: string, currentStatus: string) => {
+    try {
+      // NEW, ACTIVE -> INACTIVE로 변경
+      // INACTIVE, DISCONTINUED -> ACTIVE로 변경
+      const newStatus = (currentStatus === 'NEW' || currentStatus === 'ACTIVE') ? 'INACTIVE' : 'ACTIVE';
+      await updatePartStatus(partId, newStatus);
+      messageApi.success(t('parts.statusUpdated'));
+    } catch {
+      messageApi.error(t('parts.statusUpdateError'));
+    }
   };
 
   const handleDelete = (partId: string) => {
@@ -213,18 +225,39 @@ const Parts = () => {
     {
       title: t('inventory.actions'),
       key: 'actions',
-      width: 150,
+      width: 250,
       fixed: 'right',
-      render: (_, record) => (
-        <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => showEditModal(record)}>
-            {t('common.edit')}
-          </Button>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.part_id)}>
-            {t('common.delete')}
-          </Button>
-        </Space>
-      ),
+      render: (_, record) => {
+        const isActive = record.status === 'NEW' || record.status === 'ACTIVE';
+        return (
+          <Space>
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => showEditModal(record)}
+            >
+              {t('common.edit')}
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => handleToggleStatus(record.part_id, record.status)}
+            >
+              {isActive ? t('parts.setInactive') : t('parts.setActive')}
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record.part_id)}
+            >
+              {t('common.delete')}
+            </Button>
+          </Space>
+        );
+      },
     },
   ];
 

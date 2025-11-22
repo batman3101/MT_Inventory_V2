@@ -25,7 +25,17 @@
     "partRemoved": "Phụ tùng #{{partNumber}} đã xóa khỏi kho",
     "supplierAdded": "Nhà cung cấp mới '{{supplierName}}' đã được thêm",
     "inbound": "Nhập kho",
-    "outbound": "Xuất kho"
+    "outbound": "Xuất kho",
+    "chartTitle": "So sánh số tiền nhập/xuất kho 7 ngày gần đây",
+    "chartTitleMonth": "So sánh số tiền nhập/xuất kho 1 tháng gần đây",
+    "chartTitleCustom": "So sánh số tiền nhập/xuất kho",
+    "inboundAmount": "Số tiền nhập kho",
+    "outboundAmount": "Số tiền xuất kho",
+    "period": "Khoảng thời gian",
+    "last7Days": "7 ngày gần đây",
+    "lastMonth": "1 tháng gần đây",
+    "customPeriod": "Chọn khoảng thời gian",
+    "selectPeriod": "Vui lòng chọn khoảng thời gian"
   },
   "inventory": {
     "title": "Danh sách kho",
@@ -78,7 +88,11 @@
     "totalParts": "Tổng phụ tùng",
     "activeParts": "Phụ tùng hoạt động",
     "categories": "Danh mục",
-    "inactiveParts": "Phụ tùng không hoạt động"
+    "inactiveParts": "Phụ tùng không hoạt động",
+    "setActive": "Kích hoạt",
+    "setInactive": "Vô hiệu hóa",
+    "statusUpdated": "Trạng thái phụ tùng đã được thay đổi",
+    "statusUpdateError": "Lỗi khi thay đổi trạng thái phụ tùng"
   },
   "inbound": {
     "title": "Quản lý nhập kho",
@@ -242,6 +256,8 @@
     "userId": "ID người dùng",
     "username": "Tên người dùng",
     "email": "Email",
+    "password": "Mật khẩu",
+    "confirmPassword": "Xác nhận mật khẩu",
     "role": "Vai trò",
     "department": "Phòng ban",
     "status": "Trạng thái",
@@ -256,6 +272,10 @@
     "deleteError": "Lỗi khi xóa người dùng",
     "totalUsers": "Tổng người dùng",
     "activeUsers": "Người dùng hoạt động",
+    "passwordRequired": "Mật khẩu là bắt buộc",
+    "passwordTooShort": "Mật khẩu phải có ít nhất 6 ký tự",
+    "passwordMismatch": "Mật khẩu không khớp",
+    "passwordPlaceholder": "Tối thiểu 6 ký tự",
     "roles": {
       "system_admin": "Quản trị viên hệ thống",
       "admin": "Quản trị viên",

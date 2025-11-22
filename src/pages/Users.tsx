@@ -106,21 +106,16 @@ const Users = () => {
       const values = await form.validateFields();
 
       if (editingUser) {
-        // 기존 사용자 수정
-        await updateUser(editingUser.user_id, values);
+        // 기존 사용자 수정 (비밀번호 변경 제외)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { password, confirmPassword, ...updateData } = values;
+        await updateUser(editingUser.user_id, updateData);
         messageApi.success(t('users.userUpdated'));
       } else {
-        // 새 사용자 추가
-        await createUser({
-          ...values,
-          department: values.department_id || null,
-          user_settings: {},
-          profile_image_url: null,
-          last_password_change: null,
-          login_attempt_count: 0,
-          account_expiry_date: null,
-          password_hash: 'temporary_hash', // TODO: 실제 패스워드 해싱 필요
-        });
+        // 새 사용자 추가 - API를 통해 비밀번호 해싱 및 저장
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { confirmPassword, ...userData } = values;
+        await createUser(userData);
         messageApi.success(t('users.userAdded'));
       }
 
@@ -386,6 +381,40 @@ const Users = () => {
           >
             <Input placeholder="email@example.com" />
           </Form.Item>
+
+          {!editingUser && (
+            <>
+              <Form.Item
+                name="password"
+                label={t('users.password')}
+                rules={[
+                  { required: true, message: t('users.passwordRequired') },
+                  { min: 6, message: t('users.passwordTooShort') }
+                ]}
+              >
+                <Input.Password placeholder={t('users.passwordPlaceholder')} />
+              </Form.Item>
+
+              <Form.Item
+                name="confirmPassword"
+                label={t('users.confirmPassword')}
+                dependencies={['password']}
+                rules={[
+                  { required: true, message: t('users.passwordRequired') },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || getFieldValue('password') === value) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(new Error(t('users.passwordMismatch')));
+                    },
+                  }),
+                ]}
+              >
+                <Input.Password placeholder={t('users.passwordPlaceholder')} />
+              </Form.Item>
+            </>
+          )}
 
           <Form.Item
             name="role"

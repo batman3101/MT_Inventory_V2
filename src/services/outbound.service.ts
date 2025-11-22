@@ -440,3 +440,85 @@ export async function getLast7DaysOutboundAmount(): Promise<{ date: string; amou
     amount
   }));
 }
+
+/**
+ * 기간별 출고 금액 집계 (최근 입고 단가 기반)
+ */
+export async function getOutboundAmountByPeriod(
+  startDate: string,
+  endDate: string
+): Promise<{ date: string; amount: number }[]> {
+  const start = dayjs(startDate);
+  const end = dayjs(endDate);
+
+  // 먼저 출고 데이터를 가져옴
+  const { data: outboundData, error: outboundError } = await supabase
+    .from('outbound')
+    .select('outbound_date, quantity, part_id')
+    .gte('outbound_date', start.format('YYYY-MM-DD'))
+    .lte('outbound_date', end.format('YYYY-MM-DD'));
+
+  if (outboundError) {
+    console.error('출고 데이터 조회 에러:', outboundError);
+    throw new Error(outboundError.message);
+  }
+
+  const days = end.diff(start, 'day') + 1;
+
+  if (!outboundData || outboundData.length === 0) {
+    // 데이터가 없으면 빈 배열 반환
+    const emptyData = [];
+    for (let i = 0; i < days; i++) {
+      const date = start.add(i, 'day').format('YYYY-MM-DD');
+      emptyData.push({ date, amount: 0 });
+    }
+    return emptyData;
+  }
+
+  // 최근 30일의 입고 데이터를 모두 가져와서 부품별 최근 단가를 계산
+  const priceStartDate = end.subtract(30, 'day');
+  const { data: recentInbounds } = await supabase
+    .from('inbound')
+    .select('part_id, unit_price, inbound_date')
+    .gte('inbound_date', priceStartDate.format('YYYY-MM-DD'))
+    .order('inbound_date', { ascending: false });
+
+  // 부품별로 가장 최근 단가를 찾아서 Map에 저장
+  const priceMap = new Map<string, number>();
+
+  outboundData.forEach(outbound => {
+    if (!priceMap.has(outbound.part_id)) {
+      // 이 부품의 최근 입고 단가 찾기
+      const partInbound = recentInbounds?.find(ib => ib.part_id === outbound.part_id);
+      if (partInbound) {
+        priceMap.set(outbound.part_id, partInbound.unit_price || 0);
+      } else {
+        priceMap.set(outbound.part_id, 0);
+      }
+    }
+  });
+
+  // 날짜별로 금액 집계
+  const amountByDate = new Map<string, number>();
+
+  // 선택한 기간의 모든 날짜를 0으로 초기화
+  for (let i = 0; i < days; i++) {
+    const date = start.add(i, 'day').format('YYYY-MM-DD');
+    amountByDate.set(date, 0);
+  }
+
+  // 실제 데이터로 금액 업데이트
+  outboundData.forEach((item: any) => {
+    const date = item.outbound_date;
+    const unitPrice = priceMap.get(item.part_id) || 0;
+    const amount = item.quantity * unitPrice;
+    const currentAmount = amountByDate.get(date) || 0;
+    amountByDate.set(date, currentAmount + amount);
+  });
+
+  // Map을 배열로 변환
+  return Array.from(amountByDate.entries()).map(([date, amount]) => ({
+    date,
+    amount
+  }));
+}

@@ -7,7 +7,8 @@
  */
 
 import { supabase } from '@/lib/supabase.ts';
-import type { User, InsertDto, UpdateDto } from '../types/database.types';
+import type { User, UpdateDto } from '../types/database.types';
+import axios from 'axios';
 
 /**
  * 모든 사용자 조회
@@ -121,23 +122,62 @@ export async function searchUsers(searchTerm: string): Promise<User[]> {
 }
 
 /**
+ * 사용자 추가용 인터페이스
+ */
+interface CreateUserData {
+  username: string;
+  full_name: string;
+  email: string;
+  password: string;
+  role: string;
+  department?: string | null;
+  department_id?: string | null;
+  phone_number?: string | null;
+  position?: string | null;
+  user_settings?: Record<string, unknown>;
+  profile_image_url?: string | null;
+  is_active?: boolean;
+}
+
+/**
  * 사용자 추가
+ * ⚠️ Vercel Serverless Function을 통해 비밀번호 해싱 후 생성
  */
 export async function createUser(
-  user: InsertDto<'users'>
+  user: CreateUserData
 ): Promise<User> {
-  const { data, error } = await supabase
-    .from('users')
-    .insert(user as any)
-    .select()
-    .single();
+  try {
+    // Vercel Serverless Function 호출 (비밀번호 해싱 포함)
+    const response = await axios.post('/api/auth/createUser', {
+      username: user.username,
+      full_name: user.full_name,
+      email: user.email,
+      password: user.password, // 비밀번호는 서버에서 해싱됨
+      role: user.role,
+      department: user.department || null,
+      department_id: user.department_id || null,
+      phone_number: user.phone_number || null,
+      position: user.position || null,
+      user_settings: user.user_settings || {},
+      profile_image_url: user.profile_image_url || null,
+      is_active: user.is_active !== undefined ? user.is_active : true,
+    });
 
-  if (error) {
+    if (response.data && response.data.user) {
+      return response.data.user;
+    }
+
+    throw new Error('사용자 생성 실패');
+  } catch (error) {
     console.error('사용자 추가 에러:', error);
-    throw new Error(error.message);
-  }
 
-  return data;
+    if (axios.isAxiosError(error)) {
+      const message = error.response?.data?.error || error.message;
+      throw new Error(message);
+    }
+
+    throw new Error('사용자 추가 중 오류가 발생했습니다.');
+  }
 }
 
 /**
