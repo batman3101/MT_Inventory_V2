@@ -133,7 +133,7 @@ export interface User {
   last_password_change: string | null;
   login_attempt_count: number;
   account_expiry_date: string | null;
-  user_settings: Record<string, any>; // JSON 객체
+  user_settings: Record<string, unknown>; // JSON 객체
   password_hash: string; // ⚠️ 프론트엔드에서는 절대 사용하지 말 것
   is_active: boolean;
   department_id: string | null; // UUID

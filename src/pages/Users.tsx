@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Tag, Spin, Alert, Row, Col, Statistic, Modal, Form, Select, message } from 'antd';
-import { PlusOutlined, SearchOutlined, UserOutlined } from '@ant-design/icons';
+import { Card, Input, Button, Space, Typography, Tag, Spin, Alert, Row, Col, Statistic, Modal, Form, Select, message, Result } from 'antd';
+import { PlusOutlined, SearchOutlined, UserOutlined, LockOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { ResizableTable } from '../components/ResizableTable';
 import dayjs from 'dayjs';
-import { useUsersStore, useDepartmentsStore } from '../store';
+import { useUsersStore, useDepartmentsStore, useAuthStore } from '../store';
 import type { User } from '../types/database.types';
 
 const { Title } = Typography;
@@ -23,6 +23,12 @@ const Users = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
+
+  // 현재 로그인된 사용자 정보 가져오기
+  const { user: currentUser } = useAuthStore();
+
+  // 관리자 권한 확인 (system_admin, admin, manager만 접근 가능)
+  const hasAdminAccess = currentUser?.role && ['system_admin', 'admin', 'manager'].includes(currentUser.role);
 
   // Zustand 스토어에서 실제 데이터 가져오기
   const { users, isLoading, error, stats, fetchUsers, fetchUsersStats, createUser, updateUser, updateUserStatus, deleteUser, activateAllUsers } = useUsersStore();
@@ -262,6 +268,18 @@ const Users = () => {
       user.role?.toLowerCase().includes(search)
     );
   });
+
+  // 권한 없음 처리
+  if (!hasAdminAccess) {
+    return (
+      <Result
+        status="403"
+        title={t('common.accessDenied')}
+        subTitle={t('common.insufficientPermissions')}
+        icon={<LockOutlined style={{ fontSize: 72, color: '#faad14' }} />}
+      />
+    );
+  }
 
   if (error) {
     return (

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Outbound (출고) 서비스
  *
@@ -6,8 +5,26 @@
  */
 
 import { supabase } from '@/lib/supabase.ts';
-import type { Outbound, OutboundDetail, InsertDto, UpdateDto } from '../types/database.types';
+import type { Outbound, OutboundDetail, InsertDto, UpdateDto, Database } from '../types/database.types';
 import dayjs from 'dayjs';
+
+// Supabase JOIN 응답 타입
+interface OutboundWithRelations {
+  parts?: { part_code: string; part_name: string; unit: string };
+  departments?: { department_name: string };
+  [key: string]: unknown;
+}
+
+interface OutboundAmountRow {
+  outbound_date: string;
+  quantity: number;
+  part_id: string;
+}
+
+interface InboundPriceRow {
+  part_id: string;
+  unit_price: number;
+}
 
 /**
  * 참조번호 자동 생성 (형식: OUT-YYYYMMDD-XXX)
@@ -60,14 +77,14 @@ export async function getAllOutbound(): Promise<Outbound[]> {
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as OutboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.department || '',
+    department_name: (item.department as string) || '',
     parts: undefined,
-  }));
+  })) as Outbound[];
 }
 
 /**
@@ -114,14 +131,14 @@ export async function getOutboundByDateRange(
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as OutboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.department || '',
+    department_name: (item.department as string) || '',
     parts: undefined,
-  }));
+  })) as Outbound[];
 }
 
 /**
@@ -143,14 +160,14 @@ export async function getOutboundByPartId(partId: string): Promise<Outbound[]> {
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as OutboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.department || '',
+    department_name: (item.department as string) || '',
     parts: undefined,
-  }));
+  })) as Outbound[];
 }
 
 /**
@@ -172,14 +189,14 @@ export async function getOutboundByDepartmentId(departmentId: string): Promise<O
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as OutboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.department || '',
+    department_name: (item.department as string) || '',
     parts: undefined,
-  }));
+  })) as Outbound[];
 }
 
 /**
@@ -201,14 +218,14 @@ export async function getOutboundByRequester(requester: string): Promise<Outboun
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as OutboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.department || '',
+    department_name: (item.department as string) || '',
     parts: undefined,
-  }));
+  })) as Outbound[];
 }
 
 /**
@@ -230,14 +247,14 @@ export async function getOutboundByEquipment(equipment: string): Promise<Outboun
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as OutboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.department || '',
+    department_name: (item.department as string) || '',
     parts: undefined,
-  }));
+  })) as Outbound[];
 }
 
 /**
@@ -269,7 +286,7 @@ export async function updateOutbound(
 ): Promise<Outbound> {
   const { data, error } = await supabase
     .from('outbound')
-    .update(updates as any)
+    .update(updates as Database["public"]["Tables"]["outbound"]["Update"])
     .eq('outbound_id', outboundId)
     .select()
     .single();
@@ -353,14 +370,14 @@ export async function getRecentOutbound(limit: number = 10): Promise<Outbound[]>
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as OutboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
     part_unit: item.parts?.unit || '',
-    department_name: item.department || '',
+    department_name: (item.department as string) || '',
     parts: undefined,
-  }));
+  })) as Outbound[];
 }
 
 /**
@@ -403,11 +420,12 @@ export async function getLast7DaysOutboundAmount(): Promise<{ date: string; amou
 
   // 부품별로 가장 최근 단가를 찾아서 Map에 저장
   const priceMap = new Map<string, number>();
+  const typedRecentInbounds = recentInbounds as InboundPriceRow[] | null;
 
-  outboundData.forEach(outbound => {
+  (outboundData as OutboundAmountRow[]).forEach(outbound => {
     if (!priceMap.has(outbound.part_id)) {
       // 이 부품의 최근 입고 단가 찾기
-      const partInbound = recentInbounds?.find(ib => ib.part_id === outbound.part_id);
+      const partInbound = typedRecentInbounds?.find(ib => ib.part_id === outbound.part_id);
       if (partInbound) {
         priceMap.set(outbound.part_id, partInbound.unit_price || 0);
       } else {
@@ -426,7 +444,7 @@ export async function getLast7DaysOutboundAmount(): Promise<{ date: string; amou
   }
 
   // 실제 데이터로 금액 업데이트
-  outboundData.forEach((item: any) => {
+  (outboundData as OutboundAmountRow[]).forEach((item) => {
     const date = item.outbound_date;
     const unitPrice = priceMap.get(item.part_id) || 0;
     const amount = item.quantity * unitPrice;
@@ -485,11 +503,12 @@ export async function getOutboundAmountByPeriod(
 
   // 부품별로 가장 최근 단가를 찾아서 Map에 저장
   const priceMap = new Map<string, number>();
+  const typedRecentInbounds = recentInbounds as InboundPriceRow[] | null;
 
-  outboundData.forEach(outbound => {
+  (outboundData as OutboundAmountRow[]).forEach(outbound => {
     if (!priceMap.has(outbound.part_id)) {
       // 이 부품의 최근 입고 단가 찾기
-      const partInbound = recentInbounds?.find(ib => ib.part_id === outbound.part_id);
+      const partInbound = typedRecentInbounds?.find(ib => ib.part_id === outbound.part_id);
       if (partInbound) {
         priceMap.set(outbound.part_id, partInbound.unit_price || 0);
       } else {
@@ -508,7 +527,7 @@ export async function getOutboundAmountByPeriod(
   }
 
   // 실제 데이터로 금액 업데이트
-  outboundData.forEach((item: any) => {
+  (outboundData as OutboundAmountRow[]).forEach((item) => {
     const date = item.outbound_date;
     const unitPrice = priceMap.get(item.part_id) || 0;
     const amount = item.quantity * unitPrice;

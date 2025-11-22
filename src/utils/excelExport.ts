@@ -19,21 +19,23 @@ export interface ExcelColumn {
  * @param columns - 컬럼 정의 (header: 표시명, key: 데이터 키)
  * @param filename - 파일명 (확장자 제외)
  */
-export function exportToExcel<T extends Record<string, any>>(
+export function exportToExcel<T extends Record<string, unknown>>(
   data: T[],
   columns: ExcelColumn[],
   filename: string
 ): void {
   // 데이터를 컬럼 정의에 맞게 변환
   const transformedData = data.map(row => {
-    const newRow: Record<string, any> = {};
+    const newRow: Record<string, unknown> = {};
     columns.forEach(col => {
       // 중첩된 객체 접근 지원 (예: part.part_name)
       const keys = col.key.split('.');
-      let value: any = row;
+      let value: unknown = row;
 
       for (const key of keys) {
-        value = value?.[key];
+        value = value && typeof value === 'object' && key in value
+          ? (value as Record<string, unknown>)[key]
+          : undefined;
       }
 
       newRow[col.header] = value ?? '';

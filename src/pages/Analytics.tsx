@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { Card, Row, Col, Statistic, Select, Spin, Alert, Typography, Space, Tabs, DatePicker } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
@@ -42,6 +41,74 @@ interface CategoryData {
 }
 
 interface SupplierData {
+  supplier_name: string;
+  quantity: number;
+  value: number;
+  count: number;
+}
+
+// Supabase 응답 타입
+interface InboundQuantityRow {
+  quantity: number;
+}
+
+interface InboundValueRow {
+  quantity: number;
+  total_price: number;
+}
+
+interface InboundPartsRow {
+  part_id: string;
+  quantity: number;
+  total_price: number;
+  unit_price: number;
+  parts?: { part_code: string; part_name: string } | null;
+  suppliers?: { supplier_name: string } | null;
+}
+
+interface OutboundPartsRow {
+  part_id: string;
+  quantity: number;
+  parts?: { part_code: string; part_name: string } | null;
+}
+
+interface CategoryInboundRow {
+  quantity: number;
+  total_price: number;
+  parts?: { category: string } | null;
+}
+
+interface SupplierInboundRow {
+  quantity: number;
+  total_price: number;
+  suppliers?: { supplier_name: string } | null;
+}
+
+interface PartAccumulator {
+  part_code: string;
+  part_name: string;
+  quantity: number;
+  value: number;
+  suppliers: Array<{
+    supplier_name: string;
+    unit_price: number;
+    quantity: number;
+  }>;
+}
+
+interface SimplePartAccumulator {
+  part_code: string;
+  part_name: string;
+  quantity: number;
+}
+
+interface CategoryAccumulator {
+  category: string;
+  quantity: number;
+  value: number;
+}
+
+interface SupplierAccumulator {
   supplier_name: string;
   quantity: number;
   value: number;
@@ -158,11 +225,11 @@ const Analytics = () => {
         .gte('outbound_date', prevStartDate.format('YYYY-MM-DD'))
         .lte('outbound_date', prevEndDate.format('YYYY-MM-DD'));
 
-      const totalInbound = (inboundData as any[])?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
-      const totalOutbound = (outboundData as any[])?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
-      const inboundValue = (inboundData as any[])?.reduce((sum: number, item: any) => sum + (item.total_price || 0), 0) || 0;
-      const previousInbound = (prevInboundData as any[])?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
-      const previousOutbound = (prevOutboundData as any[])?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
+      const totalInbound = (inboundData as InboundQuantityRow[] | null)?.reduce((sum: number, item: InboundQuantityRow) => sum + (item.quantity || 0), 0) || 0;
+      const totalOutbound = (outboundData as InboundQuantityRow[] | null)?.reduce((sum: number, item: InboundQuantityRow) => sum + (item.quantity || 0), 0) || 0;
+      const inboundValue = (inboundData as InboundValueRow[] | null)?.reduce((sum: number, item: InboundValueRow) => sum + (item.total_price || 0), 0) || 0;
+      const previousInbound = (prevInboundData as InboundQuantityRow[] | null)?.reduce((sum: number, item: InboundQuantityRow) => sum + (item.quantity || 0), 0) || 0;
+      const previousOutbound = (prevOutboundData as InboundQuantityRow[] | null)?.reduce((sum: number, item: InboundQuantityRow) => sum + (item.quantity || 0), 0) || 0;
 
       setStats({
         totalInbound,
@@ -174,8 +241,9 @@ const Analytics = () => {
 
       // 상세 분석 데이터 가져오기
       await fetchDetailedAnalytics(startDate, endDate);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch analytics');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch analytics';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -190,7 +258,7 @@ const Analytics = () => {
         .gte('inbound_date', startDate.format('YYYY-MM-DD'))
         .lte('inbound_date', endDate.format('YYYY-MM-DD'));
 
-      const inboundByPart = (inboundPartsData as any[])?.reduce((acc: any, item: any) => {
+      const inboundByPart = (inboundPartsData as InboundPartsRow[] | null)?.reduce((acc: Record<string, PartAccumulator>, item: InboundPartsRow) => {
         const partCode = item.parts?.part_code || t('analytics.unknown');
         const partName = item.parts?.part_name || t('analytics.unknown');
         const supplierName = item.suppliers?.supplier_name || t('analytics.unknown');
@@ -211,7 +279,7 @@ const Analytics = () => {
 
         // 공급업체 정보 추가 (중복 체크)
         const existingSupplier = acc[partCode].suppliers.find(
-          (s: any) => s.supplier_name === supplierName && s.unit_price === unitPrice
+          (s) => s.supplier_name === supplierName && s.unit_price === unitPrice
         );
         if (existingSupplier) {
           existingSupplier.quantity += quantity;
@@ -224,11 +292,11 @@ const Analytics = () => {
         }
 
         return acc;
-      }, {});
+      }, {} as Record<string, PartAccumulator>);
 
       // 수량 기준 상위 부품
       const topInbound = Object.values(inboundByPart || {})
-        .sort((a: any, b: any) => b.quantity - a.quantity)
+        .sort((a: PartAccumulator, b: PartAccumulator) => b.quantity - a.quantity)
         .slice(0, 10) as TopPart[];
       const totalInboundQty = topInbound.reduce((sum: number, item: TopPart) => sum + item.quantity, 0);
       setTopInboundParts(topInbound.map((item: TopPart) => ({
@@ -238,7 +306,7 @@ const Analytics = () => {
 
       // 금액 기준 상위 부품
       const topInboundByValue = Object.values(inboundByPart || {})
-        .sort((a: any, b: any) => (b.value || 0) - (a.value || 0))
+        .sort((a: PartAccumulator, b: PartAccumulator) => (b.value || 0) - (a.value || 0))
         .slice(0, 10) as TopPart[];
       const totalInboundValue = topInboundByValue.reduce((sum: number, item: TopPart) => sum + (item.value || 0), 0);
       setTopInboundPartsByValue(topInboundByValue.map((item: TopPart) => ({
@@ -253,7 +321,7 @@ const Analytics = () => {
         .gte('outbound_date', startDate.format('YYYY-MM-DD'))
         .lte('outbound_date', endDate.format('YYYY-MM-DD'));
 
-      const outboundByPart = (outboundPartsData as any[])?.reduce((acc: any, item: any) => {
+      const outboundByPart = (outboundPartsData as OutboundPartsRow[] | null)?.reduce((acc: Record<string, SimplePartAccumulator>, item: OutboundPartsRow) => {
         const partCode = item.parts?.part_code || t('analytics.unknown');
         const partName = item.parts?.part_name || t('analytics.unknown');
         if (!acc[partCode]) {
@@ -261,11 +329,11 @@ const Analytics = () => {
         }
         acc[partCode].quantity += item.quantity || 0;
         return acc;
-      }, {});
+      }, {} as Record<string, SimplePartAccumulator>);
 
       // 수량 기준 상위 부품
       const topOutbound = Object.values(outboundByPart || {})
-        .sort((a: any, b: any) => b.quantity - a.quantity)
+        .sort((a: SimplePartAccumulator, b: SimplePartAccumulator) => b.quantity - a.quantity)
         .slice(0, 10) as TopPart[];
       const totalOutboundQty = topOutbound.reduce((sum: number, item: TopPart) => sum + item.quantity, 0);
       setTopOutboundParts(topOutbound.map((item: TopPart) => ({
@@ -280,7 +348,7 @@ const Analytics = () => {
         .gte('inbound_date', startDate.format('YYYY-MM-DD'))
         .lte('inbound_date', endDate.format('YYYY-MM-DD'));
 
-      const categoryStats = (categoryInboundData as any[])?.reduce((acc: any, item: any) => {
+      const categoryStats = (categoryInboundData as CategoryInboundRow[] | null)?.reduce((acc: Record<string, CategoryAccumulator>, item: CategoryInboundRow) => {
         const category = item.parts?.category || t('analytics.unknown');
         if (!acc[category]) {
           acc[category] = { category, quantity: 0, value: 0 };
@@ -288,7 +356,7 @@ const Analytics = () => {
         acc[category].quantity += item.quantity || 0;
         acc[category].value += item.total_price || 0;
         return acc;
-      }, {});
+      }, {} as Record<string, CategoryAccumulator>);
 
       const categories = Object.values(categoryStats || {}) as CategoryData[];
       const totalCategoryQty = categories.reduce((sum: number, item: CategoryData) => sum + item.quantity, 0);
@@ -304,7 +372,7 @@ const Analytics = () => {
         .gte('inbound_date', startDate.format('YYYY-MM-DD'))
         .lte('inbound_date', endDate.format('YYYY-MM-DD'));
 
-      const supplierStats = (supplierInboundData as any[])?.reduce((acc: any, item: any) => {
+      const supplierStats = (supplierInboundData as SupplierInboundRow[] | null)?.reduce((acc: Record<string, SupplierAccumulator>, item: SupplierInboundRow) => {
         const supplierName = item.suppliers?.supplier_name || t('analytics.unknown');
         if (!acc[supplierName]) {
           acc[supplierName] = { supplier_name: supplierName, quantity: 0, value: 0, count: 0 };
@@ -313,10 +381,10 @@ const Analytics = () => {
         acc[supplierName].value += item.total_price || 0;
         acc[supplierName].count += 1;
         return acc;
-      }, {});
+      }, {} as Record<string, SupplierAccumulator>);
 
       setSupplierData((Object.values(supplierStats || {}) as SupplierData[]).sort((a: SupplierData, b: SupplierData) => b.quantity - a.quantity));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch detailed analytics:', err);
     }
   };
@@ -470,7 +538,7 @@ const Analytics = () => {
                         title: t('analytics.rank'),
                         key: 'rank',
                         width: 80,
-                        render: (_: any, __: any, index: number) => index + 1,
+                        render: (_: unknown, __: unknown, index: number) => index + 1,
                       },
                       {
                         title: t('parts.partCode'),
@@ -517,7 +585,7 @@ const Analytics = () => {
                         title: t('analytics.rank'),
                         key: 'rank',
                         width: 80,
-                        render: (_: any, __: any, index: number) => index + 1,
+                        render: (_: unknown, __: unknown, index: number) => index + 1,
                       },
                       {
                         title: t('parts.partCode'),
@@ -564,7 +632,7 @@ const Analytics = () => {
                         title: t('analytics.rank'),
                         key: 'rank',
                         width: 80,
-                        render: (_: any, __: any, index: number) => index + 1,
+                        render: (_: unknown, __: unknown, index: number) => index + 1,
                       },
                       {
                         title: t('parts.partCode'),

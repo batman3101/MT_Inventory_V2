@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { supabase } from '@/lib/supabase.ts';
 import type { Department } from '../types/database.types';
 

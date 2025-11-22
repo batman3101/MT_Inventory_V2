@@ -96,7 +96,6 @@ const Suppliers = () => {
         // 기존 공급업체 수정 - 실제 Supabase에 업데이트
         await updateSupplier(editingItem.supplier_id, {
           ...values,
-          updated_by: 'current_user', // TODO: 실제 사용자 정보로 교체
         });
         messageApi.success(t('suppliers.supplierUpdated'));
       } else {
@@ -104,7 +103,6 @@ const Suppliers = () => {
         await createSupplier({
           ...values,
           created_by: 'current_user', // TODO: 실제 사용자 정보로 교체
-          updated_by: 'current_user',
         });
         messageApi.success(t('suppliers.supplierAdded'));
       }

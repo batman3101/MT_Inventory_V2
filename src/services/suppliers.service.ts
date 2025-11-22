@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Suppliers (공급업체) 서비스
  *
@@ -6,7 +5,7 @@
  */
 
 import { supabase } from '@/lib/supabase.ts';
-import type { Supplier, InsertDto, UpdateDto } from '../types/database.types';
+import type { Supplier, InsertDto, UpdateDto, Database } from '../types/database.types';
 
 /**
  * 모든 공급업체 조회
@@ -148,7 +147,7 @@ export async function updateSupplier(
 ): Promise<Supplier> {
   const { data, error } = await supabase
     .from('suppliers')
-    .update(updates as any)
+    .update(updates as Database["public"]["Tables"]["suppliers"]["Update"])
     .eq('supplier_id', supplierId)
     .select()
     .single();

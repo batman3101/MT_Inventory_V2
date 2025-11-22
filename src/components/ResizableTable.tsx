@@ -15,8 +15,14 @@ interface ResizableTableProps<T> extends TableProps<T> {
   columns: ColumnsType<T>;
 }
 
+interface ResizableTitleProps {
+  onResize?: (e: React.SyntheticEvent, data: { size: { width: number } }) => void;
+  width?: number;
+  [key: string]: unknown;
+}
+
 // Resizable Title Component
-const ResizableTitle = (props: any) => {
+const ResizableTitle = (props: ResizableTitleProps) => {
   const { onResize, width, ...restProps } = props;
 
   if (!width) {
@@ -41,7 +47,7 @@ const ResizableTitle = (props: any) => {
   );
 };
 
-export function ResizableTable<T extends Record<string, any>>({
+export function ResizableTable<T extends Record<string, unknown>>({
   columns,
   ...restProps
 }: ResizableTableProps<T>) {
@@ -55,7 +61,7 @@ export function ResizableTable<T extends Record<string, any>>({
 
   const handleResize =
     (index: number) =>
-    (_: any, { size }: any) => {
+    (_: React.SyntheticEvent, { size }: { size: { width: number } }) => {
       const newColumns = [...resizableColumns];
       newColumns[index] = {
         ...newColumns[index],
@@ -66,7 +72,7 @@ export function ResizableTable<T extends Record<string, any>>({
 
   const mergedColumns = resizableColumns.map((col, index) => ({
     ...col,
-    onHeaderCell: (column: any) => ({
+    onHeaderCell: (column: { width?: number }) => ({
       width: column.width,
       onResize: handleResize(index),
     }),

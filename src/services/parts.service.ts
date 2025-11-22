@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Parts (부품) 서비스
  *
@@ -7,7 +6,7 @@
  */
 
 import { supabase } from '@/lib/supabase.ts';
-import type { Part, InsertDto, UpdateDto } from '../types/database.types';
+import type { Part, InsertDto, UpdateDto, Database } from '../types/database.types';
 
 /**
  * 모든 부품 조회
@@ -128,7 +127,7 @@ export async function createPart(
 ): Promise<Part> {
   const { data, error } = await supabase
     .from('parts')
-    .insert(part as any as any)
+    .insert(part as Database["public"]["Tables"]["parts"]["Insert"])
     .select()
     .single();
 
@@ -149,7 +148,7 @@ export async function updatePart(
 ): Promise<Part> {
   const { data, error } = await supabase
     .from('parts')
-    .update(updates as any)
+    .update(updates as Database["public"]["Tables"]["parts"]["Update"])
     .eq('part_id', partId)
     .select()
     .single();

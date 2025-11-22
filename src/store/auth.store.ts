@@ -68,8 +68,11 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
             isLoading: false,
           });
-        } catch (error: any) {
-          const errorMessage = error.response?.data?.error || 'Login failed';
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error && 'response' in error
+              ? (error as { response?: { data?: { error?: string } } }).response?.data?.error || 'Login failed'
+              : 'Login failed';
           set({
             error: errorMessage,
             isLoading: false,
@@ -90,9 +93,10 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             isLoading: false,
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Logout failed';
           set({
-            error: error.message || 'Logout failed',
+            error: errorMessage,
             isLoading: false,
           });
           throw error;
@@ -106,9 +110,10 @@ export const useAuthStore = create<AuthState>()(
           // persist 미들웨어가 localStorage에서 자동으로 복원
           // 추가 검증이 필요한 경우 여기에 구현
           set({ isLoading: false });
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Session check failed';
           set({
-            error: error.message || 'Session check failed',
+            error: errorMessage,
             user: null,
             session: null,
             isAuthenticated: false,

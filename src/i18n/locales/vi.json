@@ -225,7 +225,10 @@
     "dateRange": "Khoảng thời gian",
     "filterByDate": "Lọc theo ngày",
     "resetFilter": "Đặt lại bộ lọc",
-    "selectDateRange": "Chọn khoảng thời gian"
+    "selectDateRange": "Chọn khoảng thời gian",
+    "accessDenied": "Truy cập bị từ chối",
+    "adminOnly": "Chỉ quản trị viên mới có thể truy cập",
+    "insufficientPermissions": "Bạn không có quyền truy cập trang này. Vui lòng liên hệ với quản trị viên."
   },
   "language": {
     "korean": "Tiếng Hàn",

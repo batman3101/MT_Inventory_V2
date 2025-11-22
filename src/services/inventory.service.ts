@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Inventory (재고) 서비스
  *
@@ -6,7 +5,7 @@
  */
 
 import { supabase } from '@/lib/supabase.ts';
-import type { Inventory, InventoryWithPart, InsertDto, UpdateDto } from '../types/database.types';
+import type { Inventory, InventoryWithPart, InsertDto, UpdateDto, Database } from '../types/database.types';
 
 /**
  * 모든 재고 조회 (부품 정보 포함)
@@ -145,7 +144,7 @@ export async function updateInventory(
 ): Promise<Inventory> {
   const { data, error } = await supabase
     .from('inventory')
-    .update(updates as any)
+    .update(updates as Database["public"]["Tables"]["inventory"]["Update"])
     .eq('inventory_id', inventoryId)
     .select()
     .single();

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Inbound (입고) 서비스
  *
@@ -6,8 +5,20 @@
  */
 
 import { supabase } from '@/lib/supabase.ts';
-import type { Inbound, InboundDetail, InsertDto, UpdateDto } from '../types/database.types';
+import type { Inbound, InboundDetail, InsertDto, UpdateDto, Database } from '../types/database.types';
 import dayjs from 'dayjs';
+
+// Supabase JOIN 응답 타입
+interface InboundWithRelations {
+  parts?: { part_code: string; part_name: string; unit: string };
+  suppliers?: { supplier_name: string };
+  [key: string]: unknown;
+}
+
+interface InboundAmountRow {
+  inbound_date: string;
+  total_price: number;
+}
 
 /**
  * 참조번호 자동 생성 (형식: IN-YYYYMMDD-XXX)
@@ -61,7 +72,7 @@ export async function getAllInbound(): Promise<Inbound[]> {
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as InboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
@@ -69,7 +80,7 @@ export async function getAllInbound(): Promise<Inbound[]> {
     supplier_name: item.suppliers?.supplier_name || '',
     parts: undefined,
     suppliers: undefined,
-  }));
+  })) as Inbound[];
 }
 
 /**
@@ -118,7 +129,7 @@ export async function getInboundByDateRange(
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as InboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
@@ -126,7 +137,7 @@ export async function getInboundByDateRange(
     supplier_name: item.suppliers?.supplier_name || '',
     parts: undefined,
     suppliers: undefined,
-  }));
+  })) as Inbound[];
 }
 
 /**
@@ -149,7 +160,7 @@ export async function getInboundByPartId(partId: string): Promise<Inbound[]> {
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as InboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
@@ -157,7 +168,7 @@ export async function getInboundByPartId(partId: string): Promise<Inbound[]> {
     supplier_name: item.suppliers?.supplier_name || '',
     parts: undefined,
     suppliers: undefined,
-  }));
+  })) as Inbound[];
 }
 
 /**
@@ -180,7 +191,7 @@ export async function getInboundBySupplierId(supplierId: string): Promise<Inboun
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as InboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
@@ -188,7 +199,7 @@ export async function getInboundBySupplierId(supplierId: string): Promise<Inboun
     supplier_name: item.suppliers?.supplier_name || '',
     parts: undefined,
     suppliers: undefined,
-  }));
+  })) as Inbound[];
 }
 
 /**
@@ -218,9 +229,9 @@ export async function updateInbound(
   inboundId: string,
   updates: UpdateDto<'inbound'>
 ): Promise<Inbound> {
-  const { data, error } = await supabase
+  const { data, error} = await supabase
     .from('inbound')
-    .update(updates as any)
+    .update(updates as Database["public"]["Tables"]["inbound"]["Update"])
     .eq('inbound_id', inboundId)
     .select()
     .single();
@@ -299,7 +310,7 @@ export async function getRecentInbound(limit: number = 10): Promise<Inbound[]> {
   }
 
   // JOIN된 데이터를 평탄화
-  return data.map((item: any) => ({
+  return (data as InboundWithRelations[]).map((item) => ({
     ...item,
     part_code: item.parts?.part_code || '',
     part_name: item.parts?.part_name || '',
@@ -307,7 +318,7 @@ export async function getRecentInbound(limit: number = 10): Promise<Inbound[]> {
     supplier_name: item.suppliers?.supplier_name || '',
     parts: undefined,
     suppliers: undefined,
-  }));
+  })) as Inbound[];
 }
 
 /**
@@ -339,7 +350,7 @@ export async function getLast7DaysInboundAmount(): Promise<{ date: string; amoun
   }
 
   // 실제 데이터로 금액 업데이트
-  data.forEach((item: any) => {
+  (data as InboundAmountRow[]).forEach((item) => {
     const date = item.inbound_date;
     const currentAmount = amountByDate.get(date) || 0;
     amountByDate.set(date, currentAmount + (item.total_price || 0));
@@ -385,7 +396,7 @@ export async function getInboundAmountByPeriod(
   }
 
   // 실제 데이터로 금액 업데이트
-  data.forEach((item: any) => {
+  (data as InboundAmountRow[]).forEach((item) => {
     const date = item.inbound_date;
     const currentAmount = amountByDate.get(date) || 0;
     amountByDate.set(date, currentAmount + (item.total_price || 0));

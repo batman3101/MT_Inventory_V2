@@ -133,7 +133,11 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   createUser: async (userData) => {
     set({ isLoading: true, error: null });
     try {
-      await usersService.createUser(userData as any);
+      // password 필드를 포함한 CreateUserData 타입으로 전달
+      await usersService.createUser({
+        ...userData,
+        password: (userData as { password?: string }).password || '',
+      });
       // 사용자 목록 및 통계 새로고침
       await get().fetchUsers();
       await get().fetchUsersStats();
@@ -150,7 +154,14 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   updateUser: async (userId: string, updates) => {
     set({ isLoading: true, error: null });
     try {
-      await usersService.updateUser(userId, updates as any);
+      // Partial<User>를 UpdateDto<'users'>로 변환
+      const updateData: Record<string, unknown> = {};
+      for (const key in updates) {
+        if (Object.prototype.hasOwnProperty.call(updates, key)) {
+          updateData[key] = updates[key as keyof User];
+        }
+      }
+      await usersService.updateUser(userId, updateData);
       // 사용자 목록 및 통계 새로고침
       await get().fetchUsers();
       await get().fetchUsersStats();

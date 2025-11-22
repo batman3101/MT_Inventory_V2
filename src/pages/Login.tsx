@@ -40,7 +40,7 @@ const Login = () => {
       await signIn(values.email, values.password);
       messageApi.success(t('auth.loginSuccess'));
       navigate('/');
-    } catch (err) {
+    } catch {
       // 에러는 이미 스토어에서 처리됨
     } finally {
       setIsSubmitting(false);

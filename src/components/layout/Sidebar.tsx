@@ -31,7 +31,7 @@ const Sidebar = () => {
       await signOut();
       messageApi.success(t('auth.logout'));
       navigate('/login');
-    } catch (error) {
+    } catch {
       messageApi.error(t('auth.loginError'));
     }
   };

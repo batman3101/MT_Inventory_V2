@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Users (사용자) 서비스
  *
@@ -7,7 +6,7 @@
  */
 
 import { supabase } from '@/lib/supabase.ts';
-import type { User, UpdateDto } from '../types/database.types';
+import type { User, UpdateDto, Database } from '../types/database.types';
 import axios from 'axios';
 
 /**
@@ -189,7 +188,7 @@ export async function updateUser(
 ): Promise<User> {
   const { data, error } = await supabase
     .from('users')
-    .update(updates as any)
+    .update(updates as Database["public"]["Tables"]["users"]["Update"])
     .eq('user_id', userId)
     .select()
     .single();
