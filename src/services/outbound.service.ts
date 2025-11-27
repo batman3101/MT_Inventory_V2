@@ -2,11 +2,39 @@
  * Outbound (출고) 서비스
  *
  * ⚠️ 실제 Supabase 데이터베이스에서 출고 데이터를 조회/관리합니다.
+ * ⚠️ 출고 추가/수정/삭제 시 재고(inventory)도 자동으로 조정됩니다.
  */
 
 import { supabase } from '@/lib/supabase.ts';
 import type { Outbound, OutboundDetail, InsertDto, UpdateDto, Database } from '../types/database.types';
+import { getInventoryByPartId, updateInventory } from './inventory.service';
 import dayjs from 'dayjs';
+
+/**
+ * 재고 수량 조정 (내부 헬퍼 함수)
+ * @param partId 부품 ID
+ * @param quantityChange 수량 변화량 (양수: 증가, 음수: 감소)
+ */
+async function adjustInventoryQuantity(partId: string, quantityChange: number): Promise<void> {
+  // 현재 재고 조회
+  const inventory = await getInventoryByPartId(partId);
+
+  if (!inventory) {
+    throw new Error(`부품 ID ${partId}에 해당하는 재고를 찾을 수 없습니다.`);
+  }
+
+  // 재고 수량 계산
+  const newQuantity = inventory.current_quantity + quantityChange;
+
+  if (newQuantity < 0) {
+    throw new Error(`재고 수량이 부족합니다. 현재 재고: ${inventory.current_quantity}, 필요 수량: ${Math.abs(quantityChange)}`);
+  }
+
+  // 재고 업데이트
+  await updateInventory(inventory.inventory_id, {
+    current_quantity: newQuantity,
+  });
+}
 
 // Supabase JOIN 응답 타입
 interface OutboundWithRelations {
@@ -259,31 +287,60 @@ export async function getOutboundByEquipment(equipment: string): Promise<Outboun
 
 /**
  * 출고 추가
+ * ⚠️ 출고 시 재고에서 해당 수량을 차감합니다.
  */
 export async function createOutbound(
   outbound: InsertDto<'outbound'>
 ): Promise<Outbound> {
+  // 1. 출고 레코드 생성
   const { data, error } = await supabase
     .from('outbound')
     .insert(outbound as Database["public"]["Tables"]["outbound"]["Insert"])
     .select()
     .single();
 
-  if (error) {
+  if (error || !data) {
     console.error('출고 추가 에러:', error);
-    throw new Error(error.message);
+    throw new Error(error?.message || '출고 추가 실패');
   }
 
-  return data;
+  const outboundData = data as Outbound;
+
+  // 2. 재고에서 출고 수량 차감
+  try {
+    await adjustInventoryQuantity(outbound.part_id, -outbound.quantity);
+  } catch (inventoryError) {
+    // 재고 차감 실패 시 출고 레코드 삭제 (롤백)
+    await supabase.from('outbound').delete().eq('outbound_id', outboundData.outbound_id);
+    throw inventoryError;
+  }
+
+  return outboundData;
 }
 
 /**
  * 출고 수정
+ * ⚠️ 수량 변경 시 재고도 함께 조정됩니다.
  */
 export async function updateOutbound(
   outboundId: string,
   updates: UpdateDto<'outbound'>
 ): Promise<Outbound> {
+  // 1. 기존 출고 정보 조회 (수량 비교를 위해)
+  const { data: existingData, error: fetchError } = await supabase
+    .from('outbound')
+    .select('part_id, quantity')
+    .eq('outbound_id', outboundId)
+    .single();
+
+  if (fetchError || !existingData) {
+    console.error('기존 출고 조회 에러:', fetchError);
+    throw new Error(fetchError?.message || '기존 출고 정보를 찾을 수 없습니다.');
+  }
+
+  const existingOutbound = existingData as { part_id: string; quantity: number };
+
+  // 2. 출고 레코드 수정
   const { data, error } = await supabase
     .from('outbound')
     .update(updates as Database["public"]["Tables"]["outbound"]["Update"])
@@ -291,18 +348,42 @@ export async function updateOutbound(
     .select()
     .single();
 
-  if (error) {
+  if (error || !data) {
     console.error('출고 수정 에러:', error);
-    throw new Error(error.message);
+    throw new Error(error?.message || '출고 수정 실패');
   }
 
-  return data;
+  // 3. 수량이 변경된 경우 재고 조정
+  if (updates.quantity !== undefined && updates.quantity !== existingOutbound.quantity) {
+    const quantityDiff = existingOutbound.quantity - updates.quantity;
+    // 출고 수량이 줄었으면 재고 증가, 늘었으면 재고 감소
+    const partId = updates.part_id || existingOutbound.part_id;
+    await adjustInventoryQuantity(partId, quantityDiff);
+  }
+
+  return data as Outbound;
 }
 
 /**
  * 출고 삭제
+ * ⚠️ 삭제 시 출고했던 수량만큼 재고가 복원됩니다.
  */
 export async function deleteOutbound(outboundId: string): Promise<void> {
+  // 1. 삭제할 출고 정보 조회 (재고 복원을 위해)
+  const { data: outboundData, error: fetchError } = await supabase
+    .from('outbound')
+    .select('part_id, quantity')
+    .eq('outbound_id', outboundId)
+    .single();
+
+  if (fetchError || !outboundData) {
+    console.error('출고 조회 에러:', fetchError);
+    throw new Error(fetchError?.message || '삭제할 출고 정보를 찾을 수 없습니다.');
+  }
+
+  const outbound = outboundData as { part_id: string; quantity: number };
+
+  // 2. 출고 레코드 삭제
   const { error } = await supabase
     .from('outbound')
     .delete()
@@ -312,6 +393,9 @@ export async function deleteOutbound(outboundId: string): Promise<void> {
     console.error('출고 삭제 에러:', error);
     throw new Error(error.message);
   }
+
+  // 3. 재고 복원 (출고했던 수량만큼 재고 증가)
+  await adjustInventoryQuantity(outbound.part_id, outbound.quantity);
 }
 
 /**

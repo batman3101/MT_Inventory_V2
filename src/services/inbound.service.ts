@@ -2,11 +2,39 @@
  * Inbound (입고) 서비스
  *
  * ⚠️ 실제 Supabase 데이터베이스에서 입고 데이터를 조회/관리합니다.
+ * ⚠️ 입고 추가/수정/삭제 시 재고(inventory)도 자동으로 조정됩니다.
  */
 
 import { supabase } from '@/lib/supabase.ts';
 import type { Inbound, InboundDetail, InsertDto, UpdateDto, Database } from '../types/database.types';
+import { getInventoryByPartId, updateInventory } from './inventory.service';
 import dayjs from 'dayjs';
+
+/**
+ * 재고 수량 조정 (내부 헬퍼 함수)
+ * @param partId 부품 ID
+ * @param quantityChange 수량 변화량 (양수: 증가, 음수: 감소)
+ */
+async function adjustInventoryQuantity(partId: string, quantityChange: number): Promise<void> {
+  // 현재 재고 조회
+  const inventory = await getInventoryByPartId(partId);
+
+  if (!inventory) {
+    throw new Error(`부품 ID ${partId}에 해당하는 재고를 찾을 수 없습니다.`);
+  }
+
+  // 재고 수량 계산
+  const newQuantity = inventory.current_quantity + quantityChange;
+
+  if (newQuantity < 0) {
+    throw new Error(`재고 수량이 부족합니다. 현재 재고: ${inventory.current_quantity}, 필요 수량: ${Math.abs(quantityChange)}`);
+  }
+
+  // 재고 업데이트
+  await updateInventory(inventory.inventory_id, {
+    current_quantity: newQuantity,
+  });
+}
 
 // Supabase JOIN 응답 타입
 interface InboundWithRelations {
@@ -204,50 +232,103 @@ export async function getInboundBySupplierId(supplierId: string): Promise<Inboun
 
 /**
  * 입고 추가
+ * ⚠️ 입고 시 재고에 해당 수량을 추가합니다.
  */
 export async function createInbound(
   inbound: InsertDto<'inbound'>
 ): Promise<Inbound> {
+  // 1. 입고 레코드 생성
   const { data, error } = await supabase
     .from('inbound')
     .insert(inbound as Database["public"]["Tables"]["inbound"]["Insert"])
     .select()
     .single();
 
-  if (error) {
+  if (error || !data) {
     console.error('입고 추가 에러:', error);
-    throw new Error(error.message);
+    throw new Error(error?.message || '입고 추가 실패');
   }
 
-  return data;
+  const inboundData = data as Inbound;
+
+  // 2. 재고에 입고 수량 추가
+  try {
+    await adjustInventoryQuantity(inbound.part_id, inbound.quantity);
+  } catch (inventoryError) {
+    // 재고 추가 실패 시 입고 레코드 삭제 (롤백)
+    await supabase.from('inbound').delete().eq('inbound_id', inboundData.inbound_id);
+    throw inventoryError;
+  }
+
+  return inboundData;
 }
 
 /**
  * 입고 수정
+ * ⚠️ 수량 변경 시 재고도 함께 조정됩니다.
  */
 export async function updateInbound(
   inboundId: string,
   updates: UpdateDto<'inbound'>
 ): Promise<Inbound> {
-  const { data, error} = await supabase
+  // 1. 기존 입고 정보 조회 (수량 비교를 위해)
+  const { data: existingData, error: fetchError } = await supabase
+    .from('inbound')
+    .select('part_id, quantity')
+    .eq('inbound_id', inboundId)
+    .single();
+
+  if (fetchError || !existingData) {
+    console.error('기존 입고 조회 에러:', fetchError);
+    throw new Error(fetchError?.message || '기존 입고 정보를 찾을 수 없습니다.');
+  }
+
+  const existingInbound = existingData as { part_id: string; quantity: number };
+
+  // 2. 입고 레코드 수정
+  const { data, error } = await supabase
     .from('inbound')
     .update(updates as Database["public"]["Tables"]["inbound"]["Update"])
     .eq('inbound_id', inboundId)
     .select()
     .single();
 
-  if (error) {
+  if (error || !data) {
     console.error('입고 수정 에러:', error);
-    throw new Error(error.message);
+    throw new Error(error?.message || '입고 수정 실패');
   }
 
-  return data;
+  // 3. 수량이 변경된 경우 재고 조정
+  if (updates.quantity !== undefined && updates.quantity !== existingInbound.quantity) {
+    const quantityDiff = updates.quantity - existingInbound.quantity;
+    // 입고 수량이 늘었으면 재고 증가, 줄었으면 재고 감소
+    const partId = updates.part_id || existingInbound.part_id;
+    await adjustInventoryQuantity(partId, quantityDiff);
+  }
+
+  return data as Inbound;
 }
 
 /**
  * 입고 삭제
+ * ⚠️ 삭제 시 입고했던 수량만큼 재고가 감소됩니다.
  */
 export async function deleteInbound(inboundId: string): Promise<void> {
+  // 1. 삭제할 입고 정보 조회 (재고 차감을 위해)
+  const { data: inboundData, error: fetchError } = await supabase
+    .from('inbound')
+    .select('part_id, quantity')
+    .eq('inbound_id', inboundId)
+    .single();
+
+  if (fetchError || !inboundData) {
+    console.error('입고 조회 에러:', fetchError);
+    throw new Error(fetchError?.message || '삭제할 입고 정보를 찾을 수 없습니다.');
+  }
+
+  const inbound = inboundData as { part_id: string; quantity: number };
+
+  // 2. 입고 레코드 삭제
   const { error } = await supabase
     .from('inbound')
     .delete()
@@ -257,6 +338,9 @@ export async function deleteInbound(inboundId: string): Promise<void> {
     console.error('입고 삭제 에러:', error);
     throw new Error(error.message);
   }
+
+  // 3. 재고 차감 (입고했던 수량만큼 재고 감소)
+  await adjustInventoryQuantity(inbound.part_id, -inbound.quantity);
 }
 
 /**
