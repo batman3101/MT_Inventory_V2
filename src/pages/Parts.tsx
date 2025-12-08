@@ -129,18 +129,21 @@ const Parts = () => {
 
       if (editingItem) {
         // 기존 부품 수정 - 실제 Supabase에 업데이트
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { initial_quantity, ...updateValues } = values;
         await updatePart(editingItem.part_id, {
-          ...values,
+          ...updateValues,
           updated_by: 'current_user', // TODO: 실제 사용자 정보로 교체
         });
         messageApi.success(t('parts.partUpdated'));
       } else {
         // 새 부품 추가 - 실제 Supabase에 추가
+        const { initial_quantity, ...partValues } = values;
         await createPart({
-          ...values,
+          ...partValues,
           created_by: 'current_user', // TODO: 실제 사용자 정보로 교체
           updated_by: 'current_user',
-        });
+        }, initial_quantity || 0);
         messageApi.success(t('parts.partAdded'));
       }
 
@@ -464,6 +467,18 @@ const Parts = () => {
           >
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
+
+          {/* 새 부품 추가 시에만 현재 재고 입력 필드 표시 */}
+          {!editingItem && (
+            <Form.Item
+              name="initial_quantity"
+              label={t('parts.initialQuantity')}
+              initialValue={0}
+              tooltip={t('parts.initialQuantityTooltip')}
+            >
+              <InputNumber min={0} style={{ width: '100%' }} />
+            </Form.Item>
+          )}
 
           <Form.Item
             name="status"

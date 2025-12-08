@@ -27,7 +27,7 @@ interface PartsState {
   searchParts: (searchTerm: string) => Promise<void>;
   getPartsByCategory: (category: string) => Promise<void>;
   fetchPartsStats: () => Promise<void>;
-  createPart: (part: Omit<Part, 'part_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  createPart: (part: Omit<Part, 'part_id' | 'created_at' | 'updated_at'>, initialQuantity?: number) => Promise<void>;
   updatePart: (partId: string, updates: Partial<Part>) => Promise<void>;
   updatePartStatus: (partId: string, status: string) => Promise<void>;
   deletePart: (partId: string) => Promise<void>;
@@ -114,10 +114,10 @@ export const usePartsStore = create<PartsState>((set, get) => ({
   },
 
   // 부품 추가
-  createPart: async (partData) => {
+  createPart: async (partData, initialQuantity = 0) => {
     set({ isLoading: true, error: null });
     try {
-      await partsService.createPart(partData);
+      await partsService.createPart(partData, initialQuantity);
       // 부품 목록 새로고침
       await get().fetchParts();
     } catch (error) {

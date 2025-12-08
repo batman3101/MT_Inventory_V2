@@ -75,6 +75,8 @@
     "spec": "Quy cách",
     "unit": "Đơn vị",
     "minStock": "Tồn kho tối thiểu",
+    "initialQuantity": "Số lượng tồn kho",
+    "initialQuantityTooltip": "Nhập số lượng tồn kho ban đầu khi tạo phụ tùng",
     "status": "Trạng thái",
     "description": "Mô tả",
     "price": "Giá",
