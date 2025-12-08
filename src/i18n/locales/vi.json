@@ -94,7 +94,12 @@
     "setActive": "Kích hoạt",
     "setInactive": "Vô hiệu hóa",
     "statusUpdated": "Trạng thái phụ tùng đã được thay đổi",
-    "statusUpdateError": "Lỗi khi thay đổi trạng thái phụ tùng"
+    "statusUpdateError": "Lỗi khi thay đổi trạng thái phụ tùng",
+    "viewDetail": "Chi tiết phụ tùng",
+    "basicInfo": "Thông tin cơ bản",
+    "inventoryStatus": "Tình trạng tồn kho",
+    "recentInbound": "Lịch sử nhập kho gần đây (5 gần nhất)",
+    "recentOutbound": "Lịch sử xuất kho gần đây (5 gần nhất)"
   },
   "inbound": {
     "title": "Quản lý nhập kho",

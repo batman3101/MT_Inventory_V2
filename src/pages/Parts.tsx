@@ -1,12 +1,14 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Modal, Form, message, Select, InputNumber, Spin, Tag, Alert, Row, Col, Statistic } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Card, Input, Button, Space, Typography, Modal, Form, message, Select, InputNumber, Spin, Tag, Alert, Row, Col, Statistic, Descriptions, Table, Divider } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { usePartsStore } from '../store';
-import type { Part } from '../types/database.types';
+import type { Part, Inventory, Inbound, Outbound } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
 import { ResizableTable } from '../components/ResizableTable';
+import { getInventoryByPartId } from '../services/inventory.service';
+import { supabase } from '../lib/supabase';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -23,6 +25,14 @@ const Parts = () => {
   const [editingItem, setEditingItem] = useState<Part | null>(null);
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
+
+  // 상세보기 모달 상태
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [detailPart, setDetailPart] = useState<Part | null>(null);
+  const [detailInventory, setDetailInventory] = useState<Inventory | null>(null);
+  const [detailInbounds, setDetailInbounds] = useState<Inbound[]>([]);
+  const [detailOutbounds, setDetailOutbounds] = useState<Outbound[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   // Zustand 스토어에서 실제 데이터 가져오기
   const { parts, isLoading, error, stats, fetchParts, fetchPartsStats, createPart, updatePart, updatePartStatus, deletePart, searchParts } = usePartsStore();
@@ -75,6 +85,63 @@ const Parts = () => {
     setEditingItem(null);
     form.resetFields();
     setIsModalOpen(true);
+  };
+
+  // 상세보기 모달 열기
+  const showDetailModal = async (part: Part) => {
+    setDetailPart(part);
+    setIsDetailModalOpen(true);
+    setDetailLoading(true);
+
+    try {
+      // 재고 정보 조회
+      const inventory = await getInventoryByPartId(part.part_id);
+      setDetailInventory(inventory);
+
+      // 최근 입고 내역 조회 (최근 5건)
+      const { data: inboundData } = await supabase
+        .from('inbound')
+        .select(`
+          *,
+          suppliers(supplier_name)
+        `)
+        .eq('part_id', part.part_id)
+        .order('inbound_date', { ascending: false })
+        .limit(5);
+
+      if (inboundData) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setDetailInbounds(inboundData.map((item: any) => ({
+          ...item,
+          supplier_name: item.suppliers?.supplier_name || ''
+        })));
+      }
+
+      // 최근 출고 내역 조회 (최근 5건)
+      const { data: outboundData } = await supabase
+        .from('outbound')
+        .select('*')
+        .eq('part_id', part.part_id)
+        .order('outbound_date', { ascending: false })
+        .limit(5);
+
+      if (outboundData) {
+        setDetailOutbounds(outboundData as Outbound[]);
+      }
+    } catch (error) {
+      console.error('상세 정보 조회 에러:', error);
+      messageApi.error(t('common.error'));
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setDetailPart(null);
+    setDetailInventory(null);
+    setDetailInbounds([]);
+    setDetailOutbounds([]);
   };
 
   const showEditModal = (item: Part) => {
@@ -228,12 +295,20 @@ const Parts = () => {
     {
       title: t('inventory.actions'),
       key: 'actions',
-      width: 250,
+      width: 300,
       fixed: 'right',
       render: (_, record) => {
         const isActive = record.status === 'NEW' || record.status === 'ACTIVE';
         return (
           <Space>
+            <Button
+              type="link"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => showDetailModal(record)}
+            >
+              {t('common.view')}
+            </Button>
             <Button
               type="link"
               size="small"
@@ -500,6 +575,201 @@ const Parts = () => {
             <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 부품 상세보기 모달 */}
+      <Modal
+        title={t('parts.viewDetail')}
+        open={isDetailModalOpen}
+        onCancel={closeDetailModal}
+        footer={[
+          <Button key="close" onClick={closeDetailModal}>
+            {t('common.close')}
+          </Button>
+        ]}
+        width={900}
+      >
+        <Spin spinning={detailLoading}>
+          {detailPart && (
+            <>
+              {/* 부품 기본 정보 */}
+              <Descriptions
+                title={t('parts.basicInfo')}
+                bordered
+                column={{ xs: 1, sm: 2, md: 2 }}
+                size="small"
+              >
+                <Descriptions.Item label={t('parts.partCode')}>
+                  {detailPart.part_code}
+                </Descriptions.Item>
+                <Descriptions.Item label={t('parts.status')}>
+                  <Tag color={
+                    detailPart.status === 'ACTIVE' ? 'green' :
+                    detailPart.status === 'NEW' ? 'blue' :
+                    detailPart.status === 'INACTIVE' ? 'red' : 'orange'
+                  }>
+                    {detailPart.status}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label={t('parts.partName')}>
+                  {detailPart.part_name}
+                </Descriptions.Item>
+                <Descriptions.Item label={t('parts.vietnameseName')}>
+                  {detailPart.vietnamese_name || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label={t('parts.koreanName')}>
+                  {detailPart.korean_name || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label={t('parts.category')}>
+                  {detailPart.category}
+                </Descriptions.Item>
+                <Descriptions.Item label={t('parts.spec')}>
+                  {detailPart.spec || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label={t('parts.unit')}>
+                  {detailPart.unit}
+                </Descriptions.Item>
+                <Descriptions.Item label={t('parts.minStock')}>
+                  {detailPart.min_stock}
+                </Descriptions.Item>
+                <Descriptions.Item label={t('parts.description')} span={2}>
+                  {detailPart.description || '-'}
+                </Descriptions.Item>
+              </Descriptions>
+
+              {/* 재고 현황 */}
+              <Divider />
+              <Descriptions
+                title={t('parts.inventoryStatus')}
+                bordered
+                column={{ xs: 1, sm: 2, md: 3 }}
+                size="small"
+              >
+                <Descriptions.Item label={t('inventory.currentQuantity')}>
+                  <span style={{
+                    color: detailInventory && detailInventory.current_quantity < detailPart.min_stock ? '#ff4d4f' : '#52c41a',
+                    fontWeight: 'bold',
+                    fontSize: '16px'
+                  }}>
+                    {detailInventory?.current_quantity ?? 0}
+                  </span>
+                </Descriptions.Item>
+                <Descriptions.Item label={t('parts.minStock')}>
+                  {detailPart.min_stock}
+                </Descriptions.Item>
+                <Descriptions.Item label={t('inventory.location')}>
+                  {detailInventory?.location || 'main'}
+                </Descriptions.Item>
+              </Descriptions>
+
+              {/* 최근 입고 내역 */}
+              <Divider />
+              <Title level={5}>{t('parts.recentInbound')}</Title>
+              <Table
+                dataSource={detailInbounds}
+                rowKey="inbound_id"
+                size="small"
+                pagination={false}
+                columns={[
+                  {
+                    title: t('inbound.date'),
+                    dataIndex: 'inbound_date',
+                    key: 'inbound_date',
+                    width: 100,
+                  },
+                  {
+                    title: t('inbound.reference'),
+                    dataIndex: 'reference_number',
+                    key: 'reference_number',
+                    width: 150,
+                  },
+                  {
+                    title: t('inbound.supplier'),
+                    dataIndex: 'supplier_name',
+                    key: 'supplier_name',
+                    width: 150,
+                  },
+                  {
+                    title: t('inbound.quantity'),
+                    dataIndex: 'quantity',
+                    key: 'quantity',
+                    width: 80,
+                    align: 'right',
+                  },
+                  {
+                    title: t('inbound.unitPrice'),
+                    dataIndex: 'unit_price',
+                    key: 'unit_price',
+                    width: 100,
+                    align: 'right',
+                    render: (value: number, record: Inbound) =>
+                      value ? `${value.toLocaleString()} ${record.currency || 'VND'}` : '-',
+                  },
+                  {
+                    title: t('inbound.totalPrice'),
+                    dataIndex: 'total_price',
+                    key: 'total_price',
+                    width: 120,
+                    align: 'right',
+                    render: (value: number, record: Inbound) =>
+                      value ? `${value.toLocaleString()} ${record.currency || 'VND'}` : '-',
+                  },
+                ]}
+                locale={{ emptyText: t('common.noData') }}
+              />
+
+              {/* 최근 출고 내역 */}
+              <Divider />
+              <Title level={5}>{t('parts.recentOutbound')}</Title>
+              <Table
+                dataSource={detailOutbounds}
+                rowKey="outbound_id"
+                size="small"
+                pagination={false}
+                columns={[
+                  {
+                    title: t('outbound.date'),
+                    dataIndex: 'outbound_date',
+                    key: 'outbound_date',
+                    width: 100,
+                  },
+                  {
+                    title: t('outbound.reference'),
+                    dataIndex: 'reference_number',
+                    key: 'reference_number',
+                    width: 150,
+                  },
+                  {
+                    title: t('outbound.quantity'),
+                    dataIndex: 'quantity',
+                    key: 'quantity',
+                    width: 80,
+                    align: 'right',
+                  },
+                  {
+                    title: t('outbound.department'),
+                    dataIndex: 'department',
+                    key: 'department',
+                    width: 120,
+                  },
+                  {
+                    title: t('outbound.requester'),
+                    dataIndex: 'requester',
+                    key: 'requester',
+                    width: 100,
+                  },
+                  {
+                    title: t('outbound.reason'),
+                    dataIndex: 'reason',
+                    key: 'reason',
+                    ellipsis: true,
+                  },
+                ]}
+                locale={{ emptyText: t('common.noData') }}
+              />
+            </>
+          )}
+        </Spin>
       </Modal>
     </div>
   );

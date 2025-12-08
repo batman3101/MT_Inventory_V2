@@ -94,7 +94,12 @@
     "setActive": "활성화",
     "setInactive": "비활성화",
     "statusUpdated": "부품 상태가 변경되었습니다",
-    "statusUpdateError": "부품 상태 변경 중 오류가 발생했습니다"
+    "statusUpdateError": "부품 상태 변경 중 오류가 발생했습니다",
+    "viewDetail": "부품 상세",
+    "basicInfo": "기본 정보",
+    "inventoryStatus": "재고 현황",
+    "recentInbound": "최근 입고 내역 (최근 5건)",
+    "recentOutbound": "최근 출고 내역 (최근 5건)"
   },
   "inbound": {
     "title": "입고 관리",
