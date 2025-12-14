@@ -8,6 +8,7 @@
 import { supabase } from '@/lib/supabase.ts';
 import type { Outbound, OutboundDetail, InsertDto, UpdateDto, Database } from '../types/database.types';
 import { getInventoryByPartId, updateInventory } from './inventory.service';
+import { createErrorCode } from '../utils/errorTranslation';
 import dayjs from 'dayjs';
 
 /**
@@ -20,14 +21,18 @@ async function adjustInventoryQuantity(partId: string, quantityChange: number): 
   const inventory = await getInventoryByPartId(partId);
 
   if (!inventory) {
-    throw new Error(`부품 ID ${partId}에 해당하는 재고를 찾을 수 없습니다.`);
+    // 출고의 경우 재고가 없으면 에러 - 먼저 입고 처리 필요
+    throw new Error(createErrorCode('INVENTORY_NOT_FOUND'));
   }
 
   // 재고 수량 계산
   const newQuantity = inventory.current_quantity + quantityChange;
 
   if (newQuantity < 0) {
-    throw new Error(`재고 수량이 부족합니다. 현재 재고: ${inventory.current_quantity}, 필요 수량: ${Math.abs(quantityChange)}`);
+    throw new Error(createErrorCode('INSUFFICIENT_STOCK', {
+      current: inventory.current_quantity,
+      required: Math.abs(quantityChange),
+    }));
   }
 
   // 재고 업데이트

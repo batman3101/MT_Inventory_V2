@@ -6,6 +6,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { usePartsStore } from '../store';
 import type { Part, Inventory, Inbound, Outbound } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
+import { translateError } from '../utils/errorTranslation';
 import { ResizableTable } from '../components/ResizableTable';
 import { getInventoryByPartId } from '../services/inventory.service';
 import { supabase } from '../lib/supabase';
@@ -217,7 +218,7 @@ const Parts = () => {
       setIsModalOpen(false);
       form.resetFields();
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : t('common.error'));
+      messageApi.error(translateError(error instanceof Error ? error.message : t('common.error')));
     }
   };
 
@@ -361,7 +362,7 @@ const Parts = () => {
     return (
       <Alert
         message={t('common.error')}
-        description={error}
+        description={translateError(error)}
         type="error"
         showIcon
       />

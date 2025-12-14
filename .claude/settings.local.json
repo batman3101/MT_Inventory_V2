@@ -30,5 +30,11 @@
     "deny": [],
     "ask": []
   },
-  "enableAllProjectMcpServers": true
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase-cnc-mt-inventory",
+    "context7",
+    "executeautomation-playwright-server",
+    "chrome-devtools"
+  ]
 }

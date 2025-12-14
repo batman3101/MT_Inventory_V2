@@ -237,6 +237,21 @@
     "adminOnly": "Chỉ quản trị viên mới có thể truy cập",
     "insufficientPermissions": "Bạn không có quyền truy cập trang này. Vui lòng liên hệ với quản trị viên."
   },
+  "errors": {
+    "inventoryNotFound": "Không tìm thấy bản ghi tồn kho. Vui lòng thực hiện nhập kho trước cho phụ tùng này.",
+    "inventoryNotFoundForInbound": "Không tìm thấy bản ghi tồn kho. Vui lòng thực hiện nhập kho trước.",
+    "insufficientStock": "Số lượng tồn kho không đủ. Tồn kho hiện tại: {{current}}, Số lượng cần: {{required}}",
+    "partNotFound": "Không tìm thấy phụ tùng.",
+    "inboundCreateFailed": "Thêm nhập kho thất bại",
+    "inboundUpdateFailed": "Cập nhật nhập kho thất bại",
+    "inboundDeleteFailed": "Xóa nhập kho thất bại",
+    "outboundCreateFailed": "Thêm xuất kho thất bại",
+    "outboundUpdateFailed": "Cập nhật xuất kho thất bại",
+    "outboundDeleteFailed": "Xóa xuất kho thất bại",
+    "inventoryCreateFailed": "Tạo bản ghi tồn kho thất bại",
+    "hasInboundHistory": "Không thể xóa phụ tùng có lịch sử nhập kho. Vui lòng vô hiệu hóa phụ tùng.",
+    "hasOutboundHistory": "Không thể xóa phụ tùng có lịch sử xuất kho. Vui lòng vô hiệu hóa phụ tùng."
+  },
   "language": {
     "korean": "Tiếng Hàn",
     "vietnamese": "Tiếng Việt",

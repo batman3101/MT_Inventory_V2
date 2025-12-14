@@ -10,6 +10,7 @@ dayjs.extend(isBetween);
 import { useOutboundStore, usePartsStore, useDepartmentsStore } from '../store';
 import type { Outbound } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
+import { translateError } from '../utils/errorTranslation';
 import { ResizableTable } from '../components/ResizableTable';
 import { generateOutboundReferenceNumber } from '../services/outbound.service';
 
@@ -155,7 +156,7 @@ const Outbound = () => {
       form.resetFields();
       setReferenceNumber('');
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : t('common.error'));
+      messageApi.error(translateError(error instanceof Error ? error.message : t('common.error')));
     }
   };
 
@@ -311,7 +312,7 @@ const Outbound = () => {
     return (
       <Alert
         message={t('common.error')}
-        description={error}
+        description={translateError(error)}
         type="error"
         showIcon
       />

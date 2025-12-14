@@ -9,6 +9,7 @@
 
 import { supabase } from '@/lib/supabase.ts';
 import type { Part, InsertDto, UpdateDto, Database } from '../types/database.types';
+import { createErrorCode } from '../utils/errorTranslation';
 
 /**
  * 모든 부품 조회
@@ -160,7 +161,7 @@ export async function createPart(
     // 재고 생성 실패 시 부품도 삭제 (롤백)
     console.error('재고 레코드 생성 에러:', inventoryError);
     await supabase.from('parts').delete().eq('part_id', partData.part_id);
-    throw new Error(`재고 레코드 생성 실패: ${inventoryError.message}`);
+    throw new Error(createErrorCode('INVENTORY_CREATE_FAILED'));
   }
 
   return partData;
@@ -202,7 +203,7 @@ export async function deletePart(partId: string): Promise<void> {
     .limit(1);
 
   if (inboundData && inboundData.length > 0) {
-    throw new Error('입고 내역이 있는 부품은 삭제할 수 없습니다. 부품을 비활성화하세요.');
+    throw new Error(createErrorCode('HAS_INBOUND_HISTORY'));
   }
 
   // 2. 출고 내역 확인 - 출고 내역이 있으면 삭제 불가
@@ -213,7 +214,7 @@ export async function deletePart(partId: string): Promise<void> {
     .limit(1);
 
   if (outboundData && outboundData.length > 0) {
-    throw new Error('출고 내역이 있는 부품은 삭제할 수 없습니다. 부품을 비활성화하세요.');
+    throw new Error(createErrorCode('HAS_OUTBOUND_HISTORY'));
   }
 
   // 3. 재고 레코드 먼저 삭제

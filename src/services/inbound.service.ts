@@ -7,27 +7,44 @@
 
 import { supabase } from '@/lib/supabase.ts';
 import type { Inbound, InboundDetail, InsertDto, UpdateDto, Database } from '../types/database.types';
-import { getInventoryByPartId, updateInventory } from './inventory.service';
+import { getInventoryByPartId, updateInventory, createInventory } from './inventory.service';
+import { createErrorCode } from '../utils/errorTranslation';
 import dayjs from 'dayjs';
 
 /**
  * 재고 수량 조정 (내부 헬퍼 함수)
  * @param partId 부품 ID
  * @param quantityChange 수량 변화량 (양수: 증가, 음수: 감소)
+ * @param createdBy 생성자 (재고 레코드 생성 시 필요)
  */
-async function adjustInventoryQuantity(partId: string, quantityChange: number): Promise<void> {
+async function adjustInventoryQuantity(partId: string, quantityChange: number, createdBy: string = 'system'): Promise<void> {
   // 현재 재고 조회
   const inventory = await getInventoryByPartId(partId);
 
   if (!inventory) {
-    throw new Error(`부품 ID ${partId}에 해당하는 재고를 찾을 수 없습니다.`);
+    // 재고 레코드가 없으면 새로 생성
+    if (quantityChange < 0) {
+      throw new Error(createErrorCode('INVENTORY_NOT_FOUND_FOR_INBOUND'));
+    }
+
+    // 새 재고 레코드 생성
+    await createInventory({
+      part_id: partId,
+      current_quantity: quantityChange,
+      location: 'main',
+      updated_by: createdBy,
+    });
+    return;
   }
 
   // 재고 수량 계산
   const newQuantity = inventory.current_quantity + quantityChange;
 
   if (newQuantity < 0) {
-    throw new Error(`재고 수량이 부족합니다. 현재 재고: ${inventory.current_quantity}, 필요 수량: ${Math.abs(quantityChange)}`);
+    throw new Error(createErrorCode('INSUFFICIENT_STOCK', {
+      current: inventory.current_quantity,
+      required: Math.abs(quantityChange),
+    }));
   }
 
   // 재고 업데이트
@@ -251,9 +268,9 @@ export async function createInbound(
 
   const inboundData = data as Inbound;
 
-  // 2. 재고에 입고 수량 추가
+  // 2. 재고에 입고 수량 추가 (재고 레코드가 없으면 자동 생성)
   try {
-    await adjustInventoryQuantity(inbound.part_id, inbound.quantity);
+    await adjustInventoryQuantity(inbound.part_id, inbound.quantity, inbound.created_by || 'system');
   } catch (inventoryError) {
     // 재고 추가 실패 시 입고 레코드 삭제 (롤백)
     await supabase.from('inbound').delete().eq('inbound_id', inboundData.inbound_id);
