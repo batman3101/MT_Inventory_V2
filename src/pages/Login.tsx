@@ -117,7 +117,7 @@ const Login = () => {
         </Form>
 
         <div className="text-center text-sm text-gray-500 mt-4">
-          <p>© 2025 CNC Inventory Management System</p>
+          <p>@2025 ALMUS TECH CNC</p>
         </div>
       </Card>
     </div>

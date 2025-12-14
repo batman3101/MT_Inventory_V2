@@ -127,8 +127,28 @@ const Sidebar = () => {
           borderTop: '1px solid rgba(255, 255, 255, 0.1)',
         }}
       >
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
-          <img src={WorkerImage} alt="Worker" style={{ width: '80%', height: 'auto', borderRadius: 8 }} />
+        <div 
+          style={{ 
+            marginBottom: 16, 
+            display: 'flex', 
+            justifyContent: 'center',
+            maxHeight: '120px',
+            overflow: 'hidden',
+          }}
+        >
+          <img 
+            src={WorkerImage} 
+            alt="Worker" 
+            className="sidebar-worker-image"
+            style={{ 
+              width: '80%', 
+              maxWidth: '100%',
+              height: 'auto', 
+              maxHeight: '120px',
+              objectFit: 'contain',
+              borderRadius: 8 
+            }} 
+          />
         </div>
         {user && (
           <div style={{ marginBottom: 12, color: '#fff', fontSize: 12, textAlign: 'center' }}>

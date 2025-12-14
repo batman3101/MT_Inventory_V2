@@ -42,3 +42,16 @@ body {
   background-color: #1890ff;
   opacity: 0.5;
 }
+
+/* 사이드바 이미지 반응형 처리 */
+@media (max-width: 768px) {
+  .sidebar-worker-image {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar-worker-image {
+    max-height: 100px !important;
+  }
+}
