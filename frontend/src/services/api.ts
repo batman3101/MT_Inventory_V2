@@ -1,11 +1,24 @@
 import { supabase } from '../utils/supabase';
 import { handleSupabaseError } from '../utils/supabase';
 
+// FastAPI 백엔드 URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 // 에러 처리 헬퍼 함수
 const handleError = (error: any, defaultMessage: string = '오류가 발생했습니다.'): Error => {
   console.error(error);
   return new Error(handleSupabaseError(error) || defaultMessage);
 };
+
+// FastAPI 에러 처리 헬퍼
+const handleApiError = (error: any, defaultMessage: string = '오류가 발생했습니다.'): Error => {
+  console.error(error);
+  if (error.detail) {
+    return new Error(error.detail);
+  }
+  return new Error(defaultMessage);
+};
+
 import type { Part, Supplier, PartPrice, Inbound } from '../utils/supabase';
 
 // Parts API
@@ -417,99 +430,116 @@ export const inboundApi = {
 
 // Part Prices API
 export const partPricesApi = {
-  // 부품 가격 목록 조회
-  async getAll(page = 1, limit = 10, partId?: string) {
+  // 부품 가격 목록 조회 (특정 부품의 가격 이력)
+  async getByPartId(partId: number) {
     try {
-      let query = supabase.from('partPrices')
-        .select(`
-          *,
-          parts!inner(part_code, vietnamese_name, korean_name),
-          suppliers!inner(supplier_name, supplier_code)
-        `);
-      
-      if (partId) {
-        query = query.eq('part_id', partId);
+      const response = await fetch(`${API_BASE_URL}/api/part_price/by-part/${partId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw handleApiError(error, '부품 가격 목록을 불러오는데 실패했습니다.');
       }
-      
-      const { data, error, count } = await query
-        .range((page - 1) * limit, page * limit - 1)
-        .order('effective_from', { ascending: false });
-      
-      if (error) throw error;
-      
-      return {
-        data: data || [],
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit)
-      };
-    } catch (error) {
-      throw handleError(error, '부품 가격 목록을 불러오는데 실패했습니다.');
-    }
-  },
 
-  // 부품 가격 생성
-  async create(partPrice: Omit<PartPrice, 'id' | 'created_at' | 'updated_at'>) {
-    try {
-      const { data, error } = await supabase.from('partPrices')
-        .insert(partPrice)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
+      return await response.json();
     } catch (error) {
-      throw handleError(error, '부품 가격 생성에 실패했습니다.');
-    }
-  },
-
-  // 부품 가격 업데이트
-  async update(id: string, updates: Partial<PartPrice>) {
-    try {
-      const { data, error } = await supabase.from('partPrices')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      throw handleError(error, '부품 가격 업데이트에 실패했습니다.');
-    }
-  },
-
-  // 부품 가격 삭제
-  async delete(id: string) {
-    try {
-      const { error } = await supabase.from('partPrices').delete().eq('id', id);
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      throw handleError(error, '부품 가격 삭제에 실패했습니다.');
+      throw handleApiError(error, '부품 가격 목록을 불러오는데 실패했습니다.');
     }
   },
 
   // 현재 유효한 부품 가격 조회
-  async getCurrentPrice(partId: string, supplierId: string) {
+  async getCurrentPrices(partId?: number) {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      
-      const { data, error } = await supabase.from('partPrices')
-        .select('*')
-        .eq('part_id', partId)
-        .eq('supplier_id', supplierId)
-        .lte('effective_from', today)
-        .or(`effective_to.is.null,effective_to.gte.${today}`)
-        .order('effective_from', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
-      return data;
+      const params = new URLSearchParams();
+      if (partId) params.append('part_id', partId.toString());
+
+      const response = await fetch(`${API_BASE_URL}/api/part_price/current?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw handleApiError(error, '현재 부품 가격을 불러오는데 실패했습니다.');
+      }
+
+      return await response.json();
     } catch (error) {
-      throw handleError(error, '현재 부품 가격을 불러오는데 실패했습니다.');
+      throw handleApiError(error, '현재 부품 가격을 불러오는데 실패했습니다.');
+    }
+  },
+
+  // 부품 가격 생성
+  async create(partPrice: any) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/part_price/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+        body: JSON.stringify(partPrice),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw handleApiError(error, '부품 가격 생성에 실패했습니다.');
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw handleApiError(error, '부품 가격 생성에 실패했습니다.');
+    }
+  },
+
+  // 부품 가격 업데이트
+  async update(id: number, updates: any) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/part_price/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw handleApiError(error, '부품 가격 업데이트에 실패했습니다.');
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw handleApiError(error, '부품 가격 업데이트에 실패했습니다.');
+    }
+  },
+
+  // 부품 가격 삭제
+  async delete(id: number, force: boolean = false) {
+    try {
+      const params = new URLSearchParams();
+      if (force) params.append('force', 'true');
+
+      const response = await fetch(`${API_BASE_URL}/api/part_price/${id}?${params}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw handleApiError(error, '부품 가격 삭제에 실패했습니다.');
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw handleApiError(error, '부품 가격 삭제에 실패했습니다.');
     }
   }
 };

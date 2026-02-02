@@ -42,7 +42,9 @@ import {
   Avatar,
   Badge,
   LinearProgress,
-  TableSortLabel
+  TableSortLabel,
+  Checkbox,
+  FormControlLabel
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -122,12 +124,35 @@ interface PartWithInventory extends Part {
 }
 
 interface PartPrice {
-  supplier_id: string;
-  supplier_name: string;
-  unit_price: number;
+  id: number;
+  part_id: number;
+  price: number;
   currency: string;
+  price_type: string; // 'purchase', 'sale', 'standard', 'average'
+  supplier_name: string;
+  quantity_break: number;
   effective_date: string;
-  is_current: boolean;
+  expiry_date?: string;
+  source?: string;
+  reference_document?: string;
+  notes?: string;
+  is_active: boolean;
+  is_current?: boolean;
+  days_until_expiry?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+interface PartPriceFormData {
+  supplier_name: string;
+  price: number;
+  currency: string;
+  price_type: string;
+  quantity_break: number;
+  effective_date: string;
+  expiry_date: string;
+  reference_document: string;
+  notes: string;
 }
 
 interface StockMovement {
@@ -167,6 +192,24 @@ const PartsPage: React.FC = () => {
   const [stockStatusFilter, setStockStatusFilter] = useState<string>('all');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  // 가격 관리 state
+  const [priceDialogOpen, setPriceDialogOpen] = useState(false);
+  const [priceDialogMode, setPriceDialogMode] = useState<'add' | 'edit'>('add');
+  const [selectedPrice, setSelectedPrice] = useState<PartPrice | null>(null);
+  const [deletePriceDialogOpen, setDeletePriceDialogOpen] = useState(false);
+  const [priceFormData, setPriceFormData] = useState<PartPriceFormData>({
+    supplier_name: '',
+    price: 0,
+    currency: 'KRW',
+    price_type: 'purchase',
+    quantity_break: 1,
+    effective_date: new Date().toISOString().split('T')[0],
+    expiry_date: '',
+    reference_document: '',
+    notes: ''
+  });
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -249,12 +292,13 @@ const PartsPage: React.FC = () => {
     }
   };
 
-  const loadPartPrices = async (partId: string) => {
+  const loadPartPrices = async (partId: number) => {
     try {
-      const response = await partPricesApi.getAll(1, 100, partId);
-      setPartPrices(response.data || []);
+      const prices = await partPricesApi.getByPartId(partId);
+      setPartPrices(prices || []);
     } catch (error) {
       console.error('부품 가격 정보 로드 실패:', error);
+      setPartPrices([]);
     }
   };
 
@@ -374,7 +418,7 @@ const PartsPage: React.FC = () => {
 
     try {
       setLoading(true);
-      
+
       await partsApi.delete(selectedPart.id);
 
       setSnackbar({
@@ -382,7 +426,7 @@ const PartsPage: React.FC = () => {
         message: '부품이 성공적으로 삭제되었습니다.',
         severity: 'success'
       });
-      
+
       setDeleteDialogOpen(false);
       setSelectedPart(null);
       await loadParts();
@@ -392,6 +436,135 @@ const PartsPage: React.FC = () => {
       setSnackbar({
         open: true,
         message: '부품 삭제에 실패했습니다.',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 가격 관리 함수들
+  const handleAddPrice = () => {
+    setPriceDialogMode('add');
+    setPriceFormData({
+      supplier_name: '',
+      price: 0,
+      currency: 'KRW',
+      price_type: 'purchase',
+      quantity_break: 1,
+      effective_date: new Date().toISOString().split('T')[0],
+      expiry_date: '',
+      reference_document: '',
+      notes: ''
+    });
+    setPriceDialogOpen(true);
+  };
+
+  const handleEditPrice = (price: PartPrice) => {
+    setPriceDialogMode('edit');
+    setSelectedPrice(price);
+    setPriceFormData({
+      supplier_name: price.supplier_name,
+      price: price.price,
+      currency: price.currency,
+      price_type: price.price_type,
+      quantity_break: price.quantity_break,
+      effective_date: price.effective_date.split('T')[0],
+      expiry_date: price.expiry_date ? price.expiry_date.split('T')[0] : '',
+      reference_document: price.reference_document || '',
+      notes: price.notes || ''
+    });
+    setPriceDialogOpen(true);
+  };
+
+  const handleSavePrice = async () => {
+    if (!selectedPart) return;
+
+    // 폼 검증
+    if (!priceFormData.supplier_name || priceFormData.price <= 0) {
+      setSnackbar({
+        open: true,
+        message: '공급업체와 단가를 입력해주세요.',
+        severity: 'error'
+      });
+      return;
+    }
+
+    if (priceFormData.expiry_date && priceFormData.effective_date >= priceFormData.expiry_date) {
+      setSnackbar({
+        open: true,
+        message: '적용 시작일은 만료일보다 이전이어야 합니다.',
+        severity: 'error'
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const priceData = {
+        part_id: selectedPart.id,
+        ...priceFormData,
+        expiry_date: priceFormData.expiry_date || undefined
+      };
+
+      if (priceDialogMode === 'add') {
+        await partPricesApi.create(priceData);
+        setSnackbar({
+          open: true,
+          message: '가격이 추가되었습니다.',
+          severity: 'success'
+        });
+      } else if (selectedPrice) {
+        await partPricesApi.update(selectedPrice.id, priceFormData);
+        setSnackbar({
+          open: true,
+          message: '가격이 수정되었습니다.',
+          severity: 'success'
+        });
+      }
+
+      setPriceDialogOpen(false);
+      await loadPartPrices(selectedPart.id);
+    } catch (error: any) {
+      console.error('가격 저장 실패:', error);
+      setSnackbar({
+        open: true,
+        message: error.message || '가격 저장에 실패했습니다.',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePriceClick = (price: PartPrice) => {
+    setSelectedPrice(price);
+    setDeletePriceDialogOpen(true);
+  };
+
+  const handleDeletePrice = async (force: boolean = false) => {
+    if (!selectedPrice || !selectedPart) return;
+
+    try {
+      setLoading(true);
+
+      const result = await partPricesApi.delete(selectedPrice.id, force);
+
+      setSnackbar({
+        open: true,
+        message: result.message || '가격이 삭제되었습니다.',
+        severity: 'success'
+      });
+
+      setDeletePriceDialogOpen(false);
+      setSelectedPrice(null);
+      await loadPartPrices(selectedPart.id);
+    } catch (error: any) {
+      console.error('가격 삭제 실패:', error);
+      setSnackbar({
+        open: true,
+        message: error.message || '가격 삭제에 실패했습니다.',
         severity: 'error'
       });
     } finally {
@@ -1367,10 +1540,23 @@ const PartsPage: React.FC = () => {
                 onChange={(_, isExpanded) => setDetailsExpanded(isExpanded ? 'prices' : false)}
               >
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <MoneyIcon />
-                    공급업체별 가격 정보 ({partPrices.length}개)
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 2 }}>
+                    <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <MoneyIcon />
+                      공급업체별 가격 정보 ({partPrices.length}개)
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<AddIcon />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddPrice();
+                      }}
+                    >
+                      가격 추가
+                    </Button>
+                  </Box>
                 </AccordionSummary>
                 <AccordionDetails>
                   {partPrices.length > 0 ? (
@@ -1379,30 +1565,69 @@ const PartsPage: React.FC = () => {
                         <TableHead>
                           <TableRow>
                             <TableCell>공급업체</TableCell>
+                            <TableCell>가격유형</TableCell>
                             <TableCell>단가</TableCell>
                             <TableCell>통화</TableCell>
+                            <TableCell>최소수량</TableCell>
                             <TableCell>적용일</TableCell>
-                            <TableCell>현재가격</TableCell>
+                            <TableCell>만료일</TableCell>
+                            <TableCell>상태</TableCell>
+                            <TableCell align="right">액션</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {partPrices.map((price, index) => (
-                            <TableRow key={index}>
+                          {partPrices.map((price) => (
+                            <TableRow
+                              key={price.id}
+                              sx={{
+                                backgroundColor: price.is_current ? 'success.lighter' : 'inherit',
+                                '&:hover': { backgroundColor: price.is_current ? 'success.light' : 'action.hover' }
+                              }}
+                            >
                               <TableCell>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                   <BusinessIcon fontSize="small" />
                                   {price.supplier_name}
                                 </Box>
                               </TableCell>
-                              <TableCell>{price.unit_price.toLocaleString()}</TableCell>
+                              <TableCell>
+                                {price.price_type === 'purchase' ? '구매가' :
+                                 price.price_type === 'sale' ? '판매가' :
+                                 price.price_type === 'standard' ? '표준가' : '평균가'}
+                              </TableCell>
+                              <TableCell>{price.price.toLocaleString()}</TableCell>
                               <TableCell>{price.currency}</TableCell>
+                              <TableCell>{price.quantity_break}</TableCell>
                               <TableCell>{new Date(price.effective_date).toLocaleDateString()}</TableCell>
+                              <TableCell>
+                                {price.expiry_date ? new Date(price.expiry_date).toLocaleDateString() : '-'}
+                              </TableCell>
                               <TableCell>
                                 <Chip
                                   label={price.is_current ? '현재가격' : '이전가격'}
                                   color={price.is_current ? 'success' : 'default'}
                                   size="small"
                                 />
+                                {price.is_active === false && (
+                                  <Chip label="비활성" color="error" size="small" sx={{ ml: 0.5 }} />
+                                )}
+                              </TableCell>
+                              <TableCell align="right">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleEditPrice(price)}
+                                  title="수정"
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDeletePriceClick(price)}
+                                  title="삭제"
+                                  color="error"
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1410,9 +1635,20 @@ const PartsPage: React.FC = () => {
                       </Table>
                     </TableContainer>
                   ) : (
-                    <Alert severity="info">
-                      등록된 가격 정보가 없습니다.
-                    </Alert>
+                    <Box>
+                      <Alert severity="info">
+                        등록된 가격 정보가 없습니다.
+                      </Alert>
+                      <Box sx={{ mt: 2, textAlign: 'center' }}>
+                        <Button
+                          variant="contained"
+                          startIcon={<AddIcon />}
+                          onClick={handleAddPrice}
+                        >
+                          첫 가격 추가하기
+                        </Button>
+                      </Box>
+                    </Box>
                   )}
                 </AccordionDetails>
               </Accordion>
@@ -1544,6 +1780,187 @@ const PartsPage: React.FC = () => {
           <Button color="error" variant="contained" onClick={handleDeletePart} disabled={loading}>
             삭제
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 가격 추가/수정 다이얼로그 */}
+      <Dialog open={priceDialogOpen} onClose={() => setPriceDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {priceDialogMode === 'add' ? '부품 가격 추가' : '부품 가격 수정'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+            {/* 부품 정보 표시 */}
+            {selectedPart && (
+              <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                <Typography variant="body2" color="text.secondary">부품 정보</Typography>
+                <Typography variant="body1">
+                  {selectedPart.part_code} - {selectedPart.vietnamese_name}
+                </Typography>
+              </Box>
+            )}
+
+            <TextField
+              label="공급업체"
+              value={priceFormData.supplier_name}
+              onChange={(e) => setPriceFormData({ ...priceFormData, supplier_name: e.target.value })}
+              required
+              fullWidth
+            />
+
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label="단가"
+                type="number"
+                value={priceFormData.price}
+                onChange={(e) => setPriceFormData({ ...priceFormData, price: parseFloat(e.target.value) || 0 })}
+                required
+                fullWidth
+                InputProps={{ inputProps: { min: 0, step: 0.01 } }}
+              />
+              <FormControl fullWidth required>
+                <InputLabel>통화</InputLabel>
+                <Select
+                  value={priceFormData.currency}
+                  label="통화"
+                  onChange={(e) => setPriceFormData({ ...priceFormData, currency: e.target.value })}
+                >
+                  <MenuItem value="KRW">KRW (원)</MenuItem>
+                  <MenuItem value="USD">USD (달러)</MenuItem>
+                  <MenuItem value="VND">VND (동)</MenuItem>
+                  <MenuItem value="JPY">JPY (엔)</MenuItem>
+                  <MenuItem value="CNY">CNY (위안)</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <FormControl fullWidth required>
+                <InputLabel>가격 유형</InputLabel>
+                <Select
+                  value={priceFormData.price_type}
+                  label="가격 유형"
+                  onChange={(e) => setPriceFormData({ ...priceFormData, price_type: e.target.value })}
+                >
+                  <MenuItem value="purchase">구매가</MenuItem>
+                  <MenuItem value="sale">판매가</MenuItem>
+                  <MenuItem value="standard">표준가</MenuItem>
+                  <MenuItem value="average">평균가</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                label="최소 수량"
+                type="number"
+                value={priceFormData.quantity_break}
+                onChange={(e) => setPriceFormData({ ...priceFormData, quantity_break: parseInt(e.target.value) || 1 })}
+                required
+                fullWidth
+                InputProps={{ inputProps: { min: 1 } }}
+              />
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label="적용 시작일"
+                type="date"
+                value={priceFormData.effective_date}
+                onChange={(e) => setPriceFormData({ ...priceFormData, effective_date: e.target.value })}
+                required
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="만료일 (선택사항)"
+                type="date"
+                value={priceFormData.expiry_date}
+                onChange={(e) => setPriceFormData({ ...priceFormData, expiry_date: e.target.value })}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                helperText="비워두면 무기한"
+              />
+            </Box>
+
+            <TextField
+              label="참조 문서"
+              value={priceFormData.reference_document}
+              onChange={(e) => setPriceFormData({ ...priceFormData, reference_document: e.target.value })}
+              fullWidth
+              placeholder="견적서 번호, 계약서 번호 등"
+            />
+
+            <TextField
+              label="비고"
+              value={priceFormData.notes}
+              onChange={(e) => setPriceFormData({ ...priceFormData, notes: e.target.value })}
+              multiline
+              rows={3}
+              fullWidth
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPriceDialogOpen(false)}>
+            취소
+          </Button>
+          <Button variant="contained" onClick={handleSavePrice} disabled={loading}>
+            {priceDialogMode === 'add' ? '추가' : '저장'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 가격 삭제 확인 다이얼로그 */}
+      <Dialog open={deletePriceDialogOpen} onClose={() => setDeletePriceDialogOpen(false)}>
+        <DialogTitle>
+          가격 삭제 확인
+        </DialogTitle>
+        <DialogContent>
+          {selectedPrice && (
+            <Box>
+              <Typography gutterBottom>
+                다음 가격 정보를 삭제하시겠습니까?
+              </Typography>
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                <Typography variant="body2">• 공급업체: {selectedPrice.supplier_name}</Typography>
+                <Typography variant="body2">• 단가: {selectedPrice.price.toLocaleString()} {selectedPrice.currency}</Typography>
+                <Typography variant="body2">
+                  • 적용 기간: {new Date(selectedPrice.effective_date).toLocaleDateString()} ~
+                  {selectedPrice.expiry_date ? new Date(selectedPrice.expiry_date).toLocaleDateString() : '무기한'}
+                </Typography>
+              </Box>
+              <Alert severity="info" sx={{ mt: 2 }}>
+                {selectedPrice.is_current
+                  ? '현재 유효한 가격은 비활성화됩니다. 완전 삭제하려면 하단 체크박스를 선택하세요.'
+                  : '이 작업은 되돌릴 수 없습니다.'}
+              </Alert>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ flexDirection: 'column', alignItems: 'stretch', gap: 1, p: 2 }}>
+          {selectedPrice?.is_current && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  onChange={(e) => {
+                    // 강제 삭제 체크박스 상태를 저장할 수 있는 state 추가 필요
+                  }}
+                />
+              }
+              label="강제 삭제 (완전 삭제)"
+            />
+          )}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, width: '100%' }}>
+            <Button onClick={() => setDeletePriceDialogOpen(false)}>
+              취소
+            </Button>
+            <Button
+              color="error"
+              variant="contained"
+              onClick={() => handleDeletePrice(false)}
+              disabled={loading}
+            >
+              삭제
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
 
