@@ -1,0 +1,293 @@
+{
+  "timestamp": "2026-02-03T04:39:16.960Z",
+  "reason": "compaction",
+  "status": {
+    "version": "2.0",
+    "lastUpdated": "2026-02-03T04:39:05.678Z",
+    "activeFeatures": [
+      "MT_Inventory_V2",
+      "store"
+    ],
+    "primaryFeature": "MT_Inventory_V2",
+    "features": {
+      "MT_Inventory_V2": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-02-03T03:29:49.411Z",
+          "lastUpdated": "2026-02-03T04:39:05.678Z"
+        },
+        "lastFile": "C:\\Work Drive\\APP\\MT_Inventory_V2\\src\\types\\database.types.ts"
+      },
+      "store": {
+        "phase": "do",
+        "phaseNumber": 3,
+        "matchRate": null,
+        "iterationCount": 0,
+        "requirements": [],
+        "documents": {},
+        "timestamps": {
+          "started": "2026-02-03T03:31:14.211Z",
+          "lastUpdated": "2026-02-03T04:38:55.377Z"
+        },
+        "lastFile": "C:\\Work Drive\\APP\\MT_Inventory_V2\\src\\store\\factory.store.ts"
+      }
+    },
+    "pipeline": {
+      "currentPhase": 1,
+      "level": "Dynamic",
+      "phaseHistory": []
+    },
+    "session": {
+      "startedAt": "2026-02-03T01:56:47.886Z",
+      "onboardingCompleted": false,
+      "lastActivity": "2026-02-03T04:39:05.678Z"
+    },
+    "history": [
+      {
+        "timestamp": "2026-02-03T03:29:49.411Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:29:54.511Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:31:05.455Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:31:14.211Z",
+        "feature": "store",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:31:16.682Z",
+        "feature": "store",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:33:06.893Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:33:22.964Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:33:28.177Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:33:31.053Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:33:32.105Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:33:44.967Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:33:49.015Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:34:04.967Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:34:20.111Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:34:37.590Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:34:50.891Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:37:21.976Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:37:27.948Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:37:34.301Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:37:40.404Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:48:00.978Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:48:18.084Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:48:27.026Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:48:50.724Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:52:47.389Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:53:12.300Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:53:35.539Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:54:04.080Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:54:21.984Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:54:38.510Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:55:02.140Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:55:51.469Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:56:23.010Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T03:56:52.539Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T04:38:10.399Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T04:38:22.969Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T04:38:41.565Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T04:38:55.377Z",
+        "feature": "store",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T04:39:00.867Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      },
+      {
+        "timestamp": "2026-02-03T04:39:05.678Z",
+        "feature": "MT_Inventory_V2",
+        "phase": "do",
+        "action": "updated"
+      }
+    ]
+  }
+}

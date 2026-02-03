@@ -8,6 +8,7 @@ import {
   LineChartOutlined,
 } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase.ts';
+import { getFactoryId } from '@/services/factoryContext';
 import { ResizableTable } from '../components/ResizableTable';
 import dayjs, { Dayjs } from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
@@ -148,6 +149,9 @@ const Analytics = () => {
     setIsLoading(true);
     setError(null);
     try {
+      // Get factory ID
+      const factoryId = getFactoryId();
+
       // 현재 기간 계산
       const now = dayjs();
       let startDate: dayjs.Dayjs;
@@ -197,6 +201,7 @@ const Analytics = () => {
       const { data: inboundData, error: inboundError } = await supabase
         .from('inbound')
         .select('quantity, total_price')
+        .eq('factory_id', factoryId)
         .gte('inbound_date', startDate.format('YYYY-MM-DD'))
         .lte('inbound_date', endDate.format('YYYY-MM-DD'));
 
@@ -206,6 +211,7 @@ const Analytics = () => {
       const { data: outboundData, error: outboundError } = await supabase
         .from('outbound')
         .select('quantity')
+        .eq('factory_id', factoryId)
         .gte('outbound_date', startDate.format('YYYY-MM-DD'))
         .lte('outbound_date', endDate.format('YYYY-MM-DD'));
 
@@ -215,6 +221,7 @@ const Analytics = () => {
       const { data: prevInboundData } = await supabase
         .from('inbound')
         .select('quantity')
+        .eq('factory_id', factoryId)
         .gte('inbound_date', prevStartDate.format('YYYY-MM-DD'))
         .lte('inbound_date', prevEndDate.format('YYYY-MM-DD'));
 
@@ -222,6 +229,7 @@ const Analytics = () => {
       const { data: prevOutboundData } = await supabase
         .from('outbound')
         .select('quantity')
+        .eq('factory_id', factoryId)
         .gte('outbound_date', prevStartDate.format('YYYY-MM-DD'))
         .lte('outbound_date', prevEndDate.format('YYYY-MM-DD'));
 
@@ -244,6 +252,7 @@ const Analytics = () => {
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch analytics';
       setError(errorMessage);
+      console.error('Analytics fetch error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -251,10 +260,14 @@ const Analytics = () => {
 
   const fetchDetailedAnalytics = async (startDate: dayjs.Dayjs, endDate: dayjs.Dayjs) => {
     try {
+      // Get factory ID
+      const factoryId = getFactoryId();
+
       // 입고 상위 부품 (수량 및 금액)
       const { data: inboundPartsData } = await supabase
         .from('inbound')
         .select('part_id, quantity, total_price, unit_price, parts(part_code, part_name), suppliers(supplier_name)')
+        .eq('factory_id', factoryId)
         .gte('inbound_date', startDate.format('YYYY-MM-DD'))
         .lte('inbound_date', endDate.format('YYYY-MM-DD'));
 
@@ -318,6 +331,7 @@ const Analytics = () => {
       const { data: outboundPartsData } = await supabase
         .from('outbound')
         .select('part_id, quantity, parts(part_code, part_name)')
+        .eq('factory_id', factoryId)
         .gte('outbound_date', startDate.format('YYYY-MM-DD'))
         .lte('outbound_date', endDate.format('YYYY-MM-DD'));
 
@@ -345,6 +359,7 @@ const Analytics = () => {
       const { data: categoryInboundData } = await supabase
         .from('inbound')
         .select('quantity, total_price, parts(category)')
+        .eq('factory_id', factoryId)
         .gte('inbound_date', startDate.format('YYYY-MM-DD'))
         .lte('inbound_date', endDate.format('YYYY-MM-DD'));
 
@@ -369,6 +384,7 @@ const Analytics = () => {
       const { data: supplierInboundData } = await supabase
         .from('inbound')
         .select('quantity, total_price, suppliers(supplier_name)')
+        .eq('factory_id', factoryId)
         .gte('inbound_date', startDate.format('YYYY-MM-DD'))
         .lte('inbound_date', endDate.format('YYYY-MM-DD'));
 

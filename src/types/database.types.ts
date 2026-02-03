@@ -6,6 +6,21 @@
  */
 
 // ============================================================================
+// Factories (공장)
+// ============================================================================
+export interface Factory {
+  factory_id: string; // UUID
+  factory_code: string; // 'ALT' | 'ALV'
+  factory_name: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string; // ISO 8601 timestamp
+  updated_at: string; // ISO 8601 timestamp
+}
+
+export type FactoryCode = 'ALT' | 'ALV';
+
+// ============================================================================
 // Parts (부품)
 // ============================================================================
 export interface Part {
@@ -40,6 +55,7 @@ export interface Supplier {
   country: string;
   website: string;
   status: string;
+  factory_id: string; // UUID - factories 테이블과 연결
   created_at: string; // ISO 8601 timestamp
   created_by: string;
   updated_at: string; // ISO 8601 timestamp
@@ -51,6 +67,7 @@ export interface Supplier {
 export interface Inventory {
   inventory_id: string; // UUID
   part_id: string; // UUID - parts 테이블과 연결
+  factory_id: string; // UUID - factories 테이블과 연결
   current_quantity: number;
   last_count_date: string; // ISO 8601 timestamp
   location: string;
@@ -66,6 +83,7 @@ export interface Inbound {
   inbound_date: string; // YYYY-MM-DD 형식
   part_id: string; // UUID - parts 테이블과 연결
   supplier_id: string; // UUID - suppliers 테이블과 연결
+  factory_id: string; // UUID - factories 테이블과 연결
   quantity: number;
   unit_price: number;
   total_price: number;
@@ -87,6 +105,7 @@ export interface Outbound {
   outbound_id: string; // UUID
   outbound_date: string; // YYYY-MM-DD 형식
   part_id: string; // UUID - parts 테이블과 연결
+  factory_id: string; // UUID - factories 테이블과 연결
   quantity: number;
   requester: string;
   department: string | null;
@@ -121,6 +140,7 @@ export interface Department {
 export interface PartPrice {
   price_id: string; // UUID
   part_id: string; // UUID - parts 테이블과 연결
+  factory_id: string; // UUID - factories 테이블과 연결
   unit_price: number;
   currency: string; // '₫', '$', '￥'
   supplier_id: string | null; // UUID - suppliers 테이블과 연결 (nullable)
@@ -144,6 +164,7 @@ export interface User {
   email: string;
   role: string; // 예: 'system_admin', 'user' 등
   department: string | null;
+  factory_id: string | null; // UUID - factories 테이블과 연결 (nullable)
   created_at: string; // ISO 8601 timestamp
   updated_at: string; // ISO 8601 timestamp
   profile_image_url: string | null;
@@ -164,6 +185,11 @@ export interface User {
 export interface Database {
   public: {
     Tables: {
+      factories: {
+        Row: Factory;
+        Insert: Omit<Factory, 'factory_id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Factory, 'factory_id' | 'created_at'>>;
+      };
       parts: {
         Row: Part;
         Insert: Omit<Part, 'part_id' | 'created_at' | 'updated_at'>;

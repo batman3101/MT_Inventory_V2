@@ -4,6 +4,7 @@ import { Card, Input, Button, Space, Typography, Modal, Form, message, InputNumb
 import { EditOutlined, SearchOutlined, WarningOutlined, DownloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useInventoryStore } from '../store';
+import { useFactoryStore } from '../store/factory.store';
 import type { InventoryWithPart } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
 import { ResizableTable } from '../components/ResizableTable';
@@ -26,6 +27,7 @@ const Inventory = () => {
 
   // Zustand 스토어에서 실제 데이터 가져오기
   const { inventory, isLoading, error, stats, fetchInventory, fetchInventoryStats, updateInventory } = useInventoryStore();
+  const { isObserverMode } = useFactoryStore();
 
   // 동적 필터 옵션 생성
   const getCategoryFilters = () => {
@@ -169,7 +171,13 @@ const Inventory = () => {
       width: 100,
       fixed: 'right',
       render: (_, record) => (
-        <Button type="link" size="small" icon={<EditOutlined />} onClick={() => showEditModal(record)}>
+        <Button
+          type="link"
+          size="small"
+          icon={<EditOutlined />}
+          onClick={() => showEditModal(record)}
+          disabled={isObserverMode}
+        >
           {t('common.edit')}
         </Button>
       ),

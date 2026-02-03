@@ -8,6 +8,7 @@ import isBetween from 'dayjs/plugin/isBetween';
 
 dayjs.extend(isBetween);
 import { useInboundStore, usePartsStore, useSuppliersStore } from '../store';
+import { useFactoryStore } from '../store/factory.store';
 import type { Inbound } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
 import { translateError } from '../utils/errorTranslation';
@@ -37,6 +38,7 @@ const Inbound = () => {
   const { inbounds, isLoading, error, stats, fetchInbounds, fetchInboundStats, createInbound, updateInbound, deleteInbound } = useInboundStore();
   const { parts, fetchParts } = usePartsStore();
   const { suppliers, fetchSuppliers } = useSuppliersStore();
+  const { isObserverMode } = useFactoryStore();
 
   // 동적 필터 옵션 생성
   const getSupplierFilters = () => {
@@ -223,10 +225,10 @@ const Inbound = () => {
       fixed: 'right',
       render: (_, record) => (
         <Space>
-          <Button type="link" size="small" onClick={() => showEditModal(record)}>
+          <Button type="link" size="small" onClick={() => showEditModal(record)} disabled={isObserverMode}>
             {t('common.edit')}
           </Button>
-          <Button type="link" size="small" danger onClick={() => handleDelete(record.inbound_id)}>
+          <Button type="link" size="small" danger onClick={() => handleDelete(record.inbound_id)} disabled={isObserverMode}>
             {t('common.delete')}
           </Button>
         </Space>
@@ -298,7 +300,7 @@ const Inbound = () => {
         <Title level={2} style={{ margin: 0 }}>
           {t('inbound.title')}
         </Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal} disabled={isObserverMode}>
           {t('inbound.newInbound')}
         </Button>
       </Space>

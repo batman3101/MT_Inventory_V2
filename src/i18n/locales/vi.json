@@ -374,5 +374,15 @@
     "inboundPrice": "Giá nhập kho",
     "save": "Lưu",
     "cancel": "Hủy"
+  },
+  "factory": {
+    "selectFactory": "Chọn nhà máy",
+    "factory1": "Nhà máy 1 (ALT)",
+    "factory2": "Nhà máy 2 (ALV)",
+    "observerMode": "Chế độ chỉ xem",
+    "viewingOtherFactory": "Đang xem dữ liệu {{factory}} (chỉ đọc)",
+    "observerBanner": "Đang xem dữ liệu nhà máy khác (chỉ đọc)",
+    "allFactories": "Tất cả nhà máy",
+    "notInitialized": "Đang tải thông tin nhà máy..."
   }
 }

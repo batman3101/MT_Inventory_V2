@@ -1,6 +1,7 @@
 import React from 'react';
 import { Layout } from 'antd';
 import Sidebar from './Sidebar';
+import { ObserverModeIndicator } from '../ObserverModeIndicator';
 
 const { Content } = Layout;
 
@@ -16,6 +17,7 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             overflow: 'auto',
           }}
         >
+          <ObserverModeIndicator />
           {children}
         </Content>
       </Layout>

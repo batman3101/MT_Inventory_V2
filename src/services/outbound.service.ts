@@ -7,9 +7,10 @@
 
 import { supabase } from '@/lib/supabase.ts';
 import type { Outbound, OutboundDetail, InsertDto, UpdateDto, Database } from '../types/database.types';
-import { getInventoryByPartId, updateInventory } from './inventory.service';
+import { getInventoryByPartId, getInventoryByPartIdAndFactory, updateInventory } from './inventory.service';
 import { createErrorCode } from '../utils/errorTranslation';
 import dayjs from 'dayjs';
+import { getFactoryId, getFactoryCode } from './factoryContext';
 
 /**
  * 재고 수량 조정 (내부 헬퍼 함수)
@@ -17,8 +18,9 @@ import dayjs from 'dayjs';
  * @param quantityChange 수량 변화량 (양수: 증가, 음수: 감소)
  */
 async function adjustInventoryQuantity(partId: string, quantityChange: number): Promise<void> {
-  // 현재 재고 조회
-  const inventory = await getInventoryByPartId(partId);
+  // 현재 재고 조회 (현재 공장의 재고)
+  const factoryId = getFactoryId();
+  const inventory = await getInventoryByPartIdAndFactory(partId, factoryId);
 
   if (!inventory) {
     // 출고의 경우 재고가 없으면 에러 - 먼저 입고 처리 필요
@@ -60,17 +62,20 @@ interface InboundPriceRow {
 }
 
 /**
- * 참조번호 자동 생성 (형식: OUT-YYYYMMDD-XXX)
+ * 참조번호 자동 생성 (형식: OUT-{FACTORY_CODE}-YYYYMMDD-XXX)
  */
 export async function generateOutboundReferenceNumber(date?: string): Promise<string> {
   const targetDate = date || dayjs().format('YYYY-MM-DD');
   const dateStr = dayjs(targetDate).format('YYYYMMDD');
+  const factoryId = getFactoryId();
+  const factoryCode = getFactoryCode();
 
-  // 해당 날짜의 모든 출고 내역 조회
+  // 해당 날짜와 공장의 모든 출고 내역 조회
   const { data, error } = await supabase
     .from('outbound')
     .select('reference_number')
-    .like('reference_number', `OUT-${dateStr}%`)
+    .eq('factory_id', factoryId)
+    .like('reference_number', `OUT-${factoryCode}-${dateStr}%`)
     .order('reference_number', { ascending: false })
     .limit(1);
 
@@ -83,25 +88,27 @@ export async function generateOutboundReferenceNumber(date?: string): Promise<st
   let counter = 1;
   if (data && data.length > 0 && data[0].reference_number) {
     const lastRef = data[0].reference_number;
-    const lastCounter = parseInt(lastRef.split('-')[2] || '0');
+    const lastCounter = parseInt(lastRef.split('-')[3] || '0');
     counter = lastCounter + 1;
   }
 
   // 3자리 숫자로 포맷
   const counterStr = counter.toString().padStart(3, '0');
-  return `OUT-${dateStr}-${counterStr}`;
+  return `OUT-${factoryCode}-${dateStr}-${counterStr}`;
 }
 
 /**
- * 모든 출고 내역 조회
+ * 모든 출고 내역 조회 (현재 공장의 출고만)
  */
 export async function getAllOutbound(): Promise<Outbound[]> {
+  const factoryId = getFactoryId();
   const { data, error} = await supabase
     .from('outbound')
     .select(`
       *,
       parts!inner(part_code, part_name, unit)
     `)
+    .eq('factory_id', factoryId)
     .order('outbound_date', { ascending: false });
 
   if (error) {
@@ -142,18 +149,20 @@ export async function getOutboundById(outboundId: string): Promise<OutboundDetai
 }
 
 /**
- * 날짜 범위별 출고 조회
+ * 날짜 범위별 출고 조회 (현재 공장의 출고만)
  */
 export async function getOutboundByDateRange(
   startDate: string,
   endDate: string
 ): Promise<Outbound[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('outbound')
     .select(`
       *,
       parts!inner(part_code, part_name, unit)
     `)
+    .eq('factory_id', factoryId)
     .gte('outbound_date', startDate)
     .lte('outbound_date', endDate)
     .order('outbound_date', { ascending: false});
@@ -175,15 +184,17 @@ export async function getOutboundByDateRange(
 }
 
 /**
- * 부품별 출고 내역 조회
+ * 부품별 출고 내역 조회 (현재 공장의 출고만)
  */
 export async function getOutboundByPartId(partId: string): Promise<Outbound[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('outbound')
     .select(`
       *,
       parts!inner(part_code, part_name, unit)
     `)
+    .eq('factory_id', factoryId)
     .eq('part_id', partId)
     .order('outbound_date', { ascending: false });
 
@@ -204,15 +215,17 @@ export async function getOutboundByPartId(partId: string): Promise<Outbound[]> {
 }
 
 /**
- * 부서별 출고 내역 조회
+ * 부서별 출고 내역 조회 (현재 공장의 출고만)
  */
 export async function getOutboundByDepartmentId(departmentId: string): Promise<Outbound[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('outbound')
     .select(`
       *,
       parts!inner(part_code, part_name, unit)
     `)
+    .eq('factory_id', factoryId)
     .eq('department_id', departmentId)
     .order('outbound_date', { ascending: false });
 
@@ -233,15 +246,17 @@ export async function getOutboundByDepartmentId(departmentId: string): Promise<O
 }
 
 /**
- * 요청자별 출고 내역 조회
+ * 요청자별 출고 내역 조회 (현재 공장의 출고만)
  */
 export async function getOutboundByRequester(requester: string): Promise<Outbound[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('outbound')
     .select(`
       *,
       parts!inner(part_code, part_name, unit)
     `)
+    .eq('factory_id', factoryId)
     .eq('requester', requester)
     .order('outbound_date', { ascending: false });
 
@@ -262,15 +277,17 @@ export async function getOutboundByRequester(requester: string): Promise<Outboun
 }
 
 /**
- * 설비별 출고 내역 조회
+ * 설비별 출고 내역 조회 (현재 공장의 출고만)
  */
 export async function getOutboundByEquipment(equipment: string): Promise<Outbound[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('outbound')
     .select(`
       *,
       parts!inner(part_code, part_name, unit)
     `)
+    .eq('factory_id', factoryId)
     .eq('equipment', equipment)
     .order('outbound_date', { ascending: false });
 
@@ -297,10 +314,11 @@ export async function getOutboundByEquipment(equipment: string): Promise<Outboun
 export async function createOutbound(
   outbound: InsertDto<'outbound'>
 ): Promise<Outbound> {
-  // 1. 출고 레코드 생성
+  // 1. 출고 레코드 생성 (factory_id 추가)
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('outbound')
-    .insert(outbound as Database["public"]["Tables"]["outbound"]["Insert"])
+    .insert({ ...outbound, factory_id: factoryId } as Database["public"]["Tables"]["outbound"]["Insert"])
     .select()
     .single();
 
@@ -441,15 +459,17 @@ export async function getOutboundStats(startDate?: string, endDate?: string) {
 }
 
 /**
- * 최근 출고 내역 조회
+ * 최근 출고 내역 조회 (현재 공장의 출고만)
  */
 export async function getRecentOutbound(limit: number = 10): Promise<Outbound[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('outbound')
     .select(`
       *,
       parts!inner(part_code, part_name, unit)
     `)
+    .eq('factory_id', factoryId)
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -470,17 +490,19 @@ export async function getRecentOutbound(limit: number = 10): Promise<Outbound[]>
 }
 
 /**
- * 최근 7일의 출고 금액을 날짜별로 집계
+ * 최근 7일의 출고 금액을 날짜별로 집계 (현재 공장의 출고만)
  * (inbound 테이블의 최근 단가를 사용하여 계산)
  */
 export async function getLast7DaysOutboundAmount(): Promise<{ date: string; amount: number }[]> {
   const endDate = dayjs();
   const startDate = endDate.subtract(6, 'day');
+  const factoryId = getFactoryId();
 
   // 먼저 출고 데이터를 가져옴
   const { data: outboundData, error: outboundError } = await supabase
     .from('outbound')
     .select('outbound_date, quantity, part_id')
+    .eq('factory_id', factoryId)
     .gte('outbound_date', startDate.format('YYYY-MM-DD'))
     .lte('outbound_date', endDate.format('YYYY-MM-DD'));
 
@@ -563,7 +585,7 @@ export async function getLast7DaysOutboundAmount(): Promise<{ date: string; amou
 }
 
 /**
- * 기간별 출고 금액 집계 (최근 입고 단가 기반)
+ * 기간별 출고 금액 집계 (최근 입고 단가 기반) (현재 공장의 출고만)
  */
 export async function getOutboundAmountByPeriod(
   startDate: string,
@@ -571,11 +593,13 @@ export async function getOutboundAmountByPeriod(
 ): Promise<{ date: string; amount: number }[]> {
   const start = dayjs(startDate);
   const end = dayjs(endDate);
+  const factoryId = getFactoryId();
 
   // 먼저 출고 데이터를 가져옴
   const { data: outboundData, error: outboundError } = await supabase
     .from('outbound')
     .select('outbound_date, quantity, part_id')
+    .eq('factory_id', factoryId)
     .gte('outbound_date', start.format('YYYY-MM-DD'))
     .lte('outbound_date', end.format('YYYY-MM-DD'));
 

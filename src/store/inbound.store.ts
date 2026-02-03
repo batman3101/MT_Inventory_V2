@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import type { Inbound, InboundDetail } from '../types/database.types';
 import * as inboundService from '../services/inbound.service';
+import { useFactoryStore } from './factory.store';
 
 interface InboundState {
   // 상태
@@ -187,3 +188,12 @@ export const useInboundStore = create<InboundState>((set, get) => ({
     set({ error: null });
   },
 }));
+
+// Subscribe to factory changes
+useFactoryStore.subscribe(
+  (state) => state.activeFactory?.factory_id,
+  () => {
+    const { fetchInbounds } = useInboundStore.getState();
+    fetchInbounds();
+  }
+);

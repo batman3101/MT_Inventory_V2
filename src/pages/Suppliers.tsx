@@ -4,6 +4,7 @@ import { Card, Input, Button, Space, Typography, Modal, Form, message, Select, S
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useSuppliersStore } from '../store';
+import { useFactoryStore } from '../store/factory.store';
 import type { Supplier } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
 import { ResizableTable } from '../components/ResizableTable';
@@ -26,6 +27,7 @@ const Suppliers = () => {
 
   // Zustand 스토어에서 실제 데이터 가져오기
   const { suppliers, isLoading, error, fetchSuppliers, createSupplier, updateSupplier, deleteSupplier, searchSuppliers } = useSuppliersStore();
+  const { isObserverMode } = useFactoryStore();
 
   // 동적 필터 옵션 생성
   const getCountryFilters = () => {
@@ -189,10 +191,10 @@ const Suppliers = () => {
       fixed: 'right',
       render: (_, record) => (
         <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => showEditModal(record)}>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => showEditModal(record)} disabled={isObserverMode}>
             {t('common.edit')}
           </Button>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.supplier_id)}>
+          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.supplier_id)} disabled={isObserverMode}>
             {t('common.delete')}
           </Button>
         </Space>
@@ -257,7 +259,7 @@ const Suppliers = () => {
               >
                 {t('common.exportExcel')}
               </Button>
-              <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal}>
+              <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal} disabled={isObserverMode}>
                 {t('suppliers.addSupplier')}
               </Button>
             </Space>

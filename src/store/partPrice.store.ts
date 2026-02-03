@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import type { PartPrice, InsertDto, UpdateDto } from '../types/database.types';
 import * as partPriceService from '../services/partPrice.service';
+import { useFactoryStore } from './factory.store';
 
 interface PartPriceState {
   pricesByPart: Record<string, PartPrice[]>;
@@ -102,3 +103,12 @@ export const usePartPriceStore = create<PartPriceState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 }));
+
+// Subscribe to factory changes
+useFactoryStore.subscribe(
+  (state) => state.activeFactory?.factory_id,
+  () => {
+    const { fetchLatestPrices } = usePartPriceStore.getState();
+    fetchLatestPrices();
+  }
+);

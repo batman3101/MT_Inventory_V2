@@ -8,6 +8,7 @@ import isBetween from 'dayjs/plugin/isBetween';
 
 dayjs.extend(isBetween);
 import { useOutboundStore, usePartsStore, useDepartmentsStore } from '../store';
+import { useFactoryStore } from '../store/factory.store';
 import type { Outbound } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
 import { translateError } from '../utils/errorTranslation';
@@ -37,6 +38,7 @@ const Outbound = () => {
   const { outbounds, isLoading, error, stats, fetchOutbounds, fetchOutboundStats, createOutbound, updateOutbound, deleteOutbound } = useOutboundStore();
   const { parts, fetchParts } = usePartsStore();
   const { departments, fetchDepartments } = useDepartmentsStore();
+  const { isObserverMode } = useFactoryStore();
 
   // department_name 보강: department_id가 있는데 department_name이 없는 경우 departments에서 찾아서 채움
   const enrichedOutbounds = outbounds.map(item => {
@@ -248,10 +250,10 @@ const Outbound = () => {
       fixed: 'right',
       render: (_, record) => (
         <Space>
-          <Button type="link" size="small" onClick={() => showEditModal(record)}>
+          <Button type="link" size="small" onClick={() => showEditModal(record)} disabled={isObserverMode}>
             {t('common.edit')}
           </Button>
-          <Button type="link" size="small" danger onClick={() => handleDelete(record.outbound_id)}>
+          <Button type="link" size="small" danger onClick={() => handleDelete(record.outbound_id)} disabled={isObserverMode}>
             {t('common.delete')}
           </Button>
         </Space>
@@ -326,7 +328,7 @@ const Outbound = () => {
         <Title level={2} style={{ margin: 0 }}>
           {t('outbound.title')}
         </Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal} disabled={isObserverMode}>
           {t('outbound.newOutbound')}
         </Button>
       </Space>

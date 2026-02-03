@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import type { Outbound, OutboundDetail } from '../types/database.types';
 import * as outboundService from '../services/outbound.service';
+import { useFactoryStore } from './factory.store';
 
 interface OutboundState {
   // 상태
@@ -187,3 +188,12 @@ export const useOutboundStore = create<OutboundState>((set, get) => ({
     set({ error: null });
   },
 }));
+
+// Subscribe to factory changes
+useFactoryStore.subscribe(
+  (state) => state.activeFactory?.factory_id,
+  () => {
+    const { fetchOutbounds } = useOutboundStore.getState();
+    fetchOutbounds();
+  }
+);

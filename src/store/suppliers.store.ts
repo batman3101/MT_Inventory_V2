@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import type { Supplier } from '../types/database.types';
 import * as suppliersService from '../services/suppliers.service';
+import { useFactoryStore } from './factory.store';
 
 interface SuppliersState {
   // 상태
@@ -148,3 +149,12 @@ export const useSuppliersStore = create<SuppliersState>((set, get) => ({
     set({ error: null });
   },
 }));
+
+// Subscribe to factory changes
+useFactoryStore.subscribe(
+  (state) => state.activeFactory?.factory_id,
+  () => {
+    const { fetchSuppliers } = useSuppliersStore.getState();
+    fetchSuppliers();
+  }
+);

@@ -5,18 +5,21 @@
  */
 
 import { supabase } from '@/lib/supabase.ts';
+import { getFactoryId } from './factoryContext';
 import type { Inventory, InventoryWithPart, InsertDto, UpdateDto, Database } from '../types/database.types';
 
 /**
  * 모든 재고 조회 (부품 정보 포함)
  */
 export async function getAllInventory(): Promise<InventoryWithPart[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('inventory')
     .select(`
       *,
       part:parts(*)
     `)
+    .eq('factory_id', factoryId)
     .order('updated_at', { ascending: false });
 
   if (error) {
@@ -49,13 +52,26 @@ export async function getInventoryById(inventoryId: string): Promise<InventoryWi
 }
 
 /**
- * 부품 ID로 재고 조회
+ * 부품 ID로 재고 조회 (현재 공장 기준)
+ * Use getInventoryByPartIdAndFactory if you need a specific factory.
  */
 export async function getInventoryByPartId(partId: string): Promise<Inventory | null> {
+  return getInventoryByPartIdAndFactory(partId, getFactoryId());
+}
+
+/**
+ * 부품 ID와 공장 ID로 재고 조회 (특정 공장)
+ * Used by inbound/outbound services that need explicit factory context.
+ */
+export async function getInventoryByPartIdAndFactory(
+  partId: string,
+  factoryId: string
+): Promise<Inventory | null> {
   const { data, error } = await supabase
     .from('inventory')
     .select('*')
     .eq('part_id', partId)
+    .eq('factory_id', factoryId)
     .single();
 
   if (error) {
@@ -74,12 +90,14 @@ export async function getInventoryByPartId(partId: string): Promise<Inventory | 
  * 낮은 재고 조회 (현재 수량 < 최소 재고)
  */
 export async function getLowStockItems(): Promise<InventoryWithPart[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('inventory')
     .select(`
       *,
       part:parts(*)
-    `);
+    `)
+    .eq('factory_id', factoryId);
 
   if (error) {
     console.error('재고 조회 에러:', error);
@@ -121,9 +139,10 @@ export async function getInventoryByLocation(location: string): Promise<Inventor
 export async function createInventory(
   inventory: InsertDto<'inventory'>
 ): Promise<Inventory> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('inventory')
-    .insert(inventory as Database["public"]["Tables"]["inventory"]["Insert"])
+    .insert({ ...inventory, factory_id: factoryId } as Database["public"]["Tables"]["inventory"]["Insert"])
     .select()
     .single();
 
@@ -176,12 +195,14 @@ export async function deleteInventory(inventoryId: string): Promise<void> {
  * 재고 총계
  */
 export async function getInventoryStats() {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('inventory')
     .select(`
       *,
       part:parts(*)
-    `);
+    `)
+    .eq('factory_id', factoryId);
 
   if (error) {
     console.error('재고 통계 조회 에러:', error);

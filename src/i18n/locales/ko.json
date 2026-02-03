@@ -374,5 +374,15 @@
     "inboundPrice": "입고단가",
     "save": "저장",
     "cancel": "취소"
+  },
+  "factory": {
+    "selectFactory": "공장 선택",
+    "factory1": "1공장 (ALT)",
+    "factory2": "2공장 (ALV)",
+    "observerMode": "읽기 전용 모드",
+    "viewingOtherFactory": "{{factory}} 데이터를 조회 중입니다 (읽기 전용)",
+    "observerBanner": "다른 공장의 데이터를 조회 중입니다 (읽기 전용)",
+    "allFactories": "전체 공장",
+    "notInitialized": "공장 정보를 불러오는 중..."
   }
 }

@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import type { Inventory, InventoryWithPart } from '../types/database.types';
 import * as inventoryService from '../services/inventory.service';
+import { useFactoryStore } from './factory.store';
 
 interface InventoryState {
   // 상태
@@ -136,3 +137,12 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
     set({ error: null });
   },
 }));
+
+// Subscribe to factory changes
+useFactoryStore.subscribe(
+  (state) => state.activeFactory?.factory_id,
+  () => {
+    const { fetchInventory } = useInventoryStore.getState();
+    fetchInventory();
+  }
+);

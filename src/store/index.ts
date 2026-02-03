@@ -5,6 +5,7 @@
  */
 
 export * from './auth.store';
+export * from './factory.store';
 export * from './parts.store';
 export * from './suppliers.store';
 export * from './departments.store';

@@ -7,7 +7,8 @@
 
 import { supabase } from '@/lib/supabase.ts';
 import type { Inbound, InboundDetail, InsertDto, UpdateDto, Database } from '../types/database.types';
-import { getInventoryByPartId, updateInventory, createInventory } from './inventory.service';
+import { getInventoryByPartIdAndFactory, updateInventory, createInventory } from './inventory.service';
+import { getFactoryId, getFactoryCode } from './factoryContext';
 import { createErrorCode } from '../utils/errorTranslation';
 import dayjs from 'dayjs';
 
@@ -18,8 +19,10 @@ import dayjs from 'dayjs';
  * @param createdBy 생성자 (재고 레코드 생성 시 필요)
  */
 async function adjustInventoryQuantity(partId: string, quantityChange: number, createdBy: string = 'system'): Promise<void> {
-  // 현재 재고 조회
-  const inventory = await getInventoryByPartId(partId);
+  const factoryId = getFactoryId();
+
+  // 현재 재고 조회 (factory-aware)
+  const inventory = await getInventoryByPartIdAndFactory(partId, factoryId);
 
   if (!inventory) {
     // 재고 레코드가 없으면 새로 생성
@@ -33,6 +36,7 @@ async function adjustInventoryQuantity(partId: string, quantityChange: number, c
       current_quantity: quantityChange,
       location: 'main',
       updated_by: createdBy,
+      factory_id: factoryId,
     });
     return;
   }
@@ -66,17 +70,20 @@ interface InboundAmountRow {
 }
 
 /**
- * 참조번호 자동 생성 (형식: IN-YYYYMMDD-XXX)
+ * 참조번호 자동 생성 (형식: IN-{FACTORY_CODE}-YYYYMMDD-XXX)
  */
 export async function generateInboundReferenceNumber(date?: string): Promise<string> {
   const targetDate = date || dayjs().format('YYYY-MM-DD');
   const dateStr = dayjs(targetDate).format('YYYYMMDD');
+  const factoryId = getFactoryId();
+  const factoryCode = getFactoryCode();
 
-  // 해당 날짜의 모든 입고 내역 조회
+  // 해당 날짜 및 공장의 모든 입고 내역 조회
   const { data, error } = await supabase
     .from('inbound')
     .select('reference_number')
-    .like('reference_number', `IN-${dateStr}%`)
+    .eq('factory_id', factoryId)
+    .like('reference_number', `IN-${factoryCode}-${dateStr}%`)
     .order('reference_number', { ascending: false })
     .limit(1);
 
@@ -89,19 +96,22 @@ export async function generateInboundReferenceNumber(date?: string): Promise<str
   let counter = 1;
   if (data && data.length > 0 && data[0].reference_number) {
     const lastRef = data[0].reference_number;
-    const lastCounter = parseInt(lastRef.split('-')[2] || '0');
+    // Parse: IN-ALT-20250518-001 -> parts[3] = '001'
+    const parts = lastRef.split('-');
+    const lastCounter = parseInt(parts[3] || '0');
     counter = lastCounter + 1;
   }
 
   // 3자리 숫자로 포맷
   const counterStr = counter.toString().padStart(3, '0');
-  return `IN-${dateStr}-${counterStr}`;
+  return `IN-${factoryCode}-${dateStr}-${counterStr}`;
 }
 
 /**
  * 모든 입고 내역 조회
  */
 export async function getAllInbound(): Promise<Inbound[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('inbound')
     .select(`
@@ -109,6 +119,7 @@ export async function getAllInbound(): Promise<Inbound[]> {
       parts!inner(part_code, part_name, unit),
       suppliers!inner(supplier_name)
     `)
+    .eq('factory_id', factoryId)
     .order('inbound_date', { ascending: false });
 
   if (error) {
@@ -157,6 +168,7 @@ export async function getInboundByDateRange(
   startDate: string,
   endDate: string
 ): Promise<Inbound[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('inbound')
     .select(`
@@ -164,6 +176,7 @@ export async function getInboundByDateRange(
       parts!inner(part_code, part_name, unit),
       suppliers!inner(supplier_name)
     `)
+    .eq('factory_id', factoryId)
     .gte('inbound_date', startDate)
     .lte('inbound_date', endDate)
     .order('inbound_date', { ascending: false });
@@ -189,6 +202,7 @@ export async function getInboundByDateRange(
  * 부품별 입고 내역 조회
  */
 export async function getInboundByPartId(partId: string): Promise<Inbound[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('inbound')
     .select(`
@@ -196,6 +210,7 @@ export async function getInboundByPartId(partId: string): Promise<Inbound[]> {
       parts!inner(part_code, part_name, unit),
       suppliers!inner(supplier_name)
     `)
+    .eq('factory_id', factoryId)
     .eq('part_id', partId)
     .order('inbound_date', { ascending: false });
 
@@ -220,6 +235,7 @@ export async function getInboundByPartId(partId: string): Promise<Inbound[]> {
  * 공급업체별 입고 내역 조회
  */
 export async function getInboundBySupplierId(supplierId: string): Promise<Inbound[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('inbound')
     .select(`
@@ -227,6 +243,7 @@ export async function getInboundBySupplierId(supplierId: string): Promise<Inboun
       parts!inner(part_code, part_name, unit),
       suppliers!inner(supplier_name)
     `)
+    .eq('factory_id', factoryId)
     .eq('supplier_id', supplierId)
     .order('inbound_date', { ascending: false});
 
@@ -254,10 +271,15 @@ export async function getInboundBySupplierId(supplierId: string): Promise<Inboun
 export async function createInbound(
   inbound: InsertDto<'inbound'>
 ): Promise<Inbound> {
+  const factoryId = getFactoryId();
+
   // 1. 입고 레코드 생성
   const { data, error } = await supabase
     .from('inbound')
-    .insert(inbound as Database["public"]["Tables"]["inbound"]["Insert"])
+    .insert({
+      ...inbound,
+      factory_id: factoryId,
+    } as Database["public"]["Tables"]["inbound"]["Insert"])
     .select()
     .single();
 
@@ -379,7 +401,8 @@ export async function deleteInbound(inboundId: string): Promise<void> {
  * 입고 통계
  */
 export async function getInboundStats(startDate?: string, endDate?: string) {
-  let query = supabase.from('inbound').select('*');
+  const factoryId = getFactoryId();
+  let query = supabase.from('inbound').select('*').eq('factory_id', factoryId);
 
   if (startDate) {
     query = query.gte('inbound_date', startDate);
@@ -410,6 +433,7 @@ export async function getInboundStats(startDate?: string, endDate?: string) {
  * 최근 입고 내역 조회
  */
 export async function getRecentInbound(limit: number = 10): Promise<Inbound[]> {
+  const factoryId = getFactoryId();
   const { data, error } = await supabase
     .from('inbound')
     .select(`
@@ -417,6 +441,7 @@ export async function getRecentInbound(limit: number = 10): Promise<Inbound[]> {
       parts!inner(part_code, part_name, unit),
       suppliers!inner(supplier_name)
     `)
+    .eq('factory_id', factoryId)
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -441,12 +466,14 @@ export async function getRecentInbound(limit: number = 10): Promise<Inbound[]> {
  * 최근 7일의 입고 금액을 날짜별로 집계
  */
 export async function getLast7DaysInboundAmount(): Promise<{ date: string; amount: number }[]> {
+  const factoryId = getFactoryId();
   const endDate = dayjs();
   const startDate = endDate.subtract(6, 'day');
 
   const { data, error } = await supabase
     .from('inbound')
     .select('inbound_date, total_price')
+    .eq('factory_id', factoryId)
     .gte('inbound_date', startDate.format('YYYY-MM-DD'))
     .lte('inbound_date', endDate.format('YYYY-MM-DD'))
     .order('inbound_date', { ascending: true });
@@ -486,12 +513,14 @@ export async function getInboundAmountByPeriod(
   startDate: string,
   endDate: string
 ): Promise<Array<{ date: string; amount: number }>> {
+  const factoryId = getFactoryId();
   const start = dayjs(startDate);
   const end = dayjs(endDate);
 
   const { data, error } = await supabase
     .from('inbound')
     .select('inbound_date, total_price')
+    .eq('factory_id', factoryId)
     .gte('inbound_date', start.format('YYYY-MM-DD'))
     .lte('inbound_date', end.format('YYYY-MM-DD'))
     .order('inbound_date', { ascending: true });

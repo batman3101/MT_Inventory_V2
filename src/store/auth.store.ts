@@ -62,6 +62,16 @@ export const useAuthStore = create<AuthState>()(
             user,
           };
 
+          // CRITICAL: Initialize factory store BEFORE setting isAuthenticated
+          // This prevents race condition where components try to fetch data
+          // before factory context is available
+          const { useFactoryStore } = await import('./factory.store');
+          const factoryStore = useFactoryStore.getState();
+          await factoryStore.initializeForUser(
+            user.factory_id,
+            user.role === 'system_admin'
+          );
+
           set({
             user,
             session,
@@ -86,6 +96,10 @@ export const useAuthStore = create<AuthState>()(
       signOut: async () => {
         set({ isLoading: true, error: null });
         try {
+          // Clear factory store on logout
+          const { useFactoryStore } = await import('./factory.store');
+          useFactoryStore.getState().reset();
+
           // 로컬 상태만 클리어 (서버에 로그아웃 API가 필요하면 나중에 추가)
           set({
             user: null,

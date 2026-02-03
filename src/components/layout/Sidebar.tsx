@@ -13,6 +13,7 @@ import {
   BarChartOutlined,
 } from '@ant-design/icons';
 import LanguageSwitcher from '../LanguageSwitcher';
+import FactorySelector from '../FactorySelector';
 import { useAuthStore } from '../../store';
 import AlmusLogo from '../../../assets/images/ALMUS_SYMBOL.png';
 import WorkerImage from '../../../assets/images/worker2.png';
@@ -165,6 +166,7 @@ const Sidebar = () => {
         >
           {t('auth.logout')}
         </Button>
+        <FactorySelector />
         <LanguageSwitcher />
       </div>
       {contextHolder}
