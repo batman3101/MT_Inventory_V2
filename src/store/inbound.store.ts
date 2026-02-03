@@ -189,11 +189,12 @@ export const useInboundStore = create<InboundState>((set, get) => ({
   },
 }));
 
-// Subscribe to factory changes
+// Subscribe to factory changes (viewingFactory for observer mode, activeFactory as fallback)
 useFactoryStore.subscribe(
-  (state) => state.activeFactory?.factory_id,
+  (state) => state.viewingFactory?.factory_id ?? state.activeFactory?.factory_id,
   () => {
-    const { fetchInbounds } = useInboundStore.getState();
+    const { fetchInbounds, fetchRecentInbounds } = useInboundStore.getState();
     fetchInbounds();
+    fetchRecentInbounds(10);
   }
 );

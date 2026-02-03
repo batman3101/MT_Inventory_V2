@@ -138,11 +138,12 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   },
 }));
 
-// Subscribe to factory changes
+// Subscribe to factory changes (viewingFactory for observer mode, activeFactory as fallback)
 useFactoryStore.subscribe(
-  (state) => state.activeFactory?.factory_id,
+  (state) => state.viewingFactory?.factory_id ?? state.activeFactory?.factory_id,
   () => {
-    const { fetchInventory } = useInventoryStore.getState();
+    const { fetchInventory, fetchInventoryStats } = useInventoryStore.getState();
     fetchInventory();
+    fetchInventoryStats();
   }
 );

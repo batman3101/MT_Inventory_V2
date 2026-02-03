@@ -109,9 +109,9 @@ export const usePartPriceStore = create<PartPriceState>((set, get) => ({
   clearError: () => set({ error: null }),
 }));
 
-// Subscribe to factory changes
+// Subscribe to factory changes (viewingFactory for observer mode, activeFactory as fallback)
 useFactoryStore.subscribe(
-  (state) => state.activeFactory?.factory_id,
+  (state) => state.viewingFactory?.factory_id ?? state.activeFactory?.factory_id,
   () => {
     const { fetchLatestPrices } = usePartPriceStore.getState();
     fetchLatestPrices();

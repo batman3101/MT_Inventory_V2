@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import type { User } from '../types/database.types';
 import * as usersService from '../services/users.service';
+import { useFactoryStore } from './factory.store';
 
 interface UsersState {
   // 상태
@@ -286,3 +287,14 @@ export const useUsersStore = create<UsersState>((set, get) => ({
     }
   },
 }));
+
+// Subscribe to factory changes (viewingFactory for observer mode, activeFactory as fallback)
+useFactoryStore.subscribe(
+  (state) => state.viewingFactory?.factory_id ?? state.activeFactory?.factory_id,
+  () => {
+    const { currentFactoryId, fetchUsersByFactory, fetchUsersStatsByFactory } = useUsersStore.getState();
+    // 현재 공장 컨텍스트 유지하며 갱신
+    fetchUsersByFactory(currentFactoryId);
+    fetchUsersStatsByFactory(currentFactoryId);
+  }
+);
