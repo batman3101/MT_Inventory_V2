@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Modal, Form, message, Select, InputNumber, Spin, Tag, Alert, Row, Col, Statistic, Descriptions, Table, Divider } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { Card, Input, Button, Space, Typography, Modal, Form, message, Select, InputNumber, Spin, Tag, Alert, Row, Col, Statistic, Descriptions, Table, Divider, Popover, DatePicker } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DownloadOutlined, EyeOutlined, DollarOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { usePartsStore } from '../store';
-import type { Part, Inventory, Inbound, Outbound } from '../types/database.types';
+import { usePartsStore, usePartPriceStore, useSuppliersStore } from '../store';
+import type { Part, Inventory, Inbound, Outbound, PartPrice } from '../types/database.types';
+import dayjs from 'dayjs';
 import { exportToExcel } from '../utils/excelExport';
 import { translateError } from '../utils/errorTranslation';
 import { ResizableTable } from '../components/ResizableTable';
@@ -38,6 +39,22 @@ const Parts = () => {
   // Zustand 스토어에서 실제 데이터 가져오기
   const { parts, isLoading, error, stats, fetchParts, fetchPartsStats, createPart, updatePart, updatePartStatus, deletePart, searchParts } = usePartsStore();
 
+  // 단가 스토어
+  const { latestPrices, pricesByPart, fetchLatestPrices, fetchPricesByPartId, createPrice, updatePrice, deletePrice } = usePartPriceStore();
+
+  // 공급사 스토어
+  const { suppliers, fetchSuppliers } = useSuppliersStore();
+
+  // 단가 빠른 편집 Popover 상태
+  const [pricePopoverOpen, setPricePopoverOpen] = useState<string | null>(null);
+  const [quickPriceValue, setQuickPriceValue] = useState<number>(0);
+  const [quickCurrency, setQuickCurrency] = useState<string>('₫');
+
+  // 단가 추가/수정 모달 상태
+  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
+  const [editingPrice, setEditingPrice] = useState<PartPrice | null>(null);
+  const [priceForm] = Form.useForm();
+
   // 동적 필터 옵션 생성
   const getCategoryFilters = () => {
     const categories = [...new Set(parts.map(item => item.category).filter(Boolean))];
@@ -69,6 +86,8 @@ const Parts = () => {
   useEffect(() => {
     fetchParts();
     fetchPartsStats();
+    fetchLatestPrices();
+    fetchSuppliers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -129,6 +148,9 @@ const Parts = () => {
       if (outboundData) {
         setDetailOutbounds(outboundData as Outbound[]);
       }
+
+      // 단가 이력 조회
+      await fetchPricesByPartId(part.part_id);
     } catch (error) {
       console.error('상세 정보 조회 에러:', error);
       messageApi.error(t('common.error'));
@@ -227,6 +249,94 @@ const Parts = () => {
     form.resetFields();
   };
 
+  // 빠른 단가 편집 저장
+  const handleQuickPriceSave = async (partId: string) => {
+    try {
+      await createPrice({
+        part_id: partId,
+        unit_price: quickPriceValue,
+        currency: quickCurrency,
+        effective_from: dayjs().format('YYYY-MM-DD'),
+        created_by: 'current_user',
+        supplier_id: null,
+      });
+      messageApi.success(t('partPrice.priceAdded'));
+      setPricePopoverOpen(null);
+    } catch {
+      messageApi.error(t('common.error'));
+    }
+  };
+
+  // 단가 모달 열기 (추가)
+  const showAddPriceModal = () => {
+    setEditingPrice(null);
+    priceForm.resetFields();
+    priceForm.setFieldsValue({
+      currency: '₫',
+      effective_from: dayjs(),
+    });
+    setIsPriceModalOpen(true);
+  };
+
+  // 단가 모달 열기 (수정)
+  const showEditPriceModal = (price: PartPrice) => {
+    setEditingPrice(price);
+    priceForm.setFieldsValue({
+      unit_price: price.unit_price,
+      currency: price.currency,
+      effective_from: dayjs(price.effective_from),
+      supplier_id: price.supplier_id,
+    });
+    setIsPriceModalOpen(true);
+  };
+
+  // 단가 모달 저장
+  const handlePriceModalOk = async () => {
+    try {
+      const values = await priceForm.validateFields();
+      const priceData = {
+        ...values,
+        effective_from: values.effective_from.format('YYYY-MM-DD'),
+        part_id: detailPart!.part_id,
+        created_by: 'current_user',
+      };
+
+      if (editingPrice) {
+        await updatePrice(editingPrice.price_id, priceData);
+        messageApi.success(t('partPrice.priceUpdated'));
+      } else {
+        await createPrice(priceData);
+        messageApi.success(t('partPrice.priceAdded'));
+      }
+
+      setIsPriceModalOpen(false);
+      priceForm.resetFields();
+      if (detailPart) {
+        fetchPricesByPartId(detailPart.part_id);
+      }
+    } catch {
+      messageApi.error(t('common.error'));
+    }
+  };
+
+  // 단가 삭제
+  const handleDeletePrice = (priceId: string, partId: string) => {
+    Modal.confirm({
+      title: t('partPrice.deleteConfirm'),
+      okText: t('common.yes'),
+      cancelText: t('common.no'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await deletePrice(priceId, partId);
+          messageApi.success(t('partPrice.priceDeleted'));
+        } catch {
+          messageApi.error(t('common.error'));
+        }
+      },
+    });
+  };
+
   const columns: ColumnsType<Part> = [
     {
       title: t('parts.partCode'),
@@ -274,6 +384,68 @@ const Parts = () => {
       width: 100,
       align: 'right',
       sorter: (a, b) => a.min_stock - b.min_stock,
+    },
+    {
+      title: t('partPrice.latestPrice'),
+      key: 'latest_price',
+      width: 150,
+      align: 'right' as const,
+      render: (_: unknown, record: Part) => {
+        const price = latestPrices[record.part_id];
+        if (!price) {
+          return <span style={{ color: '#999' }}>{t('partPrice.noPrice')}</span>;
+        }
+        const isInboundFallback = price.source === 'inbound';
+        return (
+          <Popover
+            trigger="click"
+            open={pricePopoverOpen === record.part_id}
+            onOpenChange={(open) => {
+              if (open) {
+                setQuickPriceValue(price.unit_price);
+                setQuickCurrency(price.currency);
+                setPricePopoverOpen(record.part_id);
+              } else {
+                setPricePopoverOpen(null);
+              }
+            }}
+            content={
+              <Space direction="vertical" size="small" style={{ width: 200 }}>
+                <InputNumber
+                  value={quickPriceValue}
+                  onChange={(v) => setQuickPriceValue(v || 0)}
+                  min={0}
+                  style={{ width: '100%' }}
+                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(value) => Number(value?.replace(/,/g, '') || 0)}
+                />
+                <Select
+                  value={quickCurrency}
+                  onChange={setQuickCurrency}
+                  style={{ width: '100%' }}
+                >
+                  <Option value="₫">₫ (VND)</Option>
+                  <Option value="$">$ (USD)</Option>
+                  <Option value="￥">￥ (CNY)</Option>
+                </Select>
+                <Space>
+                  <Button size="small" type="primary" onClick={() => handleQuickPriceSave(record.part_id)}>
+                    {t('partPrice.save')}
+                  </Button>
+                  <Button size="small" onClick={() => setPricePopoverOpen(null)}>
+                    {t('partPrice.cancel')}
+                  </Button>
+                </Space>
+              </Space>
+            }
+          >
+            <span style={{ cursor: 'pointer', color: isInboundFallback ? '#faad14' : '#1890ff' }}>
+              {price.unit_price.toLocaleString()} {price.currency}
+              {isInboundFallback && <span style={{ fontSize: 10, color: '#999', marginLeft: 4 }}>({t('partPrice.inboundPrice')})</span>}
+            </span>
+          </Popover>
+        );
+      },
     },
     {
       title: t('parts.status'),
@@ -663,6 +835,83 @@ const Parts = () => {
                 </Descriptions.Item>
               </Descriptions>
 
+              {/* 단가 관리 */}
+              <Divider />
+              <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}>
+                <Title level={5} style={{ margin: 0 }}>{t('partPrice.title')}</Title>
+                <Button type="primary" size="small" icon={<PlusOutlined />} onClick={showAddPriceModal}>
+                  {t('partPrice.addPrice')}
+                </Button>
+              </Space>
+
+              {/* 현재 단가 표시 */}
+              {latestPrices[detailPart.part_id] && (
+                <Card size="small" style={{ marginBottom: 12, backgroundColor: '#f6ffed' }}>
+                  <Space>
+                    <DollarOutlined style={{ fontSize: 20, color: '#52c41a' }} />
+                    <span style={{ fontSize: 18, fontWeight: 'bold' }}>
+                      {latestPrices[detailPart.part_id].unit_price.toLocaleString()} {latestPrices[detailPart.part_id].currency}
+                    </span>
+                    <Tag color="green">{t('partPrice.latestPrice')}</Tag>
+                  </Space>
+                </Card>
+              )}
+
+              {/* 단가 이력 테이블 */}
+              <Table
+                dataSource={pricesByPart[detailPart.part_id] || []}
+                rowKey="price_id"
+                size="small"
+                pagination={false}
+                columns={[
+                  {
+                    title: t('partPrice.effectiveDate'),
+                    dataIndex: 'effective_from',
+                    key: 'effective_from',
+                    width: 110,
+                  },
+                  {
+                    title: t('partPrice.unitPrice'),
+                    dataIndex: 'unit_price',
+                    key: 'unit_price',
+                    width: 120,
+                    align: 'right',
+                    render: (value: number, record: PartPrice) =>
+                      `${value.toLocaleString()} ${record.currency}`,
+                  },
+                  {
+                    title: t('partPrice.supplier'),
+                    dataIndex: 'supplier_name',
+                    key: 'supplier_name',
+                    width: 130,
+                    render: (value: string) => value || '-',
+                  },
+                  {
+                    title: t('inventory.actions'),
+                    key: 'actions',
+                    width: 120,
+                    render: (_: unknown, record: PartPrice) => (
+                      <Space>
+                        <Button
+                          type="link"
+                          size="small"
+                          icon={<EditOutlined />}
+                          onClick={() => showEditPriceModal(record)}
+                        />
+                        <Button
+                          type="link"
+                          size="small"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={() => handleDeletePrice(record.price_id, record.part_id)}
+                        />
+                      </Space>
+                    ),
+                  },
+                ]}
+                locale={{ emptyText: t('common.noData') }}
+              />
+
               {/* 최근 입고 내역 */}
               <Divider />
               <Title level={5}>{t('parts.recentInbound')}</Title>
@@ -771,6 +1020,51 @@ const Parts = () => {
             </>
           )}
         </Spin>
+      </Modal>
+      {/* 단가 추가/수정 모달 */}
+      <Modal
+        title={editingPrice ? t('partPrice.editPrice') : t('partPrice.addPrice')}
+        open={isPriceModalOpen}
+        onOk={handlePriceModalOk}
+        onCancel={() => { setIsPriceModalOpen(false); priceForm.resetFields(); }}
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
+        width={500}
+      >
+        <Form form={priceForm} layout="vertical">
+          <Form.Item
+            name="unit_price"
+            label={t('partPrice.unitPrice')}
+            rules={[{ required: true, message: t('common.required') }]}
+          >
+            <InputNumber min={0} style={{ width: '100%' }} formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(value) => Number(value?.replace(/,/g, '') || 0)} />
+          </Form.Item>
+          <Form.Item
+            name="currency"
+            label={t('partPrice.currency')}
+            rules={[{ required: true, message: t('common.required') }]}
+          >
+            <Select>
+              <Option value="₫">₫ (VND)</Option>
+              <Option value="$">$ (USD)</Option>
+              <Option value="￥">￥ (CNY)</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="effective_from"
+            label={t('partPrice.effectiveDate')}
+            rules={[{ required: true, message: t('common.required') }]}
+          >
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="supplier_id" label={t('partPrice.supplier')}>
+            <Select allowClear placeholder={t('partPrice.supplier')}>
+              {(suppliers || []).map((s: any) => (
+                <Option key={s.supplier_id} value={s.supplier_id}>{s.supplier_name}</Option>
+              ))}
+            </Select>
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

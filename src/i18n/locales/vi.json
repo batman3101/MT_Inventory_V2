@@ -352,5 +352,27 @@
     "viewMore": "Xem thêm",
     "unknown": "Không rõ",
     "notAvailable": "-"
+  },
+  "partPrice": {
+    "title": "Quản lý đơn giá",
+    "unitPrice": "Đơn giá",
+    "currency": "Loại tiền",
+    "effectiveDate": "Ngày áp dụng",
+    "supplier": "Nhà cung cấp",
+    "notes": "Ghi chú",
+    "addPrice": "Thêm đơn giá",
+    "editPrice": "Sửa đơn giá",
+    "deletePrice": "Xóa đơn giá",
+    "deleteConfirm": "Bạn có muốn xóa đơn giá này không?",
+    "priceAdded": "Đã thêm đơn giá",
+    "priceUpdated": "Đã cập nhật đơn giá",
+    "priceDeleted": "Đã xóa đơn giá",
+    "noPrice": "Chưa có đơn giá",
+    "priceHistory": "Lịch sử đơn giá",
+    "latestPrice": "Đơn giá mới nhất",
+    "quickEdit": "Chỉnh sửa nhanh",
+    "inboundPrice": "Giá nhập kho",
+    "save": "Lưu",
+    "cancel": "Hủy"
   }
 }

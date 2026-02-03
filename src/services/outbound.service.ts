@@ -499,29 +499,43 @@ export async function getLast7DaysOutboundAmount(): Promise<{ date: string; amou
     return emptyData;
   }
 
-  // 최근 30일의 입고 데이터를 모두 가져와서 부품별 최근 단가를 계산
-  const priceStartDate = endDate.subtract(30, 'day');
-  const { data: recentInbounds } = await supabase
-    .from('inbound')
-    .select('part_id, unit_price, inbound_date')
-    .gte('inbound_date', priceStartDate.format('YYYY-MM-DD'))
-    .order('inbound_date', { ascending: false });
+  // 단가 조회: part_prices 우선, inbound fallback
+  const { data: partPricesData } = await supabase
+    .from('part_prices')
+    .select('part_id, unit_price')
+    .order('effective_from', { ascending: false });
 
-  // 부품별로 가장 최근 단가를 찾아서 Map에 저장
   const priceMap = new Map<string, number>();
-  const typedRecentInbounds = recentInbounds as InboundPriceRow[] | null;
-
-  (outboundData as OutboundAmountRow[]).forEach(outbound => {
-    if (!priceMap.has(outbound.part_id)) {
-      // 이 부품의 최근 입고 단가 찾기
-      const partInbound = typedRecentInbounds?.find(ib => ib.part_id === outbound.part_id);
-      if (partInbound) {
-        priceMap.set(outbound.part_id, partInbound.unit_price || 0);
-      } else {
-        priceMap.set(outbound.part_id, 0);
-      }
+  (partPricesData || []).forEach((pp: { part_id: string; unit_price: number }) => {
+    if (!priceMap.has(pp.part_id)) {
+      priceMap.set(pp.part_id, pp.unit_price);
     }
   });
+
+  // Fallback: part_prices에 없는 부품은 inbound에서 조회
+  const missingPartIds = [...new Set(
+    (outboundData as OutboundAmountRow[])
+      .map(o => o.part_id)
+      .filter(id => !priceMap.has(id))
+  )];
+
+  if (missingPartIds.length > 0) {
+    const priceStartDate = endDate.subtract(30, 'day');
+    const { data: recentInbounds } = await supabase
+      .from('inbound')
+      .select('part_id, unit_price, inbound_date')
+      .in('part_id', missingPartIds)
+      .gte('inbound_date', priceStartDate.format('YYYY-MM-DD'))
+      .order('inbound_date', { ascending: false });
+
+    const typedRecentInbounds = recentInbounds as InboundPriceRow[] | null;
+    missingPartIds.forEach(partId => {
+      const partInbound = typedRecentInbounds?.find(ib => ib.part_id === partId);
+      if (partInbound) {
+        priceMap.set(partId, partInbound.unit_price);
+      }
+    });
+  }
 
   // 날짜별로 금액 집계
   const amountByDate = new Map<string, number>();
@@ -582,29 +596,43 @@ export async function getOutboundAmountByPeriod(
     return emptyData;
   }
 
-  // 최근 30일의 입고 데이터를 모두 가져와서 부품별 최근 단가를 계산
-  const priceStartDate = end.subtract(30, 'day');
-  const { data: recentInbounds } = await supabase
-    .from('inbound')
-    .select('part_id, unit_price, inbound_date')
-    .gte('inbound_date', priceStartDate.format('YYYY-MM-DD'))
-    .order('inbound_date', { ascending: false });
+  // 단가 조회: part_prices 우선, inbound fallback
+  const { data: partPricesData } = await supabase
+    .from('part_prices')
+    .select('part_id, unit_price')
+    .order('effective_from', { ascending: false });
 
-  // 부품별로 가장 최근 단가를 찾아서 Map에 저장
   const priceMap = new Map<string, number>();
-  const typedRecentInbounds = recentInbounds as InboundPriceRow[] | null;
-
-  (outboundData as OutboundAmountRow[]).forEach(outbound => {
-    if (!priceMap.has(outbound.part_id)) {
-      // 이 부품의 최근 입고 단가 찾기
-      const partInbound = typedRecentInbounds?.find(ib => ib.part_id === outbound.part_id);
-      if (partInbound) {
-        priceMap.set(outbound.part_id, partInbound.unit_price || 0);
-      } else {
-        priceMap.set(outbound.part_id, 0);
-      }
+  (partPricesData || []).forEach((pp: { part_id: string; unit_price: number }) => {
+    if (!priceMap.has(pp.part_id)) {
+      priceMap.set(pp.part_id, pp.unit_price);
     }
   });
+
+  // Fallback: part_prices에 없는 부품은 inbound에서 조회
+  const missingPartIds = [...new Set(
+    (outboundData as OutboundAmountRow[])
+      .map(o => o.part_id)
+      .filter(id => !priceMap.has(id))
+  )];
+
+  if (missingPartIds.length > 0) {
+    const priceStartDate = end.subtract(30, 'day');
+    const { data: recentInbounds } = await supabase
+      .from('inbound')
+      .select('part_id, unit_price, inbound_date')
+      .in('part_id', missingPartIds)
+      .gte('inbound_date', priceStartDate.format('YYYY-MM-DD'))
+      .order('inbound_date', { ascending: false });
+
+    const typedRecentInbounds = recentInbounds as InboundPriceRow[] | null;
+    missingPartIds.forEach(partId => {
+      const partInbound = typedRecentInbounds?.find(ib => ib.part_id === partId);
+      if (partInbound) {
+        priceMap.set(partId, partInbound.unit_price);
+      }
+    });
+  }
 
   // 날짜별로 금액 집계
   const amountByDate = new Map<string, number>();

@@ -116,6 +116,25 @@ export interface Department {
 }
 
 // ============================================================================
+// Part Prices (부품 단가)
+// ============================================================================
+export interface PartPrice {
+  price_id: string; // UUID
+  part_id: string; // UUID - parts 테이블과 연결
+  unit_price: number;
+  currency: string; // '₫', '$', '￥'
+  supplier_id: string | null; // UUID - suppliers 테이블과 연결 (nullable)
+  effective_from: string; // YYYY-MM-DD 형식
+  effective_to: string | null; // YYYY-MM-DD 형식
+  is_current: boolean;
+  created_at: string; // ISO 8601 timestamp
+  created_by: string;
+  // Joined data (not in DB, populated by service)
+  supplier_name?: string;
+  source?: 'part_prices' | 'inbound'; // 데이터 출처 구분
+}
+
+// ============================================================================
 // Users (사용자)
 // ============================================================================
 export interface User {
@@ -174,6 +193,11 @@ export interface Database {
         Row: Outbound;
         Insert: Omit<Outbound, 'outbound_id' | 'created_at' | 'reference_number' | 'part_code' | 'part_name' | 'department_name' | 'part_unit'>;
         Update: Partial<Omit<Outbound, 'outbound_id' | 'created_at' | 'reference_number'>>;
+      };
+      part_prices: {
+        Row: PartPrice;
+        Insert: Omit<PartPrice, 'price_id' | 'created_at' | 'supplier_name' | 'source'> & { effective_to?: string | null; is_current?: boolean };
+        Update: Partial<Omit<PartPrice, 'price_id' | 'created_at' | 'supplier_name' | 'source'>>;
       };
       users: {
         Row: User;
