@@ -219,6 +219,7 @@
     "items": "mục",
     "total": "Tổng",
     "noData": "Không có dữ liệu",
+    "unknown": "Không xác định",
     "selectCategory": "Chọn danh mục",
     "selectUnit": "Chọn đơn vị",
     "selectStatus": "Chọn trạng thái",
@@ -301,6 +302,11 @@
     "passwordTooShort": "Mật khẩu phải có ít nhất 6 ký tự",
     "passwordMismatch": "Mật khẩu không khớp",
     "passwordPlaceholder": "Tối thiểu 6 ký tự",
+    "factory": "Nhà máy",
+    "factoryUnassigned": "Chưa chỉ định",
+    "factorySelect": "Chọn nhà máy",
+    "showAllFactories": "Xem tất cả người dùng",
+    "factoryRequired": "Vui lòng chọn nhà máy",
     "roles": {
       "system_admin": "Quản trị viên hệ thống",
       "admin": "Quản trị viên",
@@ -384,5 +390,72 @@
     "observerBanner": "Đang xem dữ liệu nhà máy khác (chỉ đọc)",
     "allFactories": "Tất cả nhà máy",
     "notInitialized": "Đang tải thông tin nhà máy..."
+  },
+  "bulkImport": {
+    "title": "Nhập hàng loạt từ Excel",
+    "downloadTemplate": "Tải mẫu",
+    "uploadFile": "Tải file lên",
+    "dragDropText": "Kéo thả file vào đây hoặc nhấn để chọn",
+    "supportedFormats": "Định dạng hỗ trợ: .xlsx, .xls (tối đa 5MB)",
+    "preview": "Xem trước",
+    "import": "Nhập",
+    "cancel": "Hủy",
+    "importing": "Đang nhập...",
+    "complete": "Hoàn thành",
+    "selectLanguage": "Chọn ngôn ngữ mẫu",
+    "korean": "Tiếng Hàn",
+    "vietnamese": "Tiếng Việt",
+    "summary": {
+      "total": "Tổng số dòng",
+      "valid": "Hợp lệ",
+      "invalid": "Lỗi",
+      "toUpdate": "Cập nhật",
+      "toInsert": "Thêm mới"
+    },
+    "validation": {
+      "valid": "Hợp lệ",
+      "invalid": "Lỗi"
+    },
+    "errors": {
+      "partNotFound": "Mã phụ tùng không tồn tại",
+      "invalidQuantity": "Số lượng phải là số nguyên >= 0",
+      "locationRequired": "Vị trí là bắt buộc",
+      "invalidPrice": "Đơn giá phải lớn hơn 0",
+      "invalidCurrency": "Loại tiền phải là VND, USD hoặc KRW",
+      "invalidDate": "Định dạng ngày không hợp lệ (YYYY-MM-DD)",
+      "supplierNotFound": "Mã nhà cung cấp không tồn tại",
+      "duplicateSupplierCode": "Mã nhà cung cấp bị trùng",
+      "duplicateInFile": "Mã bị trùng trong file",
+      "nameRequired": "Tên là bắt buộc",
+      "contactRequired": "Người liên hệ là bắt buộc",
+      "phoneRequired": "Số điện thoại là bắt buộc",
+      "invalidEmail": "Định dạng email không hợp lệ",
+      "invalidStatus": "Trạng thái phải là ACTIVE hoặc INACTIVE",
+      "countryTooLong": "Tên quốc gia không được vượt quá 50 ký tự",
+      "emptyFile": "File không có dữ liệu",
+      "invalidFormat": "Định dạng file không hợp lệ",
+      "fileTooLarge": "Kích thước file vượt quá 5MB",
+      "importFailed": "Nhập thất bại",
+      "rollbackFailed": "Rollback thất bại. Một số dữ liệu có thể đã được lưu"
+    },
+    "guide": {
+      "sheetName": "Hướng dẫn sử dụng",
+      "fieldName": "Tên trường",
+      "required": "Bắt buộc",
+      "format": "Định dạng",
+      "example": "Ví dụ",
+      "description": "Mô tả",
+      "yes": "Có",
+      "no": "Không"
+    },
+    "success": {
+      "imported": "Đã nhập thành công {{count}} dòng",
+      "updated": "Đã cập nhật {{count}} dòng"
+    },
+    "template": {
+      "inventory": "Mẫu kho",
+      "partPrices": "Mẫu đơn giá",
+      "suppliers": "Mẫu nhà cung cấp"
+    }
   }
 }

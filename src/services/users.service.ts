@@ -121,6 +121,100 @@ export async function searchUsers(searchTerm: string): Promise<User[]> {
 }
 
 /**
+ * 공장별 사용자 조회
+ *
+ * @param factoryId - 공장 ID
+ *   - string: 해당 공장 + factory_id가 null인 사용자
+ *   - null: 전체 사용자 (system_admin "전체 공장 보기" 용)
+ */
+export async function getUsersByFactory(factoryId: string | null): Promise<User[]> {
+  let query = supabase
+    .from('users')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (factoryId) {
+    // 특정 공장: 해당 공장 사용자 + factory_id가 null인 사용자(미배정)
+    query = query.or(`factory_id.eq.${factoryId},factory_id.is.null`);
+  }
+  // factoryId === null: 필터 없이 전체 조회
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('사용자 조회 에러:', error);
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+/**
+ * 공장별 사용자 검색
+ *
+ * 쿼리 구조:
+ * - factoryId가 있으면: (factory_id = X OR factory_id IS NULL) AND (search conditions)
+ * - factoryId가 null이면: (search conditions)
+ *
+ * Supabase .or() 다중 호출 시 AND로 결합됨
+ */
+export async function searchUsersByFactory(
+  searchTerm: string,
+  factoryId: string | null
+): Promise<User[]> {
+  let query = supabase
+    .from('users')
+    .select('*');
+
+  // Step 1: 공장 필터 적용 (있는 경우)
+  if (factoryId) {
+    query = query.or(`factory_id.eq.${factoryId},factory_id.is.null`);
+  }
+
+  // Step 2: 검색 조건 적용 (AND 결합)
+  // 결과: (factory filter) AND (search filter)
+  query = query
+    .or(`username.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%`)
+    .order('created_at', { ascending: false });
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('사용자 검색 에러:', error);
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+/**
+ * 공장별 사용자 통계
+ */
+export async function getUsersStatsByFactory(factoryId: string | null) {
+  let query = supabase.from('users').select('*');
+
+  if (factoryId) {
+    query = query.or(`factory_id.eq.${factoryId},factory_id.is.null`);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('사용자 통계 조회 에러:', error);
+    throw new Error(error.message);
+  }
+
+  const users = data as User[];
+
+  return {
+    totalUsers: users.length,
+    activeUsers: users.filter((u) => u.is_active).length,
+    inactiveUsers: users.filter((u) => !u.is_active).length,
+    roles: [...new Set(users.map((u) => u.role))].length,
+  };
+}
+
+/**
  * 사용자 추가용 인터페이스
  */
 interface CreateUserData {
@@ -136,6 +230,7 @@ interface CreateUserData {
   user_settings?: Record<string, unknown>;
   profile_image_url?: string | null;
   is_active?: boolean;
+  factory_id?: string | null;
 }
 
 /**
@@ -160,6 +255,7 @@ export async function createUser(
       user_settings: user.user_settings || {},
       profile_image_url: user.profile_image_url || null,
       is_active: user.is_active !== undefined ? user.is_active : true,
+      factory_id: user.factory_id || null,
     });
 
     if (response.data && response.data.user) {

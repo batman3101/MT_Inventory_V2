@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { supabase } from '@/lib/supabase.ts';
 import { getFactoryId } from '@/services/factoryContext';
+import { useFactoryStore } from '@/store/factory.store';
 import { ResizableTable } from '../components/ResizableTable';
 import dayjs, { Dayjs } from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
@@ -123,6 +124,8 @@ interface SupplierAccumulator {
  */
 const Analytics = () => {
   const { t } = useTranslation();
+  const { activeFactory, viewingFactory } = useFactoryStore();
+  const effectiveFactoryId = viewingFactory?.factory_id ?? activeFactory?.factory_id;
   const [period, setPeriod] = useState<PeriodType>('monthly');
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
   const [isLoading, setIsLoading] = useState(false);
@@ -140,10 +143,12 @@ const Analytics = () => {
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
   const [supplierData, setSupplierData] = useState<SupplierData[]>([]);
 
+  // 기간 또는 공장 변경 시 데이터 로드
   useEffect(() => {
+    if (!effectiveFactoryId) return;
     fetchAnalytics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, dateRange]);
+  }, [period, dateRange, effectiveFactoryId]);
 
   const fetchAnalytics = async () => {
     setIsLoading(true);

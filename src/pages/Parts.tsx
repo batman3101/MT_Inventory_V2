@@ -1,16 +1,18 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { Card, Input, Button, Space, Typography, Modal, Form, message, Select, InputNumber, Spin, Tag, Alert, Row, Col, Statistic, Descriptions, Table, Divider, Popover, DatePicker } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DownloadOutlined, EyeOutlined, DollarOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DownloadOutlined, EyeOutlined, DollarOutlined, UploadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { usePartsStore, usePartPriceStore, useSuppliersStore } from '../store';
-import type { Part, Inventory, Inbound, Outbound, PartPrice } from '../types/database.types';
+import { useFactoryStore } from '../store/factory.store';
+import type { Part, Inventory, Inbound, Outbound, PartPrice, Supplier } from '../types/database.types';
 import dayjs from 'dayjs';
 import { exportToExcel } from '../utils/excelExport';
 import { translateError } from '../utils/errorTranslation';
 import { ResizableTable } from '../components/ResizableTable';
 import { getInventoryByPartId } from '../services/inventory.service';
 import { supabase } from '../lib/supabase';
+import BulkImportModal from '@/components/BulkImportModal';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -27,6 +29,7 @@ const Parts = () => {
   const [editingItem, setEditingItem] = useState<Part | null>(null);
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
+  const [priceImportModalOpen, setPriceImportModalOpen] = useState(false);
 
   // 상세보기 모달 상태
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -44,6 +47,9 @@ const Parts = () => {
 
   // 공급사 스토어
   const { suppliers, fetchSuppliers } = useSuppliersStore();
+
+  // 공장 스토어 (옵저버 모드 확인용)
+  const { isObserverMode } = useFactoryStore();
 
   // 단가 빠른 편집 Popover 상태
   const [pricePopoverOpen, setPricePopoverOpen] = useState<string | null>(null);
@@ -548,9 +554,18 @@ const Parts = () => {
         <Title level={2} style={{ margin: 0 }}>
           {t('parts.title')}
         </Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal}>
-          {t('parts.addPart')}
-        </Button>
+        <Space>
+          <Button
+            icon={<UploadOutlined />}
+            onClick={() => setPriceImportModalOpen(true)}
+            disabled={isObserverMode}
+          >
+            {t('bulkImport.template.partPrices') || '단가 가져오기'}
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal}>
+            {t('parts.addPart')}
+          </Button>
+        </Space>
       </Space>
 
       <Spin spinning={isLoading}>
@@ -1059,13 +1074,24 @@ const Parts = () => {
           </Form.Item>
           <Form.Item name="supplier_id" label={t('partPrice.supplier')}>
             <Select allowClear placeholder={t('partPrice.supplier')}>
-              {(suppliers || []).map((s: any) => (
+              {(suppliers || []).map((s: Supplier) => (
                 <Option key={s.supplier_id} value={s.supplier_id}>{s.supplier_name}</Option>
               ))}
             </Select>
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* 단가 일괄 가져오기 모달 */}
+      <BulkImportModal
+        open={priceImportModalOpen}
+        onClose={() => setPriceImportModalOpen(false)}
+        importType="partPrices"
+        onSuccess={() => {
+          fetchLatestPrices();
+          setPriceImportModalOpen(false);
+        }}
+      />
     </div>
   );
 };

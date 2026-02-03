@@ -41,6 +41,7 @@ export default async function handler(req, res) {
       user_settings,
       profile_image_url,
       is_active = true,
+      factory_id,
     } = req.body;
 
     console.log('👤 새 사용자 생성 시도:', email);
@@ -124,6 +125,7 @@ export default async function handler(req, res) {
         last_password_change: new Date().toISOString(),
         login_attempt_count: 0,
         account_expiry_date: null,
+        factory_id: factory_id || null,
       })
       .select()
       .single();

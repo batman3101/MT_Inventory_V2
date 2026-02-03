@@ -20,6 +20,8 @@ interface UsersState {
     inactiveUsers: number;
     roles: number;
   } | null;
+  // 현재 조회 중인 공장 ID (CRUD 후 refresh용)
+  currentFactoryId: string | null;
 
   // 액션
   fetchUsers: () => Promise<void>;
@@ -35,6 +37,10 @@ interface UsersState {
   activateAllUsers: () => Promise<void>;
   setSelectedUser: (user: User | null) => void;
   clearError: () => void;
+  // 공장별 필터링 액션
+  fetchUsersByFactory: (factoryId: string | null) => Promise<void>;
+  searchUsersByFactory: (searchTerm: string, factoryId: string | null) => Promise<void>;
+  fetchUsersStatsByFactory: (factoryId: string | null) => Promise<void>;
 }
 
 export const useUsersStore = create<UsersState>((set, get) => ({
@@ -44,6 +50,7 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   error: null,
   selectedUser: null,
   stats: null,
+  currentFactoryId: null,
 
   // 모든 사용자 조회
   fetchUsers: async () => {
@@ -138,9 +145,11 @@ export const useUsersStore = create<UsersState>((set, get) => ({
         ...userData,
         password: (userData as { password?: string }).password || '',
       });
-      // 사용자 목록 및 통계 새로고침
-      await get().fetchUsers();
-      await get().fetchUsersStats();
+      // 현재 공장 컨텍스트로 refresh
+      const currentFactoryId = get().currentFactoryId;
+      const users = await usersService.getUsersByFactory(currentFactoryId);
+      const stats = await usersService.getUsersStatsByFactory(currentFactoryId);
+      set({ users, stats, isLoading: false });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : '사용자 추가 실패',
@@ -162,9 +171,11 @@ export const useUsersStore = create<UsersState>((set, get) => ({
         }
       }
       await usersService.updateUser(userId, updateData);
-      // 사용자 목록 및 통계 새로고침
-      await get().fetchUsers();
-      await get().fetchUsersStats();
+      // 현재 공장 컨텍스트로 refresh
+      const currentFactoryId = get().currentFactoryId;
+      const users = await usersService.getUsersByFactory(currentFactoryId);
+      const stats = await usersService.getUsersStatsByFactory(currentFactoryId);
+      set({ users, stats, isLoading: false });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : '사용자 수정 실패',
@@ -196,9 +207,11 @@ export const useUsersStore = create<UsersState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await usersService.deleteUser(userId);
-      // 사용자 목록 및 통계 새로고침
-      await get().fetchUsers();
-      await get().fetchUsersStats();
+      // 현재 공장 컨텍스트로 refresh
+      const currentFactoryId = get().currentFactoryId;
+      const users = await usersService.getUsersByFactory(currentFactoryId);
+      const stats = await usersService.getUsersStatsByFactory(currentFactoryId);
+      set({ users, stats, isLoading: false });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : '사용자 삭제 실패',
@@ -233,5 +246,43 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   // 에러 초기화
   clearError: () => {
     set({ error: null });
+  },
+
+  // 공장별 사용자 조회
+  fetchUsersByFactory: async (factoryId: string | null) => {
+    set({ isLoading: true, error: null, currentFactoryId: factoryId });
+    try {
+      const users = await usersService.getUsersByFactory(factoryId);
+      set({ users, isLoading: false });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : '사용자 조회 실패',
+        isLoading: false,
+      });
+    }
+  },
+
+  // 공장별 사용자 검색
+  searchUsersByFactory: async (searchTerm: string, factoryId: string | null) => {
+    set({ isLoading: true, error: null, currentFactoryId: factoryId });
+    try {
+      const users = await usersService.searchUsersByFactory(searchTerm, factoryId);
+      set({ users, isLoading: false });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : '사용자 검색 실패',
+        isLoading: false,
+      });
+    }
+  },
+
+  // 공장별 사용자 통계 조회
+  fetchUsersStatsByFactory: async (factoryId: string | null) => {
+    try {
+      const stats = await usersService.getUsersStatsByFactory(factoryId);
+      set({ stats });
+    } catch (error) {
+      console.error('사용자 통계 조회 실패:', error);
+    }
   },
 }));

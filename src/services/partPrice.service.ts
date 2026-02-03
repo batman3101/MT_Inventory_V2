@@ -6,6 +6,13 @@ import type { PartPrice, InsertDto, UpdateDto } from '../types/database.types';
 import { getFactoryId } from './factoryContext';
 
 /**
+ * Supabase response type with suppliers relation
+ */
+interface PartPriceWithSuppliers extends Omit<PartPrice, 'supplier_name'> {
+  suppliers?: { supplier_name: string } | null;
+}
+
+/**
  * 특정 부품의 전체 단가 이력 조회
  */
 export async function getPartPrices(partId: string): Promise<PartPrice[]> {
@@ -25,7 +32,7 @@ export async function getPartPrices(partId: string): Promise<PartPrice[]> {
     throw new Error(error.message);
   }
 
-  return (data || []).map((item: any) => ({
+  return (data || []).map((item: PartPriceWithSuppliers) => ({
     ...item,
     supplier_name: item.suppliers?.supplier_name || '',
     suppliers: undefined,
@@ -58,10 +65,29 @@ export async function getLatestPartPrice(partId: string): Promise<PartPrice | nu
 
   return {
     ...data,
-    supplier_name: (data as any).suppliers?.supplier_name || '',
+    supplier_name: (data as PartPriceWithSuppliers).suppliers?.supplier_name || '',
     suppliers: undefined,
     source: 'part_prices' as const,
   } as PartPrice;
+}
+
+/**
+ * RPC return type for get_latest_part_prices
+ */
+interface PartPriceRpcResult {
+  price_id: string;
+  part_id: string;
+  factory_id: string;
+  unit_price: number | string;
+  currency: string;
+  supplier_id: string | null;
+  effective_from: string;
+  effective_to: string | null;
+  is_current: boolean;
+  created_at: string;
+  created_by: string;
+  supplier_name: string;
+  source: 'part_prices' | 'inbound';
 }
 
 /**
@@ -80,7 +106,7 @@ export async function getLatestPartPrices(): Promise<Record<string, PartPrice>> 
   }
 
   const latestMap: Record<string, PartPrice> = {};
-  (data || []).forEach((item: any) => {
+  (data || []).forEach((item: PartPriceRpcResult) => {
     if (!latestMap[item.part_id]) {
       latestMap[item.part_id] = {
         price_id: item.price_id,
@@ -124,7 +150,7 @@ export async function createPartPrice(data: InsertDto<'part_prices'>): Promise<P
 
   return {
     ...created,
-    supplier_name: (created as any).suppliers?.supplier_name || '',
+    supplier_name: (created as PartPriceWithSuppliers).suppliers?.supplier_name || '',
     suppliers: undefined,
     source: 'part_prices' as const,
   } as PartPrice;
@@ -153,7 +179,7 @@ export async function updatePartPrice(priceId: string, updates: UpdateDto<'part_
 
   return {
     ...updated,
-    supplier_name: (updated as any).suppliers?.supplier_name || '',
+    supplier_name: (updated as PartPriceWithSuppliers).suppliers?.supplier_name || '',
     suppliers: undefined,
     source: 'part_prices' as const,
   } as PartPrice;

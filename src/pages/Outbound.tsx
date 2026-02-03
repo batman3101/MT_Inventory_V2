@@ -38,7 +38,8 @@ const Outbound = () => {
   const { outbounds, isLoading, error, stats, fetchOutbounds, fetchOutboundStats, createOutbound, updateOutbound, deleteOutbound } = useOutboundStore();
   const { parts, fetchParts } = usePartsStore();
   const { departments, fetchDepartments } = useDepartmentsStore();
-  const { isObserverMode } = useFactoryStore();
+  const { isObserverMode, activeFactory, viewingFactory } = useFactoryStore();
+  const effectiveFactoryId = viewingFactory?.factory_id ?? activeFactory?.factory_id;
 
   // department_name 보강: department_id가 있는데 department_name이 없는 경우 departments에서 찾아서 채움
   const enrichedOutbounds = outbounds.map(item => {
@@ -68,14 +69,15 @@ const Outbound = () => {
     return reasons.map(reason => ({ text: reason, value: reason }));
   };
 
-  // 컴포넌트 마운트 시 실제 데이터 로드
+  // 컴포넌트 마운트 또는 공장 변경 시 데이터 로드
   useEffect(() => {
+    if (!effectiveFactoryId) return;
     fetchOutbounds();
     fetchOutboundStats();
     fetchParts();
     fetchDepartments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [effectiveFactoryId]);
 
   const showAddModal = async () => {
     setEditingItem(null);

@@ -122,7 +122,19 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           // persist 미들웨어가 localStorage에서 자동으로 복원
-          // 추가 검증이 필요한 경우 여기에 구현
+          // 세션이 유효하면 factory store 재초기화 (factories 배열은 persist되지 않음)
+          const currentState = useAuthStore.getState();
+          if (currentState.isAuthenticated && currentState.user) {
+            const { useFactoryStore } = await import('./factory.store');
+            const factoryStore = useFactoryStore.getState();
+            // factories 배열이 비어있으면 재초기화
+            if (factoryStore.factories.length === 0) {
+              await factoryStore.initializeForUser(
+                currentState.user.factory_id,
+                currentState.user.role === 'system_admin'
+              );
+            }
+          }
           set({ isLoading: false });
         } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : 'Session check failed';

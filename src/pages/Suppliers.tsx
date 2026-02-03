@@ -1,13 +1,14 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { Card, Input, Button, Space, Typography, Modal, Form, message, Select, Spin, Alert, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useSuppliersStore } from '../store';
 import { useFactoryStore } from '../store/factory.store';
 import type { Supplier } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
 import { ResizableTable } from '../components/ResizableTable';
+import BulkImportModal from '@/components/BulkImportModal';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -21,13 +22,15 @@ const Suppliers = () => {
   const { t } = useTranslation();
   const [searchText, setSearchText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Supplier | null>(null);
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
 
   // Zustand 스토어에서 실제 데이터 가져오기
   const { suppliers, isLoading, error, fetchSuppliers, createSupplier, updateSupplier, deleteSupplier, searchSuppliers } = useSuppliersStore();
-  const { isObserverMode } = useFactoryStore();
+  const { isObserverMode, activeFactory, viewingFactory } = useFactoryStore();
+  const effectiveFactoryId = viewingFactory?.factory_id ?? activeFactory?.factory_id;
 
   // 동적 필터 옵션 생성
   const getCountryFilters = () => {
@@ -35,21 +38,23 @@ const Suppliers = () => {
     return countries.map(country => ({ text: country, value: country }));
   };
 
-  // 컴포넌트 마운트 시 실제 데이터 로드
+  // 컴포넌트 마운트 또는 공장 변경 시 데이터 로드
   useEffect(() => {
+    if (!effectiveFactoryId) return;
     fetchSuppliers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [effectiveFactoryId]);
 
-  // 검색 처리 - searchText 변경 시에만 실행
+  // 검색 처리 - searchText 또는 공장 변경 시 실행
   useEffect(() => {
+    if (!effectiveFactoryId) return;
     if (searchText) {
       searchSuppliers(searchText);
     } else {
       fetchSuppliers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchText]);
+  }, [searchText, effectiveFactoryId]);
 
   const showAddModal = () => {
     setEditingItem(null);
@@ -253,6 +258,13 @@ const Suppliers = () => {
             <Space>
               <span>{t('common.total')}: {suppliers.length} {t('common.items')}</span>
               <Button
+                icon={<UploadOutlined />}
+                onClick={() => setImportModalOpen(true)}
+                disabled={isObserverMode}
+              >
+                {t('bulkImport.title') || 'Excel 가져오기'}
+              </Button>
+              <Button
                 type="default"
                 icon={<DownloadOutlined />}
                 onClick={handleExportExcel}
@@ -278,6 +290,16 @@ const Suppliers = () => {
           />
         </Card>
       </Spin>
+
+      <BulkImportModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        importType="suppliers"
+        onSuccess={() => {
+          fetchSuppliers();
+          setImportModalOpen(false);
+        }}
+      />
 
       <Modal
         title={editingItem ? t('suppliers.editSupplier') : t('suppliers.addSupplier')}

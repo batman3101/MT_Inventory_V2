@@ -10,6 +10,7 @@ import {
   ArrowDownOutlined
 } from '@ant-design/icons';
 import { useInventoryStore, useSuppliersStore, useInboundStore, useOutboundStore } from '../store';
+import { useFactoryStore } from '../store/factory.store';
 import dayjs, { Dayjs } from 'dayjs';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getLast7DaysInboundAmount, getInboundAmountByPeriod } from '../services/inbound.service';
@@ -33,6 +34,10 @@ const Dashboard = () => {
   const { recentInbounds, fetchRecentInbounds, isLoading: inboundLoading } = useInboundStore();
   const { recentOutbounds, fetchRecentOutbounds, isLoading: outboundLoading } = useOutboundStore();
 
+  // Factory 상태 - 공장 변경 시 데이터 갱신을 위해 사용
+  const { activeFactory, viewingFactory } = useFactoryStore();
+  const effectiveFactoryId = viewingFactory?.factory_id ?? activeFactory?.factory_id;
+
   // 차트 데이터 상태
   const [chartData, setChartData] = useState<Array<{
     date: string;
@@ -45,20 +50,22 @@ const Dashboard = () => {
   const [periodType, setPeriodType] = useState<'7days' | 'month' | 'custom'>('7days');
   const [customDateRange, setCustomDateRange] = useState<[Dayjs, Dayjs] | null>(null);
 
-  // 컴포넌트 마운트 시 실제 데이터 로드
+  // 컴포넌트 마운트 시 또는 공장 변경 시 데이터 로드
   useEffect(() => {
+    if (!effectiveFactoryId) return;
     fetchInventoryStats();
     fetchSuppliers();
     fetchRecentInbounds(5);
     fetchRecentOutbounds(5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [effectiveFactoryId]);
 
-  // 기간 선택이 변경될 때마다 차트 데이터 로드
+  // 기간 선택 또는 공장 변경될 때마다 차트 데이터 로드
   useEffect(() => {
+    if (!effectiveFactoryId) return;
     loadChartData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodType, customDateRange]);
+  }, [periodType, customDateRange, effectiveFactoryId]);
 
   // 차트 데이터 로드
   const loadChartData = async () => {

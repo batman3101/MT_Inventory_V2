@@ -38,7 +38,8 @@ const Inbound = () => {
   const { inbounds, isLoading, error, stats, fetchInbounds, fetchInboundStats, createInbound, updateInbound, deleteInbound } = useInboundStore();
   const { parts, fetchParts } = usePartsStore();
   const { suppliers, fetchSuppliers } = useSuppliersStore();
-  const { isObserverMode } = useFactoryStore();
+  const { isObserverMode, activeFactory, viewingFactory } = useFactoryStore();
+  const effectiveFactoryId = viewingFactory?.factory_id ?? activeFactory?.factory_id;
 
   // 동적 필터 옵션 생성
   const getSupplierFilters = () => {
@@ -51,14 +52,15 @@ const Inbound = () => {
     return partCodes.map(code => ({ text: code, value: code }));
   };
 
-  // 컴포넌트 마운트 시 실제 데이터 로드
+  // 컴포넌트 마운트 또는 공장 변경 시 데이터 로드
   useEffect(() => {
+    if (!effectiveFactoryId) return;
     fetchInbounds();
     fetchInboundStats();
     fetchParts();
     fetchSuppliers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [effectiveFactoryId]);
 
   const showAddModal = async () => {
     setEditingItem(null);

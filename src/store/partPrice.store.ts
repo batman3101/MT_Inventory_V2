@@ -34,9 +34,10 @@ export const usePartPriceStore = create<PartPriceState>((set, get) => ({
         pricesByPart: { ...state.pricesByPart, [partId]: prices },
         isLoading: false,
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '알 수 없는 에러';
       console.error('단가 이력 조회 실패:', error);
-      set({ error: error.message, isLoading: false });
+      set({ error: message, isLoading: false });
     }
   },
 
@@ -45,9 +46,10 @@ export const usePartPriceStore = create<PartPriceState>((set, get) => ({
     try {
       const latestPrices = await partPriceService.getLatestPartPrices();
       set({ latestPrices, isLoading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '알 수 없는 에러';
       console.error('최신 단가 조회 실패:', error);
-      set({ error: error.message, isLoading: false });
+      set({ error: message, isLoading: false });
     }
   },
 
@@ -64,9 +66,10 @@ export const usePartPriceStore = create<PartPriceState>((set, get) => ({
         },
         isLoading: false,
       }));
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '알 수 없는 에러';
       console.error('단가 추가 실패:', error);
-      set({ error: error.message, isLoading: false });
+      set({ error: message, isLoading: false });
       throw error;
     }
   },
@@ -79,9 +82,10 @@ export const usePartPriceStore = create<PartPriceState>((set, get) => ({
       await get().fetchPricesByPartId(updated.part_id);
       await get().fetchLatestPrices();
       set({ isLoading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '알 수 없는 에러';
       console.error('단가 수정 실패:', error);
-      set({ error: error.message, isLoading: false });
+      set({ error: message, isLoading: false });
       throw error;
     }
   },
@@ -94,9 +98,10 @@ export const usePartPriceStore = create<PartPriceState>((set, get) => ({
       await get().fetchPricesByPartId(partId);
       await get().fetchLatestPrices();
       set({ isLoading: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '알 수 없는 에러';
       console.error('단가 삭제 실패:', error);
-      set({ error: error.message, isLoading: false });
+      set({ error: message, isLoading: false });
       throw error;
     }
   },

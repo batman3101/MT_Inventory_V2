@@ -122,7 +122,7 @@ export function translateError(errorMessage: string, params?: ErrorParams): stri
  * 에러 코드를 생성합니다 (서비스에서 사용)
  */
 export function createErrorCode(code: keyof typeof ERROR_CODES, params?: ErrorParams): string {
-  let errorCode = ERROR_CODES[code];
+  const errorCode = ERROR_CODES[code];
   if (params) {
     if (code === 'INSUFFICIENT_STOCK' && params.current !== undefined && params.required !== undefined) {
       return `${errorCode}:${params.current}:${params.required}`;

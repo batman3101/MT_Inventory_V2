@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Tag, Spin, Alert, Row, Col, Statistic, Modal, Form, Select, message, Result } from 'antd';
+import { Card, Input, Button, Space, Typography, Tag, Spin, Alert, Row, Col, Statistic, Modal, Form, Select, message, Result, Checkbox } from 'antd';
 import { PlusOutlined, SearchOutlined, UserOutlined, LockOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { ResizableTable } from '../components/ResizableTable';
 import dayjs from 'dayjs';
 import { useUsersStore, useDepartmentsStore, useAuthStore } from '../store';
+import { useFactoryStore } from '../store/factory.store';
 import type { User } from '../types/database.types';
 
 const { Title } = Typography;
@@ -31,16 +32,32 @@ const Users = () => {
   const hasAdminAccess = currentUser?.role && ['system_admin', 'admin', 'manager'].includes(currentUser.role);
 
   // Zustand 스토어에서 실제 데이터 가져오기
-  const { users, isLoading, error, stats, fetchUsers, fetchUsersStats, createUser, updateUser, updateUserStatus, deleteUser, activateAllUsers } = useUsersStore();
+  const {
+    users, isLoading, error, stats,
+    fetchUsersByFactory, searchUsersByFactory, fetchUsersStatsByFactory,
+    createUser, updateUser, updateUserStatus, deleteUser, activateAllUsers
+  } = useUsersStore();
   const { departments, fetchDepartments } = useDepartmentsStore();
+  const { factories, activeFactory, viewingFactory } = useFactoryStore();
 
-  // 컴포넌트 마운트 시 실제 데이터 로드
+  // 공장 및 권한 관련 변수
+  const effectiveFactoryId = viewingFactory?.factory_id ?? activeFactory?.factory_id ?? null;
+  const isSystemAdmin = currentUser?.role === 'system_admin';
+  const [showAllFactories, setShowAllFactories] = useState(false);
+
+  // 공장 변경 시 사용자 데이터 로드
   useEffect(() => {
-    fetchUsers();
-    fetchUsersStats();
+    const targetFactoryId = isSystemAdmin && showAllFactories ? null : effectiveFactoryId;
+
+    if (searchText) {
+      searchUsersByFactory(searchText, targetFactoryId);
+    } else {
+      fetchUsersByFactory(targetFactoryId);
+    }
+    fetchUsersStatsByFactory(targetFactoryId);
     fetchDepartments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [effectiveFactoryId, showAllFactories, isSystemAdmin, searchText]);
 
   const showAddModal = () => {
     setEditingUser(null);
@@ -59,6 +76,7 @@ const Users = () => {
       phone_number: user.phone_number,
       position: user.position,
       is_active: user.is_active,
+      factory_id: user.factory_id,
     });
     setIsModalOpen(true);
   };
@@ -111,17 +129,23 @@ const Users = () => {
     try {
       const values = await form.validateFields();
 
+      // factory_id 처리: 선택하지 않으면 현재 공장 또는 null (system_admin)
+      const userData = {
+        ...values,
+        factory_id: values.factory_id ?? (isSystemAdmin ? null : effectiveFactoryId),
+      };
+
       if (editingUser) {
         // 기존 사용자 수정 (비밀번호 변경 제외)
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { password, confirmPassword, ...updateData } = values;
+        const { password, confirmPassword, ...updateData } = userData;
         await updateUser(editingUser.user_id, updateData);
         messageApi.success(t('users.userUpdated'));
       } else {
         // 새 사용자 추가 - API를 통해 비밀번호 해싱 및 저장
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { confirmPassword, ...userData } = values;
-        await createUser(userData);
+        const { confirmPassword, ...createData } = userData;
+        await createUser(createData);
         messageApi.success(t('users.userAdded'));
       }
 
@@ -196,6 +220,25 @@ const Users = () => {
             {t(`users.roles.${role.toLowerCase()}`) || role}
           </Tag>
         );
+      },
+    },
+    {
+      title: t('users.factory'),
+      dataIndex: 'factory_id',
+      key: 'factory_id',
+      width: 100,
+      render: (factoryId: string | null) => {
+        if (!factoryId) return <Tag>{t('users.factoryUnassigned')}</Tag>;
+        const factory = factories.find(f => f.factory_id === factoryId);
+        return <Tag color="blue">{factory?.factory_code || t('common.unknown')}</Tag>;
+      },
+      filters: [
+        { text: t('users.factoryUnassigned'), value: 'null' },
+        ...factories.map(f => ({ text: f.factory_code, value: f.factory_id }))
+      ],
+      onFilter: (value, record) => {
+        if (value === 'null') return record.factory_id === null;
+        return record.factory_id === value;
       },
     },
     {
@@ -334,14 +377,24 @@ const Users = () => {
 
         <Card>
           <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }}>
-            <Input
-              placeholder={t('common.search')}
-              prefix={<SearchOutlined />}
-              style={{ width: 300 }}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-            />
+            <Space>
+              <Input
+                placeholder={t('common.search')}
+                prefix={<SearchOutlined />}
+                style={{ width: 300 }}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                allowClear
+              />
+              {isSystemAdmin && (
+                <Checkbox
+                  checked={showAllFactories}
+                  onChange={(e) => setShowAllFactories(e.target.checked)}
+                >
+                  {t('users.showAllFactories')}
+                </Checkbox>
+              )}
+            </Space>
             <span>{t('common.total')}: {filteredUsers.length} {t('common.items')}</span>
           </Space>
 
@@ -479,6 +532,23 @@ const Users = () => {
                     {dept.department_code} - {dept.department_name}
                   </Option>
                 ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="factory_id"
+            label={t('users.factory')}
+            rules={[{ required: !isSystemAdmin, message: t('users.factoryRequired') }]}
+          >
+            <Select
+              placeholder={t('users.factorySelect')}
+              allowClear={isSystemAdmin}
+            >
+              {factories.map(factory => (
+                <Option key={factory.factory_id} value={factory.factory_id}>
+                  {factory.factory_code} - {factory.factory_name}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
 

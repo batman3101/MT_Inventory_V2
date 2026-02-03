@@ -7,7 +7,7 @@
 
 import { supabase } from '@/lib/supabase.ts';
 import type { Outbound, OutboundDetail, InsertDto, UpdateDto, Database } from '../types/database.types';
-import { getInventoryByPartId, getInventoryByPartIdAndFactory, updateInventory } from './inventory.service';
+import { getInventoryByPartIdAndFactory, updateInventory } from './inventory.service';
 import { createErrorCode } from '../utils/errorTranslation';
 import dayjs from 'dayjs';
 import { getFactoryId, getFactoryCode } from './factoryContext';

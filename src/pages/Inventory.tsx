@@ -1,13 +1,14 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { Card, Input, Button, Space, Typography, Modal, Form, message, InputNumber, Spin, Tag, Alert, Row, Col, Statistic } from 'antd';
-import { EditOutlined, SearchOutlined, WarningOutlined, DownloadOutlined } from '@ant-design/icons';
+import { EditOutlined, SearchOutlined, WarningOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useInventoryStore } from '../store';
 import { useFactoryStore } from '../store/factory.store';
 import type { InventoryWithPart } from '../types/database.types';
 import { exportToExcel } from '../utils/excelExport';
 import { ResizableTable } from '../components/ResizableTable';
+import BulkImportModal from '@/components/BulkImportModal';
 import dayjs from 'dayjs';
 
 const { Title } = Typography;
@@ -21,13 +22,15 @@ const Inventory = () => {
   const { t } = useTranslation();
   const [searchText, setSearchText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryWithPart | null>(null);
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
 
   // Zustand 스토어에서 실제 데이터 가져오기
   const { inventory, isLoading, error, stats, fetchInventory, fetchInventoryStats, updateInventory } = useInventoryStore();
-  const { isObserverMode } = useFactoryStore();
+  const { isObserverMode, activeFactory, viewingFactory } = useFactoryStore();
+  const effectiveFactoryId = viewingFactory?.factory_id ?? activeFactory?.factory_id;
 
   // 동적 필터 옵션 생성
   const getCategoryFilters = () => {
@@ -45,12 +48,13 @@ const Inventory = () => {
     return locations.map(loc => ({ text: loc, value: loc }));
   };
 
-  // 컴포넌트 마운트 시 실제 데이터 로드
+  // 컴포넌트 마운트 또는 공장 변경 시 데이터 로드
   useEffect(() => {
+    if (!effectiveFactoryId) return;
     fetchInventory();
     fetchInventoryStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [effectiveFactoryId]);
 
   const showEditModal = (item: InventoryWithPart) => {
     setEditingItem(item);
@@ -287,6 +291,13 @@ const Inventory = () => {
             <Space>
               <span>{t('common.total')}: {filteredItems.length} {t('common.items')}</span>
               <Button
+                icon={<UploadOutlined />}
+                onClick={() => setImportModalOpen(true)}
+                disabled={isObserverMode}
+              >
+                {t('bulkImport.title') || 'Excel 가져오기'}
+              </Button>
+              <Button
                 type="default"
                 icon={<DownloadOutlined />}
                 onClick={handleExportExcel}
@@ -351,6 +362,17 @@ const Inventory = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <BulkImportModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        importType="inventory"
+        onSuccess={() => {
+          fetchInventory();
+          fetchInventoryStats();
+          setImportModalOpen(false);
+        }}
+      />
 
       <style>{`
         .low-stock-row {
