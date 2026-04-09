@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Row, Col, Statistic, Modal, Form, message, DatePicker, Select, Spin, Alert, InputNumber, Segmented } from 'antd';
+import { Card, Input, Button, Space, Typography, Row, Col, Statistic, Modal, Form, message, DatePicker, Select, Spin, Alert, InputNumber, Segmented, Tag } from 'antd';
 import { PlusOutlined, SearchOutlined, DownloadOutlined, ClearOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
@@ -203,6 +203,29 @@ const Inbound = () => {
       sorter: (a, b) => (a.part_name || '').localeCompare(b.part_name || ''),
     },
     {
+      title: t('inbound.type'),
+      dataIndex: 'inbound_type',
+      key: 'inbound_type',
+      width: 80,
+      align: 'center',
+      filters: [
+        { text: t('inbound.typePurchase'), value: 'purchase' },
+        { text: t('inbound.typeWarranty'), value: 'warranty' },
+        { text: t('inbound.typePaidRepair'), value: 'paid_repair' },
+      ],
+      onFilter: (value, record) => (record.inbound_type || 'purchase') === value,
+      render: (type: string) => {
+        switch (type) {
+          case 'warranty':
+            return <Tag color="green">{t('inbound.typeWarranty')}</Tag>;
+          case 'paid_repair':
+            return <Tag color="orange">{t('inbound.typePaidRepair')}</Tag>;
+          default:
+            return <Tag color="blue">{t('inbound.typePurchase')}</Tag>;
+        }
+      },
+    },
+    {
       title: t('inbound.quantity'),
       dataIndex: 'quantity',
       key: 'quantity',
@@ -218,7 +241,12 @@ const Inbound = () => {
       width: 120,
       align: 'right',
       sorter: (a, b) => (a.unit_price || 0) - (b.unit_price || 0),
-      render: (price: number, record: Inbound) => price ? `${price.toLocaleString()} ${record.currency || '₫'}` : '-',
+      render: (price: number, record: Inbound) => {
+        if (record.inbound_type === 'warranty') {
+          return <span style={{ color: '#2e7d32', fontSize: '12px' }}>{t('inbound.warrantyRepair')}</span>;
+        }
+        return price ? `${price.toLocaleString()} ${record.currency || '₫'}` : '-';
+      },
     },
     {
       title: t('inbound.totalPrice'),
@@ -227,7 +255,12 @@ const Inbound = () => {
       width: 140,
       align: 'right',
       sorter: (a, b) => (a.total_price || 0) - (b.total_price || 0),
-      render: (price: number, record: Inbound) => price ? `${price.toLocaleString()} ${record.currency || '₫'}` : '-',
+      render: (price: number, record: Inbound) => {
+        if (record.inbound_type === 'warranty') {
+          return <span style={{ color: '#2e7d32' }}>-</span>;
+        }
+        return price ? `${price.toLocaleString()} ${record.currency || '₫'}` : '-';
+      },
     },
     {
       title: t('inventory.actions'),
@@ -275,14 +308,24 @@ const Inbound = () => {
 
   // Excel 내보내기
   const handleExportExcel = () => {
+    const typeLabels: Record<string, string> = {
+      purchase: t('inbound.typePurchase'),
+      warranty: t('inbound.typeWarranty'),
+      paid_repair: t('inbound.typePaidRepair'),
+    };
+    const exportData = filteredList.map(item => ({
+      ...item,
+      inbound_type: typeLabels[item.inbound_type] || typeLabels.purchase,
+    }));
     exportToExcel(
-      filteredList,
+      exportData,
       [
         { header: t('inbound.reference'), key: 'reference_number', width: 18 },
         { header: t('inbound.date'), key: 'inbound_date', width: 15 },
         { header: t('inbound.supplier'), key: 'supplier_name', width: 20 },
         { header: t('parts.partCode'), key: 'part_code', width: 15 },
         { header: t('inbound.partName'), key: 'part_name', width: 25 },
+        { header: t('inbound.type'), key: 'inbound_type', width: 12 },
         { header: t('inbound.quantity'), key: 'quantity', width: 12 },
         { header: t('inbound.unitPrice'), key: 'unit_price', width: 15 },
         { header: t('inbound.totalPrice'), key: 'total_price', width: 15 },
@@ -395,6 +438,11 @@ const Inbound = () => {
             columns={columns}
             dataSource={filteredList}
             rowKey="inbound_id"
+            rowClassName={(record: Inbound) => {
+              if (record.inbound_type === 'warranty') return 'row-warranty';
+              if (record.inbound_type === 'paid_repair') return 'row-paid-repair';
+              return '';
+            }}
             pagination={{
               pageSize: 20,
               showSizeChanger: true,
@@ -542,6 +590,12 @@ const Inbound = () => {
           </Form.Item>
         </Form>
       </Modal>
+      <style>{`
+        .row-warranty td { background-color: #f1f8e9 !important; }
+        .row-warranty:hover td { background-color: #e8f5e9 !important; }
+        .row-paid-repair td { background-color: #fff8e1 !important; }
+        .row-paid-repair:hover td { background-color: #fff3e0 !important; }
+      `}</style>
     </div>
   );
 };
