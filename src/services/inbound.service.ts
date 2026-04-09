@@ -299,19 +299,21 @@ export async function createInbound(
     throw inventoryError;
   }
 
-  // Auto-sync: 입고 단가를 part_prices 테이블에 자동 동기화
-  try {
-    const { createPartPrice } = await import('./partPrice.service');
-    await createPartPrice({
-      part_id: inbound.part_id,
-      unit_price: inbound.unit_price,
-      currency: inbound.currency || '₫',
-      supplier_id: inbound.supplier_id || null,
-      effective_from: inbound.inbound_date || dayjs().format('YYYY-MM-DD'),
-      created_by: inbound.created_by || 'system',
-    });
-  } catch (syncError) {
-    console.warn('단가 자동 동기화 실패 (무시):', syncError);
+  // Auto-sync: 입고 단가를 part_prices 테이블에 자동 동기화 (보증수리 제외)
+  if (inbound.inbound_type !== 'warranty') {
+    try {
+      const { createPartPrice } = await import('./partPrice.service');
+      await createPartPrice({
+        part_id: inbound.part_id,
+        unit_price: inbound.unit_price,
+        currency: inbound.currency || '₫',
+        supplier_id: inbound.supplier_id || null,
+        effective_from: inbound.inbound_date || dayjs().format('YYYY-MM-DD'),
+        created_by: inbound.created_by || 'system',
+      });
+    } catch (syncError) {
+      console.warn('단가 자동 동기화 실패 (무시):', syncError);
+    }
   }
 
   return inboundData;
