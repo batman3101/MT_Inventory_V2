@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Row, Col, Statistic, Modal, Form, message, DatePicker, Select, Spin, Alert, InputNumber } from 'antd';
+import { Card, Input, Button, Space, Typography, Row, Col, Statistic, Modal, Form, message, DatePicker, Select, Spin, Alert, InputNumber, Segmented } from 'antd';
 import { PlusOutlined, SearchOutlined, DownloadOutlined, ClearOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
@@ -32,6 +32,7 @@ const Inbound = () => {
   const [editingItem, setEditingItem] = useState<Inbound | null>(null);
   const [referenceNumber, setReferenceNumber] = useState('');
   const [form] = Form.useForm();
+  const [inboundType, setInboundType] = useState<'purchase' | 'warranty' | 'paid_repair'>('purchase');
   const [messageApi, contextHolder] = message.useMessage();
 
   // Zustand 스토어에서 실제 데이터 가져오기
@@ -65,12 +66,14 @@ const Inbound = () => {
   const showAddModal = async () => {
     setEditingItem(null);
     form.resetFields();
+    setInboundType('purchase');
     // 오늘 날짜로 참조번호 자동 생성
     const today = dayjs();
     const refNumber = await generateInboundReferenceNumber(today.format('YYYY-MM-DD'));
     setReferenceNumber(refNumber);
     form.setFieldsValue({
       inbound_date: today,
+      inbound_type: 'purchase',
     });
     setIsModalOpen(true);
   };
@@ -78,6 +81,8 @@ const Inbound = () => {
   const showEditModal = (item: Inbound) => {
     setEditingItem(item);
     setReferenceNumber(item.reference_number || '');
+    const type = item.inbound_type || 'purchase';
+    setInboundType(type);
     form.setFieldsValue({
       part_id: item.part_id,
       supplier_id: item.supplier_id,
@@ -86,6 +91,7 @@ const Inbound = () => {
       inbound_date: item.inbound_date ? dayjs(item.inbound_date) : undefined,
       currency: item.currency || '₫',
       notes: item.notes,
+      inbound_type: type,
     });
     setIsModalOpen(true);
   };
@@ -118,22 +124,23 @@ const Inbound = () => {
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
+      const isWarranty = values.inbound_type === 'warranty';
+      const unitPrice = isWarranty ? 0 : values.unit_price;
       const formattedValues = {
         ...values,
         inbound_date: values.inbound_date.format('YYYY-MM-DD'),
-        total_price: values.quantity * values.unit_price,
+        unit_price: unitPrice,
+        total_price: values.quantity * unitPrice,
         reference_number: referenceNumber,
       };
 
       if (editingItem) {
-        // 기존 입고 수정 - 실제 Supabase에 업데이트
         await updateInbound(editingItem.inbound_id, formattedValues);
         messageApi.success(t('inbound.inboundUpdated'));
       } else {
-        // 새 입고 추가 - 실제 Supabase에 추가
         await createInbound({
           ...formattedValues,
-          created_by: 'current_user', // TODO: 실제 사용자 정보로 교체
+          created_by: 'current_user',
         });
         messageApi.success(t('inbound.inboundAdded'));
       }
@@ -141,6 +148,7 @@ const Inbound = () => {
       setIsModalOpen(false);
       form.resetFields();
       setReferenceNumber('');
+      setInboundType('purchase');
     } catch (error) {
       messageApi.error(translateError(error instanceof Error ? error.message : t('common.error')));
     }
@@ -150,6 +158,7 @@ const Inbound = () => {
     setIsModalOpen(false);
     form.resetFields();
     setReferenceNumber('');
+    setInboundType('purchase');
   };
 
   const columns: ColumnsType<Inbound> = [
@@ -417,6 +426,29 @@ const Inbound = () => {
           </Form.Item>
 
           <Form.Item
+            name="inbound_type"
+            label={t('inbound.type')}
+            initialValue="purchase"
+            rules={[{ required: true, message: t('common.required') }]}
+          >
+            <Segmented
+              options={[
+                { label: t('inbound.typePurchase'), value: 'purchase' },
+                { label: t('inbound.typeWarranty'), value: 'warranty' },
+                { label: t('inbound.typePaidRepair'), value: 'paid_repair' },
+              ]}
+              onChange={(value) => {
+                const type = value as 'purchase' | 'warranty' | 'paid_repair';
+                setInboundType(type);
+                if (type === 'warranty') {
+                  form.setFieldsValue({ unit_price: 0 });
+                }
+              }}
+              block
+            />
+          </Form.Item>
+
+          <Form.Item
             name="part_id"
             label={t('inbound.part')}
             rules={[{ required: true, message: t('common.required') }]}
@@ -474,10 +506,20 @@ const Inbound = () => {
 
           <Form.Item
             name="unit_price"
-            label={t('inbound.unitPrice')}
-            rules={[{ required: true, message: t('common.required') }]}
+            label={
+              inboundType === 'warranty'
+                ? `${t('inbound.unitPrice')} (${t('inbound.warrantyRepair')} - 0₫)`
+                : t('inbound.unitPrice')
+            }
+            rules={inboundType === 'warranty' ? [] : [{ required: true, message: t('common.required') }]}
           >
-            <InputNumber min={0} precision={0} style={{ width: '100%' }} addonAfter="₫" />
+            <InputNumber
+              min={0}
+              precision={0}
+              style={{ width: '100%' }}
+              addonAfter="₫"
+              disabled={inboundType === 'warranty'}
+            />
           </Form.Item>
 
           <Form.Item
