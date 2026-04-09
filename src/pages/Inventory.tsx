@@ -193,10 +193,10 @@ const Inventory = () => {
     if (!searchText) return true;
     const search = searchText.toLowerCase();
     return (
-      item.part?.part_code.toLowerCase().includes(search) ||
-      item.part?.part_name.toLowerCase().includes(search) ||
-      item.part?.vietnamese_name.toLowerCase().includes(search) ||
-      item.location.toLowerCase().includes(search)
+      item.part?.part_code?.toLowerCase().includes(search) ||
+      item.part?.part_name?.toLowerCase().includes(search) ||
+      item.part?.vietnamese_name?.toLowerCase().includes(search) ||
+      item.location?.toLowerCase().includes(search)
     );
   });
 
