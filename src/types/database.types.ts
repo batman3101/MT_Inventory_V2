@@ -88,6 +88,7 @@ export interface Inbound {
   unit_price: number;
   total_price: number;
   currency: string;
+  inbound_type: 'purchase' | 'warranty' | 'paid_repair'; // 입고 유형
   notes: string;
   created_at: string; // ISO 8601 timestamp
   created_by: string;

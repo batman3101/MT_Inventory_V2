@@ -128,7 +128,13 @@
     "inboundAdded": "입고 내역이 추가되었습니다",
     "inboundUpdated": "입고 내역이 수정되었습니다",
     "inboundDeleted": "입고 내역이 삭제되었습니다",
-    "deleteError": "입고 내역 삭제 중 오류가 발생했습니다"
+    "deleteError": "입고 내역 삭제 중 오류가 발생했습니다",
+    "type": "유형",
+    "typePurchase": "신품",
+    "typeWarranty": "보증수리",
+    "typePaidRepair": "유상수리",
+    "warrantyRepair": "보증수리",
+    "typeFilter": "유형 필터"
   },
   "outbound": {
     "title": "출고 관리",

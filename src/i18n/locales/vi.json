@@ -128,7 +128,13 @@
     "inboundAdded": "Bản ghi nhập kho đã được thêm",
     "inboundUpdated": "Bản ghi nhập kho đã được cập nhật",
     "inboundDeleted": "Bản ghi nhập kho đã được xóa",
-    "deleteError": "Lỗi khi xóa bản ghi nhập kho"
+    "deleteError": "Lỗi khi xóa bản ghi nhập kho",
+    "type": "Loại",
+    "typePurchase": "Mới",
+    "typeWarranty": "Bảo hành",
+    "typePaidRepair": "Sửa có phí",
+    "warrantyRepair": "Bảo hành",
+    "typeFilter": "Lọc theo loại"
   },
   "outbound": {
     "title": "Quản lý xuất kho",
