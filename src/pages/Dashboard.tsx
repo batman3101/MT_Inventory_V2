@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, List, Typography, Spin, Alert, Select, DatePicker, Space } from 'antd';
+import { Card, Row, Col, Statistic, List, Typography, Spin, Alert, Select, DatePicker, Space, theme } from 'antd';
 import {
   InboxOutlined,
   WarningOutlined,
@@ -27,6 +27,7 @@ const { Title } = Typography;
  */
 const Dashboard = () => {
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   // Zustand 스토어에서 데이터 가져오기
   const { stats: inventoryStats, fetchInventoryStats, isLoading: inventoryLoading, error: inventoryError } = useInventoryStore();
@@ -163,7 +164,7 @@ const Dashboard = () => {
                 title={t('dashboard.totalInventory')}
                 value={inventoryStats?.totalQuantity || 0}
                 prefix={<InboxOutlined />}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: token.colorPrimary }}
                 suffix={t('common.items')}
               />
             </Card>
@@ -174,7 +175,7 @@ const Dashboard = () => {
                 title={t('dashboard.lowStockItems')}
                 value={inventoryStats?.lowStockCount || 0}
                 prefix={<WarningOutlined />}
-                valueStyle={{ color: '#faad14' }}
+                valueStyle={{ color: token.colorWarning }}
               />
             </Card>
           </Col>
@@ -184,7 +185,7 @@ const Dashboard = () => {
                 title={t('dashboard.outOfStock')}
                 value={outOfStockCount}
                 prefix={<CloseCircleOutlined />}
-                valueStyle={{ color: '#f5222d' }}
+                valueStyle={{ color: token.colorError }}
               />
             </Card>
           </Col>
@@ -194,7 +195,7 @@ const Dashboard = () => {
                 title={t('dashboard.totalSuppliers')}
                 value={suppliers.length}
                 prefix={<TeamOutlined />}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
               />
             </Card>
           </Col>
@@ -244,16 +245,16 @@ const Dashboard = () => {
                   data={chartData}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={token.colorFillSecondary} />
                   <XAxis
                     dataKey="date"
                     style={{ fontSize: 14 }}
-                    tick={{ fill: '#666' }}
+                    tick={{ fill: token.colorTextSecondary }}
                   />
                   <YAxis
                     tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
                     style={{ fontSize: 14 }}
-                    tick={{ fill: '#666' }}
+                    tick={{ fill: token.colorTextSecondary }}
                   />
                   <Tooltip
                     formatter={(value: number, name: string) => [
@@ -261,8 +262,8 @@ const Dashboard = () => {
                       name === 'inbound' ? t('dashboard.inboundAmount') : t('dashboard.outboundAmount')
                     ]}
                     contentStyle={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #d9d9d9',
+                      backgroundColor: token.colorBgContainer,
+                      border: `1px solid ${token.colorBorderSecondary}`,
                       borderRadius: 4,
                       padding: 10
                     }}
@@ -274,26 +275,26 @@ const Dashboard = () => {
                   <Line
                     type="monotone"
                     dataKey="inbound"
-                    stroke="#52c41a"
+                    stroke={token.colorSuccess}
                     strokeWidth={3}
                     name="inbound"
-                    dot={{ fill: '#52c41a', r: 5 }}
+                    dot={{ fill: token.colorSuccess, r: 5 }}
                     activeDot={{ r: 7 }}
                     animationBegin={0}
                     animationDuration={1500}
-                    animationEasing="ease-in-out"
+                    animationEasing="ease-out"
                   />
                   <Line
                     type="monotone"
                     dataKey="outbound"
-                    stroke="#f5222d"
+                    stroke={token.colorError}
                     strokeWidth={3}
                     name="outbound"
-                    dot={{ fill: '#f5222d', r: 5 }}
+                    dot={{ fill: token.colorError, r: 5 }}
                     activeDot={{ r: 7 }}
                     animationBegin={300}
                     animationDuration={1500}
-                    animationEasing="ease-in-out"
+                    animationEasing="ease-out"
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -308,9 +309,9 @@ const Dashboard = () => {
                 dataSource={recentInboundActivities}
                 renderItem={(item) => (
                   <List.Item key={item.id}>
-                    <ArrowUpOutlined style={{ color: '#52c41a', marginRight: 8 }} />
+                    <ArrowUpOutlined aria-label={t('dashboard.inbound')} style={{ color: token.colorSuccess, marginRight: 8 }} />
                     {item.text}
-                    <span style={{ color: '#8c8c8c', marginLeft: 8, fontSize: 12 }}>
+                    <span style={{ color: token.colorTextSecondary, marginLeft: 8, fontSize: 12 }}>
                       ({dayjs(item.date).format('YYYY-MM-DD HH:mm')})
                     </span>
                   </List.Item>
@@ -325,9 +326,9 @@ const Dashboard = () => {
                 dataSource={recentOutboundActivities}
                 renderItem={(item) => (
                   <List.Item key={item.id}>
-                    <ArrowDownOutlined style={{ color: '#f5222d', marginRight: 8 }} />
+                    <ArrowDownOutlined aria-label={t('dashboard.outbound')} style={{ color: token.colorError, marginRight: 8 }} />
                     {item.text}
-                    <span style={{ color: '#8c8c8c', marginLeft: 8, fontSize: 12 }}>
+                    <span style={{ color: token.colorTextSecondary, marginLeft: 8, fontSize: 12 }}>
                       ({dayjs(item.date).format('YYYY-MM-DD HH:mm')})
                     </span>
                   </List.Item>

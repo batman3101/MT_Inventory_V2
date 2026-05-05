@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Modal, Upload, Table, Button, Alert, Progress, Space, Tag, Tooltip, Select, message } from 'antd';
+import { Modal, Upload, Table, Button, Alert, Progress, Space, Tag, Tooltip, Select, message, theme } from 'antd';
 import { FileExcelOutlined, DownloadOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import type { UploadFile } from 'antd/es/upload/interface';
 import { useTranslation } from 'react-i18next';
@@ -33,6 +33,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
   onSuccess
 }) => {
   const { t, i18n } = useTranslation();
+  const { token } = theme.useToken();
   const { isObserverMode } = useFactoryStore();
   const { user } = useAuthStore();
 
@@ -261,7 +262,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
       {step === 'upload' && (
         <div>
           {/* Template Download Section */}
-          <div style={{ marginBottom: 24, padding: 16, background: '#f5f5f5', borderRadius: 8 }}>
+          <div style={{ marginBottom: 24, padding: 16, background: token.colorFillAlter, borderRadius: 8 }}>
             <Space>
               <Select
                 value={templateLang}
@@ -291,7 +292,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
             disabled={isObserverMode}
           >
             <p className="ant-upload-drag-icon">
-              <FileExcelOutlined style={{ fontSize: 48, color: '#52c41a' }} />
+              <FileExcelOutlined style={{ fontSize: 48, color: token.colorSuccess }} />
             </p>
             <p className="ant-upload-text">{t('bulkImport.dragDropText')}</p>
             <p className="ant-upload-hint">{t('bulkImport.supportedFormats')}</p>
@@ -308,12 +309,12 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
           {/* Summary */}
           <div style={{ marginBottom: 16, display: 'flex', gap: 24 }}>
             <span>{t('bulkImport.summary.total')}: <strong>{validationResults.length}</strong></span>
-            <span style={{ color: '#52c41a' }}>{t('bulkImport.summary.valid')}: <strong>{validCount}</strong></span>
-            <span style={{ color: '#ff4d4f' }}>{t('bulkImport.summary.invalid')}: <strong>{invalidCount}</strong></span>
+            <span style={{ color: token.colorSuccess }}>{t('bulkImport.summary.valid')}: <strong>{validCount}</strong></span>
+            <span style={{ color: token.colorError }}>{t('bulkImport.summary.invalid')}: <strong>{invalidCount}</strong></span>
             {importType === 'inventory' && updateCount > 0 && (
               <>
-                <span style={{ color: '#1890ff' }}>{t('bulkImport.summary.toUpdate')}: <strong>{updateCount}</strong></span>
-                <span style={{ color: '#52c41a' }}>{t('bulkImport.summary.toInsert')}: <strong>{insertCount}</strong></span>
+                <span style={{ color: token.colorPrimary }}>{t('bulkImport.summary.toUpdate')}: <strong>{updateCount}</strong></span>
+                <span style={{ color: token.colorSuccess }}>{t('bulkImport.summary.toInsert')}: <strong>{insertCount}</strong></span>
               </>
             )}
           </div>
@@ -339,7 +340,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({
 
       {step === 'complete' && (
         <div style={{ textAlign: 'center', padding: 40 }}>
-          <CheckCircleOutlined style={{ fontSize: 64, color: '#52c41a' }} />
+          <CheckCircleOutlined style={{ fontSize: 64, color: token.colorSuccess }} />
           <p style={{ marginTop: 16, fontSize: 18 }}>{t('bulkImport.complete')}</p>
         </div>
       )}

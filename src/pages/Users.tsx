@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Tag, Spin, Alert, Row, Col, Statistic, Modal, Form, Select, message, Result, Checkbox } from 'antd';
+import { Card, Input, Button, Space, Typography, Tag, Spin, Alert, Row, Col, Statistic, Modal, Form, Select, message, Result, Checkbox, theme } from 'antd';
 import { PlusOutlined, SearchOutlined, UserOutlined, LockOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { ResizableTable } from '../components/ResizableTable';
@@ -19,6 +19,7 @@ const { Option } = Select;
  */
 const Users = () => {
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const [searchText, setSearchText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -319,7 +320,7 @@ const Users = () => {
         status="403"
         title={t('common.accessDenied')}
         subTitle={t('common.insufficientPermissions')}
-        icon={<LockOutlined style={{ fontSize: 72, color: '#faad14' }} />}
+        icon={<LockOutlined style={{ fontSize: 72, color: token.colorWarning }} />}
       />
     );
   }
@@ -368,7 +369,7 @@ const Users = () => {
               <Statistic
                 title={t('users.activeUsers')}
                 value={stats?.activeUsers || 0}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
                 prefix={<UserOutlined />}
               />
             </Card>

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Row, Col, Statistic, Modal, Form, message, DatePicker, Select, Spin, Alert, InputNumber, Segmented, Tag } from 'antd';
+import { useState, useEffect, useMemo } from 'react';
+import { Card, Input, Button, Space, Typography, Row, Col, Statistic, Modal, Form, message, DatePicker, Select, Spin, Alert, InputNumber, Segmented, Tag, theme } from 'antd';
 import { PlusOutlined, SearchOutlined, DownloadOutlined, ClearOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
@@ -26,6 +26,7 @@ const { RangePicker } = DatePicker;
  */
 const Inbound = () => {
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,15 +44,15 @@ const Inbound = () => {
   const effectiveFactoryId = viewingFactory?.factory_id ?? activeFactory?.factory_id;
 
   // 동적 필터 옵션 생성
-  const getSupplierFilters = () => {
+  const supplierFilters = useMemo(() => {
     const supplierNames = [...new Set(inbounds.map(item => item.supplier_name).filter(Boolean))];
     return supplierNames.map(name => ({ text: name, value: name }));
-  };
+  }, [inbounds]);
 
-  const getPartCodeFilters = () => {
+  const partCodeFilters = useMemo(() => {
     const partCodes = [...new Set(inbounds.map(item => item.part_code).filter(Boolean))];
     return partCodes.map(code => ({ text: code, value: code }));
-  };
+  }, [inbounds]);
 
   // 컴포넌트 마운트 또는 공장 변경 시 데이터 로드
   useEffect(() => {
@@ -182,7 +183,7 @@ const Inbound = () => {
       dataIndex: 'supplier_name',
       key: 'supplier_name',
       sorter: (a, b) => (a.supplier_name || '').localeCompare(b.supplier_name || ''),
-      filters: getSupplierFilters(),
+      filters: supplierFilters,
       onFilter: (value, record) => record.supplier_name === value,
       filterSearch: true,
     },
@@ -192,7 +193,7 @@ const Inbound = () => {
       key: 'part_code',
       width: 120,
       sorter: (a, b) => (a.part_code || '').localeCompare(b.part_code || ''),
-      filters: getPartCodeFilters(),
+      filters: partCodeFilters,
       onFilter: (value, record) => record.part_code === value,
       filterSearch: true,
     },
@@ -243,7 +244,7 @@ const Inbound = () => {
       sorter: (a, b) => (a.unit_price || 0) - (b.unit_price || 0),
       render: (price: number, record: Inbound) => {
         if (record.inbound_type === 'warranty') {
-          return <span style={{ color: '#2e7d32', fontSize: '12px' }}>{t('inbound.warrantyRepair')}</span>;
+          return <span style={{ color: token.colorSuccess, fontSize: '12px' }}>{t('inbound.warrantyRepair')}</span>;
         }
         return price ? `${price.toLocaleString()} ${record.currency || '₫'}` : '-';
       },
@@ -257,7 +258,7 @@ const Inbound = () => {
       sorter: (a, b) => (a.total_price || 0) - (b.total_price || 0),
       render: (price: number, record: Inbound) => {
         if (record.inbound_type === 'warranty') {
-          return <span style={{ color: '#2e7d32' }}>-</span>;
+          return <span style={{ color: token.colorSuccess }}>-</span>;
         }
         return price ? `${price.toLocaleString()} ${record.currency || '₫'}` : '-';
       },
@@ -374,7 +375,7 @@ const Inbound = () => {
               <Statistic
                 title={t('inbound.totalCount')}
                 value={stats?.totalCount || 0}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: token.colorPrimary }}
               />
             </Card>
           </Col>
@@ -384,7 +385,7 @@ const Inbound = () => {
                 title={t('inbound.totalValue')}
                 value={stats?.totalValue || 0}
                 precision={0}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
                 suffix="₫"
               />
             </Card>
@@ -470,7 +471,7 @@ const Inbound = () => {
           <Form.Item
             label={t('inbound.reference')}
           >
-            <Input value={referenceNumber} disabled style={{ color: '#000', fontWeight: 'bold' }} />
+            <Input value={referenceNumber} disabled style={{ color: token.colorText, fontWeight: 'bold' }} />
           </Form.Item>
 
           <Form.Item
@@ -591,10 +592,10 @@ const Inbound = () => {
         </Form>
       </Modal>
       <style>{`
-        .row-warranty td { background-color: #f1f8e9 !important; }
-        .row-warranty:hover td { background-color: #e8f5e9 !important; }
-        .row-paid-repair td { background-color: #fff8e1 !important; }
-        .row-paid-repair:hover td { background-color: #fff3e0 !important; }
+        .row-warranty td { background-color: ${token.colorSuccessBg} !important; }
+        .row-warranty:hover td { background-color: ${token.colorSuccessBgHover} !important; }
+        .row-paid-repair td { background-color: ${token.colorWarningBg} !important; }
+        .row-paid-repair:hover td { background-color: ${token.colorWarningBgHover} !important; }
       `}</style>
     </div>
   );

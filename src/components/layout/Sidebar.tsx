@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Layout, Menu, Button, message } from 'antd';
+import { Layout, Menu, Button, message, theme } from 'antd';
 import {
   DashboardOutlined,
   InboxOutlined,
@@ -20,12 +20,17 @@ import WorkerImage from '../../../assets/images/worker2.png';
 
 const { Sider } = Layout;
 
-const Sidebar = () => {
+interface SidebarProps {
+  onNavigate?: () => void;
+}
+
+const Sidebar = ({ onNavigate }: SidebarProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { signOut, user } = useAuthStore();
   const [messageApi, contextHolder] = message.useMessage();
+  const { token } = theme.useToken();
 
   const handleLogout = async () => {
     try {
@@ -100,7 +105,7 @@ const Sidebar = () => {
           justifyContent: 'center',
           fontSize: 20,
           fontWeight: 'bold',
-          color: '#fff',
+          color: token.colorTextLightSolid,
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           gap: '12px',
         }}
@@ -109,14 +114,16 @@ const Sidebar = () => {
         {t('app.title')}
       </div>
 
-      <Menu
-        theme="dark"
-        mode="inline"
-        selectedKeys={[location.pathname]}
-        items={menuItems}
-        onClick={({ key }) => navigate(key)}
-        style={{ marginTop: 16 }}
-      />
+      <nav aria-label={t('nav.mainMenu')}>
+        <Menu
+          theme="dark"
+          mode="inline"
+          selectedKeys={[location.pathname]}
+          items={menuItems}
+          onClick={({ key }) => { navigate(key); onNavigate?.(); }}
+          style={{ marginTop: 16 }}
+        />
+      </nav>
 
       <div
         style={{
@@ -137,9 +144,10 @@ const Sidebar = () => {
             overflow: 'hidden',
           }}
         >
-          <img 
-            src={WorkerImage} 
-            alt="Worker" 
+          <img
+            src={WorkerImage}
+            alt=""
+            loading="lazy"
             className="sidebar-worker-image"
             style={{ 
               width: '80%', 
@@ -152,7 +160,7 @@ const Sidebar = () => {
           />
         </div>
         {user && (
-          <div style={{ marginBottom: 12, color: '#fff', fontSize: 12, textAlign: 'center' }}>
+          <div style={{ marginBottom: 12, color: token.colorTextLightSolid, fontSize: 12, textAlign: 'center' }}>
             {user.email}
           </div>
         )}

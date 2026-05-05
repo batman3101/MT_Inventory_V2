@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "CNC 재고 관리"
+    "title": "설부 부품 관리"
   },
   "nav": {
     "dashboard": "대시보드",
@@ -10,7 +10,8 @@
     "outbound": "출고",
     "suppliers": "공급업체",
     "users": "사용자 관리",
-    "analytics": "분석"
+    "analytics": "분석",
+    "mainMenu": "주요 메뉴"
   },
   "dashboard": {
     "title": "대시보드",
@@ -58,7 +59,8 @@
     "totalItems": "총 품목",
     "totalQuantity": "총 수량",
     "lowStockItems": "재고 부족 품목",
-    "totalLocations": "보관 위치"
+    "totalLocations": "보관 위치",
+    "lowStock": "재고 부족"
   },
   "parts": {
     "title": "부품 관리",
@@ -242,7 +244,8 @@
     "selectDateRange": "기간 선택",
     "accessDenied": "접근 권한이 없습니다",
     "adminOnly": "관리자만 접근할 수 있습니다",
-    "insufficientPermissions": "이 페이지에 접근할 권한이 없습니다. 관리자에게 문의하세요."
+    "insufficientPermissions": "이 페이지에 접근할 권한이 없습니다. 관리자에게 문의하세요.",
+    "mainContent": "주요 콘텐츠"
   },
   "errors": {
     "inventoryNotFound": "재고 레코드가 없습니다. 해당 부품의 입고 처리를 먼저 진행해주세요.",
@@ -279,7 +282,7 @@
     "invalidCredentials": "이메일 또는 비밀번호가 올바르지 않습니다",
     "welcome": "환영합니다",
     "welcomeBack": "다시 오신 것을 환영합니다",
-    "systemTitle": "CNC 재고 관리 시스템"
+    "systemTitle": "설부 부품 관리 시스템"
   },
   "users": {
     "title": "사용자 관리",

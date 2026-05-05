@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Modal, Form, message, InputNumber, Spin, Tag, Alert, Row, Col, Statistic } from 'antd';
+import { useState, useEffect, useMemo } from 'react';
+import { Card, Input, Button, Space, Typography, Modal, Form, message, InputNumber, Spin, Tag, Alert, Row, Col, Statistic, theme } from 'antd';
 import { EditOutlined, SearchOutlined, WarningOutlined, DownloadOutlined, UploadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useInventoryStore } from '../store';
@@ -20,6 +20,7 @@ const { Title } = Typography;
  */
 const Inventory = () => {
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const [searchText, setSearchText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -32,21 +33,21 @@ const Inventory = () => {
   const { isObserverMode, activeFactory, viewingFactory } = useFactoryStore();
   const effectiveFactoryId = viewingFactory?.factory_id ?? activeFactory?.factory_id;
 
-  // 동적 필터 옵션 생성
-  const getCategoryFilters = () => {
+  // 동적 필터 옵션 생성 (inventory 변경 시에만 재계산)
+  const categoryFilters = useMemo(() => {
     const categories = [...new Set(inventory.map(item => item.part?.category).filter(Boolean))];
     return categories.map(cat => ({ text: cat as string, value: cat as string }));
-  };
+  }, [inventory]);
 
-  const getUnitFilters = () => {
+  const unitFilters = useMemo(() => {
     const units = [...new Set(inventory.map(item => item.part?.unit).filter(Boolean))];
     return units.map(unit => ({ text: unit as string, value: unit as string }));
-  };
+  }, [inventory]);
 
-  const getLocationFilters = () => {
+  const locationFilters = useMemo(() => {
     const locations = [...new Set(inventory.map(item => item.location).filter(Boolean))];
     return locations.map(loc => ({ text: loc, value: loc }));
-  };
+  }, [inventory]);
 
   // 컴포넌트 마운트 또는 공장 변경 시 데이터 로드
   useEffect(() => {
@@ -111,7 +112,7 @@ const Inventory = () => {
       key: 'category',
       width: 120,
       sorter: (a, b) => (a.part?.category || '').localeCompare(b.part?.category || ''),
-      filters: getCategoryFilters(),
+      filters: categoryFilters,
       onFilter: (value, record) => record.part?.category === value,
       filterSearch: true,
     },
@@ -125,9 +126,9 @@ const Inventory = () => {
       render: (quantity: number, record: InventoryWithPart) => {
         const isLowStock = record.part && quantity < record.part.min_stock;
         return (
-          <span style={{ color: isLowStock ? '#ff4d4f' : 'inherit', fontWeight: isLowStock ? 'bold' : 'normal' }}>
+          <span style={{ color: isLowStock ? token.colorError : 'inherit', fontWeight: isLowStock ? 'bold' : 'normal' }}>
             {quantity}
-            {isLowStock && <WarningOutlined style={{ marginLeft: 8, color: '#ff4d4f' }} />}
+            {isLowStock && <WarningOutlined aria-label={t('inventory.lowStock')} style={{ marginLeft: 8, color: token.colorError }} />}
           </span>
         );
       },
@@ -146,7 +147,7 @@ const Inventory = () => {
       key: 'unit',
       width: 80,
       sorter: (a, b) => (a.part?.unit || '').localeCompare(b.part?.unit || ''),
-      filters: getUnitFilters(),
+      filters: unitFilters,
       onFilter: (value, record) => record.part?.unit === value,
       filterSearch: true,
     },
@@ -156,7 +157,7 @@ const Inventory = () => {
       key: 'location',
       width: 120,
       sorter: (a, b) => a.location.localeCompare(b.location),
-      filters: getLocationFilters(),
+      filters: locationFilters,
       onFilter: (value, record) => record.location === value,
       filterSearch: true,
       render: (location: string) => <Tag color="blue">{location}</Tag>,
@@ -254,7 +255,7 @@ const Inventory = () => {
               <Statistic
                 title={t('inventory.totalQuantity')}
                 value={stats?.totalQuantity || 0}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: token.colorPrimary }}
               />
             </Card>
           </Col>
@@ -263,7 +264,7 @@ const Inventory = () => {
               <Statistic
                 title={t('inventory.lowStockItems')}
                 value={stats?.lowStockCount || 0}
-                valueStyle={{ color: '#ff4d4f' }}
+                valueStyle={{ color: token.colorError }}
               />
             </Card>
           </Col>
@@ -272,7 +273,7 @@ const Inventory = () => {
               <Statistic
                 title={t('inventory.totalLocations')}
                 value={stats?.locations.length || 0}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
               />
             </Card>
           </Col>
@@ -339,7 +340,7 @@ const Inventory = () => {
           name="inventoryForm"
         >
           {editingItem && (
-            <div style={{ marginBottom: 16, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
+            <div style={{ marginBottom: 16, padding: 12, background: token.colorFillAlter, borderRadius: 4 }}>
               <div><strong>{t('parts.partCode')}:</strong> {editingItem.part?.part_code}</div>
               <div><strong>{t('parts.partName')}:</strong> {editingItem.part?.part_name}</div>
             </div>
@@ -376,7 +377,7 @@ const Inventory = () => {
 
       <style>{`
         .low-stock-row {
-          background-color: #fff1f0;
+          background-color: ${token.colorErrorBg};
         }
       `}</style>
     </div>

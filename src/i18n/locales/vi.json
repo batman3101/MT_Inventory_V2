@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "Quản lý kho CNC"
+    "title": "Quản lý phụ tùng máy"
   },
   "nav": {
     "dashboard": "Bảng điều khiển",
@@ -10,7 +10,8 @@
     "outbound": "Xuất kho",
     "suppliers": "Nhà cung cấp",
     "users": "Quản lý người dùng",
-    "analytics": "Phân tích"
+    "analytics": "Phân tích",
+    "mainMenu": "Menu chính"
   },
   "dashboard": {
     "title": "Bảng điều khiển",
@@ -58,7 +59,8 @@
     "totalItems": "Tổng mặt hàng",
     "totalQuantity": "Tổng số lượng",
     "lowStockItems": "Mặt hàng tồn kho thấp",
-    "totalLocations": "Vị trí lưu trữ"
+    "totalLocations": "Vị trí lưu trữ",
+    "lowStock": "Tồn kho thấp"
   },
   "parts": {
     "title": "Quản lý phụ tùng",
@@ -242,7 +244,8 @@
     "selectDateRange": "Chọn khoảng thời gian",
     "accessDenied": "Truy cập bị từ chối",
     "adminOnly": "Chỉ quản trị viên mới có thể truy cập",
-    "insufficientPermissions": "Bạn không có quyền truy cập trang này. Vui lòng liên hệ với quản trị viên."
+    "insufficientPermissions": "Bạn không có quyền truy cập trang này. Vui lòng liên hệ với quản trị viên.",
+    "mainContent": "Nội dung chính"
   },
   "errors": {
     "inventoryNotFound": "Không tìm thấy bản ghi tồn kho. Vui lòng thực hiện nhập kho trước cho phụ tùng này.",
@@ -279,7 +282,7 @@
     "invalidCredentials": "Email hoặc mật khẩu không đúng",
     "welcome": "Chào mừng",
     "welcomeBack": "Chào mừng trở lại",
-    "systemTitle": "Hệ thống Quản lý Kho CNC"
+    "systemTitle": "Hệ thống Quản lý phụ tùng máy"
   },
   "users": {
     "title": "Quản lý người dùng",

@@ -48,7 +48,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen flex items-center justify-center bg-slate-900">
       {contextHolder}
       <Card className="w-full max-w-md shadow-lg">
         <div className="text-center mb-8">
@@ -97,9 +97,13 @@ const Login = () => {
               <Form.Item name="remember" valuePropName="checked" noStyle>
                 <Checkbox>{t('auth.rememberMe')}</Checkbox>
               </Form.Item>
-              <a href="#" className="text-blue-600 hover:text-blue-800">
+              <button
+                type="button"
+                className="text-blue-600 hover:text-blue-800 border-none bg-transparent cursor-pointer p-0 text-sm"
+                onClick={() => {}}
+              >
                 {t('auth.forgotPassword')}
-              </a>
+              </button>
             </div>
           </Form.Item>
 

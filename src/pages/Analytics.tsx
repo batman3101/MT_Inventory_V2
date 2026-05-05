@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Select, Spin, Alert, Typography, Space, Tabs, DatePicker } from 'antd';
+import { Card, Row, Col, Statistic, Select, Spin, Alert, Typography, Space, Tabs, DatePicker, theme } from 'antd';
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
@@ -124,6 +124,7 @@ interface SupplierAccumulator {
  */
 const Analytics = () => {
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const { activeFactory, viewingFactory } = useFactoryStore();
   const effectiveFactoryId = viewingFactory?.factory_id ?? activeFactory?.factory_id;
   const [period, setPeriod] = useState<PeriodType>('monthly');
@@ -486,19 +487,19 @@ const Analytics = () => {
                 value={stats.totalInbound}
                 suffix={t('common.items')}
                 prefix={<BarChartOutlined />}
-                valueStyle={{ color: '#3f8600' }}
+                valueStyle={{ color: token.colorSuccess }}
               />
               <div style={{ marginTop: 8, fontSize: 14 }}>
                 {Number(inboundGrowth) >= 0 ? (
-                  <span style={{ color: '#3f8600' }}>
+                  <span style={{ color: token.colorSuccess }}>
                     <ArrowUpOutlined /> {inboundGrowth}%
                   </span>
                 ) : (
-                  <span style={{ color: '#cf1322' }}>
+                  <span style={{ color: token.colorError }}>
                     <ArrowDownOutlined /> {inboundGrowth}%
                   </span>
                 )}
-                <span style={{ marginLeft: 8, color: '#999' }}>
+                <span style={{ marginLeft: 8, color: token.colorTextSecondary }}>
                   {t('analytics.comparison')}
                 </span>
               </div>
@@ -512,19 +513,19 @@ const Analytics = () => {
                 value={stats.totalOutbound}
                 suffix={t('common.items')}
                 prefix={<LineChartOutlined />}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: token.colorPrimary }}
               />
               <div style={{ marginTop: 8, fontSize: 14 }}>
                 {Number(outboundGrowth) >= 0 ? (
-                  <span style={{ color: '#3f8600' }}>
+                  <span style={{ color: token.colorSuccess }}>
                     <ArrowUpOutlined /> {outboundGrowth}%
                   </span>
                 ) : (
-                  <span style={{ color: '#cf1322' }}>
+                  <span style={{ color: token.colorError }}>
                     <ArrowDownOutlined /> {outboundGrowth}%
                   </span>
                 )}
-                <span style={{ marginLeft: 8, color: '#999' }}>
+                <span style={{ marginLeft: 8, color: token.colorTextSecondary }}>
                   {t('analytics.comparison')}
                 </span>
               </div>
@@ -538,7 +539,7 @@ const Analytics = () => {
                 value={stats.inboundValue}
                 precision={0}
                 suffix="₫"
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
               />
             </Card>
           </Col>

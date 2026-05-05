@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Row, Col, Statistic, Modal, Form, message, DatePicker, Select, Spin, Alert, InputNumber } from 'antd';
+import { Card, Input, Button, Space, Typography, Row, Col, Statistic, Modal, Form, message, DatePicker, Select, Spin, Alert, InputNumber, theme } from 'antd';
 import { PlusOutlined, SearchOutlined, DownloadOutlined, ClearOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { Dayjs } from 'dayjs';
@@ -26,6 +26,7 @@ const { RangePicker } = DatePicker;
  */
 const Outbound = () => {
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -350,7 +351,7 @@ const Outbound = () => {
               <Statistic
                 title={t('outbound.totalCount')}
                 value={stats?.totalCount || 0}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: token.colorPrimary }}
               />
             </Card>
           </Col>
@@ -359,7 +360,7 @@ const Outbound = () => {
               <Statistic
                 title={t('outbound.byDepartment')}
                 value={Object.keys(stats?.byDepartment || {}).length}
-                valueStyle={{ color: '#faad14' }}
+                valueStyle={{ color: token.colorWarning }}
               />
             </Card>
           </Col>
@@ -368,7 +369,7 @@ const Outbound = () => {
               <Statistic
                 title={t('outbound.byReason')}
                 value={Object.keys(stats?.byReason || {}).length}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
               />
             </Card>
           </Col>
@@ -448,7 +449,7 @@ const Outbound = () => {
           <Form.Item
             label={t('outbound.reference')}
           >
-            <Input value={referenceNumber} disabled style={{ color: '#000', fontWeight: 'bold' }} />
+            <Input value={referenceNumber} disabled style={{ color: token.colorText, fontWeight: 'bold' }} />
           </Form.Item>
 
           <Form.Item

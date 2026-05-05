@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { useState, useEffect } from 'react';
-import { Card, Input, Button, Space, Typography, Modal, Form, message, Select, InputNumber, Spin, Tag, Alert, Row, Col, Statistic, Descriptions, Table, Divider, Popover, DatePicker } from 'antd';
+import { useState, useEffect, useMemo } from 'react';
+import { Card, Input, Button, Space, Typography, Modal, Form, message, Select, InputNumber, Spin, Tag, Alert, Row, Col, Statistic, Descriptions, Table, Divider, Popover, DatePicker, theme } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, DownloadOutlined, EyeOutlined, DollarOutlined, UploadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { usePartsStore, usePartPriceStore, useSuppliersStore } from '../store';
@@ -24,6 +24,7 @@ const { Option } = Select;
  */
 const Parts = () => {
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const [searchText, setSearchText] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Part | null>(null);
@@ -62,20 +63,20 @@ const Parts = () => {
   const [priceForm] = Form.useForm();
 
   // 동적 필터 옵션 생성
-  const getCategoryFilters = () => {
+  const categoryFilters = useMemo(() => {
     const categories = [...new Set(parts.map(item => item.category).filter(Boolean))];
     return categories.map(cat => ({ text: cat, value: cat }));
-  };
+  }, [parts]);
 
-  const getUnitFilters = () => {
+  const unitFilters = useMemo(() => {
     const units = [...new Set(parts.map(item => item.unit).filter(Boolean))];
     return units.map(unit => ({ text: unit, value: unit }));
-  };
+  }, [parts]);
 
-  const getStatusFilters = () => {
+  const statusFilters = useMemo(() => {
     const statuses = [...new Set(parts.map(item => item.status).filter(Boolean))];
     return statuses.map(status => ({ text: status, value: status }));
-  };
+  }, [parts]);
 
   // 모달 Select 옵션 생성 (실제 데이터 기반)
   const getAllCategories = () => {
@@ -369,7 +370,7 @@ const Parts = () => {
       key: 'category',
       width: 150,
       sorter: (a, b) => a.category.localeCompare(b.category),
-      filters: getCategoryFilters(),
+      filters: categoryFilters,
       onFilter: (value, record) => record.category === value,
       filterSearch: true,
     },
@@ -379,7 +380,7 @@ const Parts = () => {
       key: 'unit',
       width: 80,
       sorter: (a, b) => a.unit.localeCompare(b.unit),
-      filters: getUnitFilters(),
+      filters: unitFilters,
       onFilter: (value, record) => record.unit === value,
       filterSearch: true,
     },
@@ -399,7 +400,7 @@ const Parts = () => {
       render: (_: unknown, record: Part) => {
         const price = latestPrices[record.part_id];
         if (!price) {
-          return <span style={{ color: '#999' }}>{t('partPrice.noPrice')}</span>;
+          return <span style={{ color: token.colorTextSecondary }}>{t('partPrice.noPrice')}</span>;
         }
         const isInboundFallback = price.source === 'inbound';
         return (
@@ -445,9 +446,9 @@ const Parts = () => {
               </Space>
             }
           >
-            <span style={{ cursor: 'pointer', color: isInboundFallback ? '#faad14' : '#1890ff' }}>
+            <span style={{ cursor: 'pointer', color: isInboundFallback ? token.colorWarning : token.colorPrimary }}>
               {price.unit_price.toLocaleString()} {price.currency}
-              {isInboundFallback && <span style={{ fontSize: 10, color: '#999', marginLeft: 4 }}>({t('partPrice.inboundPrice')})</span>}
+              {isInboundFallback && <span style={{ fontSize: 10, color: token.colorTextSecondary, marginLeft: 4 }}>({t('partPrice.inboundPrice')})</span>}
             </span>
           </Popover>
         );
@@ -459,7 +460,7 @@ const Parts = () => {
       key: 'status',
       width: 120,
       sorter: (a, b) => a.status.localeCompare(b.status),
-      filters: getStatusFilters(),
+      filters: statusFilters,
       onFilter: (value, record) => record.status === value,
       filterSearch: true,
       render: (status: string) => {
@@ -583,7 +584,7 @@ const Parts = () => {
               <Statistic
                 title={t('parts.activeParts')}
                 value={stats?.activeParts || 0}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
               />
             </Card>
           </Col>
@@ -592,7 +593,7 @@ const Parts = () => {
               <Statistic
                 title={t('parts.categories')}
                 value={stats?.categories || 0}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: token.colorPrimary }}
               />
             </Card>
           </Col>
@@ -601,7 +602,7 @@ const Parts = () => {
               <Statistic
                 title={t('parts.inactiveParts')}
                 value={stats?.inactiveParts || 0}
-                valueStyle={{ color: '#faad14' }}
+                valueStyle={{ color: token.colorWarning }}
               />
             </Card>
           </Col>
@@ -835,7 +836,7 @@ const Parts = () => {
               >
                 <Descriptions.Item label={t('inventory.currentQuantity')}>
                   <span style={{
-                    color: detailInventory && detailInventory.current_quantity < detailPart.min_stock ? '#ff4d4f' : '#52c41a',
+                    color: detailInventory && detailInventory.current_quantity < detailPart.min_stock ? token.colorError : token.colorSuccess,
                     fontWeight: 'bold',
                     fontSize: '16px'
                   }}>
@@ -861,9 +862,9 @@ const Parts = () => {
 
               {/* 현재 단가 표시 */}
               {latestPrices[detailPart.part_id] && (
-                <Card size="small" style={{ marginBottom: 12, backgroundColor: '#f6ffed' }}>
+                <Card size="small" style={{ marginBottom: 12, backgroundColor: token.colorSuccessBg }}>
                   <Space>
-                    <DollarOutlined style={{ fontSize: 20, color: '#52c41a' }} />
+                    <DollarOutlined style={{ fontSize: 20, color: token.colorSuccess }} />
                     <span style={{ fontSize: 18, fontWeight: 'bold' }}>
                       {latestPrices[detailPart.part_id].unit_price.toLocaleString()} {latestPrices[detailPart.part_id].currency}
                     </span>
